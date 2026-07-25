@@ -5,6 +5,7 @@ export interface WheelBuildInputs {
   drillingOffsetRight: number;  // Right drilling offset in mm
   spokeCount: number;           // Total spoke count (e.g., 32, 28, 24)
   spokeHoleDiameter: number;    // Hub flange spoke hole diameter in mm (e.g., 2.6)
+  flangeThickness?: number;     // Hub flange thickness in mm (optional, e.g. 3.0)
   hubOffset: number;            // Frame offset in mm (e.g., 0)
   rimFlip: 'Auto' | 'Left' | 'Right'; // Orientation of asymmetric rim spoke bed
   
@@ -29,6 +30,7 @@ export interface SideCalculations {
   wrapAngleAtRim: number;          // θ_wrap in degrees
   totalAngleAtRim: number;         // θ_total in degrees
   flangeExitAngle: number;         // θ_exit in degrees
+  totalExitBendAngle: number;      // 3D deflection angle at flange exit in degrees
 }
 
 export interface WheelBuildCalculations {
@@ -140,6 +142,11 @@ export function calculateWheelBuild(inputs: WheelBuildInputs): WheelBuildCalcula
       flangeExitAngle = Math.acos(Math.max(-1.0, Math.min(1.0, cosExit))) * (180.0 / Math.PI);
     }
 
+    // Total 3D Exit Bend Angle (deflection between axial neck axis and 3D spoke tension vector)
+    // cos(θ_bend) = W_eff / L_raw
+    const cosExit3D = Math.min(1.0, safeW / rawLength3D);
+    const totalExitBendAngle = Math.acos(cosExit3D) * (180.0 / Math.PI);
+
     return {
       effectiveFlangeDistance: wEff,
       thetaAngle,
@@ -150,6 +157,7 @@ export function calculateWheelBuild(inputs: WheelBuildInputs): WheelBuildCalcula
       wrapAngleAtRim: wrapAngle,
       totalAngleAtRim,
       flangeExitAngle,
+      totalExitBendAngle,
     };
   };
 

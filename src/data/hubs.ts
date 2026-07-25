@@ -7,6 +7,7 @@ export interface Hub {
   centerToLeft: number;       // wL (Center-to-left flange distance in mm)
   centerToRight: number;      // wR (Center-to-right flange distance in mm)
   spokeHoleDiameter: number;  // s (Diameter of spoke holes in the hub flange in mm)
+  flangeThickness?: number;   // t (Flange thickness in mm, optional)
   category: 'Road' | 'Gravel' | 'MTB' | 'BMX' | 'Urban';
   spacing: string;            // Axle spacing description
   weight?: number;            // in grams

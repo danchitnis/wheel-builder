@@ -175,22 +175,53 @@ import { hubs } from '../data/hubs';
   <!-- RIGHT COLUMN: VIEWPORT & OUTCOMES -->
   <div class="flex-grow flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.15s;">
     <!-- 3D Viewport Box -->
-    <div class="relative bg-titanium-900/40 border border-titanium-850 rounded-2xl h-[420px] sm:h-[480px] lg:h-[520px] overflow-hidden shadow-2xl flex flex-col">
+    <div id="viewport-card" class="relative bg-titanium-900/40 border border-titanium-850 rounded-2xl h-[420px] sm:h-[480px] lg:h-[520px] overflow-hidden shadow-2xl flex flex-col transition-all duration-300">
       <!-- 3D Canvas Container -->
       <div id="canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
 
+      <!-- Fixed 3D Measurement HUD Panel (Top-Left) -->
+      <div id="ruler-3d-badge" class="absolute top-4 left-4 hidden bg-titanium-950/85 backdrop-blur-md border border-cyan-500/40 p-3 rounded-xl shadow-2xl text-xs flex flex-col gap-1.5 z-20 pointer-events-none select-none min-w-[210px]">
+        <div class="flex items-center gap-1.5 font-bold text-cyan-400 border-b border-titanium-800 pb-1">
+          <span>📏 3D Vector Measurement</span>
+        </div>
+        <div class="flex justify-between gap-4">
+          <span class="text-titanium-400">Straight 3D Vector:</span>
+          <span id="badge-direct-val" class="font-bold text-cyan-300 mono-data">-- mm</span>
+        </div>
+        <div class="flex justify-between gap-4">
+          <span class="text-titanium-400">Actual Wire (bends):</span>
+          <span id="badge-actual-val" class="font-bold text-yellow-400 mono-data">-- mm</span>
+        </div>
+        <div class="flex justify-between gap-4 border-t border-titanium-800/80 pt-1">
+          <span class="text-titanium-400 font-medium">Path Delta (bends):</span>
+          <span id="badge-delta-val" class="font-bold text-emerald-400 mono-data">+-- mm</span>
+        </div>
+      </div>
+
       <!-- Hover Tooltip -->
-      <div id="spoke-tooltip" class="absolute hidden bg-titanium-950/90 backdrop-blur-md border border-cyan-500/30 p-3 rounded-xl shadow-2xl text-xs flex flex-col gap-1 pointer-events-none z-30 min-w-[150px]">
+      <div id="spoke-tooltip" class="absolute hidden bg-titanium-950/90 backdrop-blur-md border border-cyan-500/30 p-3 rounded-xl shadow-2xl text-xs flex flex-col gap-1 pointer-events-none z-30 min-w-[180px]">
         <div id="tooltip-title" class="font-bold text-cyan-400 flex items-center justify-between gap-2 border-b border-titanium-800 pb-1">
           <span>Spoke</span>
         </div>
         <div class="flex justify-between gap-4 mt-1">
-          <span class="text-titanium-500">Calculated Length:</span>
+          <span class="text-titanium-500">Spoke Order Length:</span>
           <span id="tooltip-length" class="font-bold text-titanium-100 mono-data">-- mm</span>
+        </div>
+        <div class="flex justify-between gap-4">
+          <span class="text-titanium-500">Straight 3D Vector:</span>
+          <span id="tooltip-direct" class="font-bold text-cyan-400 mono-data">-- mm</span>
+        </div>
+        <div class="flex justify-between gap-4">
+          <span class="text-titanium-500">Actual Wire (bends):</span>
+          <span id="tooltip-actual" class="font-bold text-yellow-400 mono-data">-- mm</span>
         </div>
         <div class="flex justify-between gap-4">
           <span class="text-titanium-500">Bracing Angle:</span>
           <span id="tooltip-bracing" class="font-semibold text-titanium-100 mono-data">--°</span>
+        </div>
+        <div class="flex justify-between gap-4">
+          <span class="text-titanium-500">Exit Bend Angle:</span>
+          <span id="tooltip-exitbend" class="font-semibold text-cyan-400 mono-data">--°</span>
         </div>
       </div>
 
@@ -200,6 +231,11 @@ import { hubs } from '../data/hubs';
         <button data-cam="lateral" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Side (Lacing)</button>
         <button data-cam="dish" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Dish (Alignment)</button>
         <button data-cam="hub" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Hub</button>
+        <button data-cam="spoke-delta" class="cam-btn px-2.5 py-1.5 bg-yellow-950/40 border border-yellow-500/30 text-[11px] font-bold text-yellow-300 rounded-lg hover:text-yellow-100 hover:border-yellow-400 transition-all" title="Highlight single spoke path delta (Straight Vector vs Actual Bends)">🔬 Spoke Delta</button>
+        <button id="btn-fullpage" class="px-2.5 py-1.5 bg-cyan-950/40 border border-cyan-500/30 text-[11px] font-bold text-cyan-300 rounded-lg hover:text-cyan-100 hover:border-cyan-400 transition-all flex items-center gap-1.5" title="Expand 3D Viewport to Full Page">
+          <span id="fp-icon">🗖</span>
+          <span id="fp-label">Full Page</span>
+        </button>
       </div>
 
       <!-- Settings Overlay controls -->
@@ -213,10 +249,12 @@ import { hubs } from '../data/hubs';
           <input type="range" id="slider-explode" min="0" max="1" step="0.05" value="0" class="w-full h-1 bg-titanium-900 rounded appearance-none cursor-pointer accent-cyan-500" />
         </div>
 
-        <!-- Visibility / Color Selects -->
-        <div class="flex gap-1 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 p-1 rounded-xl">
-          <button id="toggle-l-spokes" class="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">NDS (L)</button>
-          <button id="toggle-r-spokes" class="px-2.5 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">DS (R)</button>
+        <!-- Visibility / Color / Interlacing / Ruler Selects -->
+        <div class="flex flex-wrap gap-1 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 p-1 rounded-xl">
+          <button id="toggle-l-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">NDS (L)</button>
+          <button id="toggle-r-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">DS (R)</button>
+          <button id="toggle-interlace" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all" title="Toggle 3D Spoke Over/Under Interlacing Weave">Interlaced</button>
+          <button id="toggle-ruler" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-yellow-950/40 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/60 transition-all" title="Toggle Direct 3D Straight Measurement Vector Ruler">📏 Ruler</button>
           <select id="select-colormode" class="bg-titanium-950 border border-titanium-800 rounded-lg text-[10px] font-bold px-1 py-1 text-titanium-200 cursor-pointer focus:outline-none">
             <option value="classic">Titanium Steel</option>
             <option value="side">Side Colors</option>
@@ -399,6 +437,8 @@ import { hubs } from '../data/hubs';
   const explodeValLabel = document.getElementById('explode-val') as HTMLElement;
   const toggleLSpokes = document.getElementById('toggle-l-spokes') as HTMLButtonElement;
   const toggleRSpokes = document.getElementById('toggle-r-spokes') as HTMLButtonElement;
+  const toggleInterlace = document.getElementById('toggle-interlace') as HTMLButtonElement;
+  const toggleRuler = document.getElementById('toggle-ruler') as HTMLButtonElement;
   const selectColorMode = document.getElementById('select-colormode') as HTMLSelectElement;
 
   // DOM Elements - Outputs
@@ -638,6 +678,35 @@ import { hubs } from '../data/hubs';
     }
   });
 
+  if (toggleInterlace) {
+    toggleInterlace.addEventListener('click', () => {
+      if (!viewport) return;
+      viewport.enableInterlacing = !viewport.enableInterlacing;
+      toggleInterlace.classList.toggle('bg-cyan-950/30', viewport.enableInterlacing);
+      toggleInterlace.classList.toggle('text-cyan-400', viewport.enableInterlacing);
+      toggleInterlace.classList.toggle('bg-titanium-950', !viewport.enableInterlacing);
+      toggleInterlace.classList.toggle('text-titanium-500', !viewport.enableInterlacing);
+      toggleInterlace.textContent = viewport.enableInterlacing ? 'Interlaced' : 'Straight';
+      viewport.update(getInputs());
+    });
+  }
+
+  if (toggleRuler) {
+    toggleRuler.addEventListener('click', () => {
+      if (!viewport) return;
+      viewport.showMeasurement = !viewport.showMeasurement;
+      viewport.showRuler = viewport.showMeasurement;
+      toggleRuler.classList.toggle('bg-yellow-950/40', viewport.showMeasurement);
+      toggleRuler.classList.toggle('text-yellow-400', viewport.showMeasurement);
+      toggleRuler.classList.toggle('border-yellow-500/30', viewport.showMeasurement);
+      toggleRuler.classList.toggle('bg-titanium-950', !viewport.showMeasurement);
+      toggleRuler.classList.toggle('text-titanium-500', !viewport.showMeasurement);
+      toggleRuler.classList.toggle('border-titanium-800', !viewport.showMeasurement);
+      toggleRuler.textContent = viewport.showMeasurement ? '📏 Ruler: ON' : '📏 Ruler: OFF';
+      viewport.update(getInputs());
+    });
+  }
+
   selectColorMode.addEventListener('change', () => {
     if (viewport) {
       viewport.colorMode = selectColorMode.value as 'classic' | 'side' | 'tension';
@@ -648,23 +717,134 @@ import { hubs } from '../data/hubs';
   // Camera preset selectors
   document.querySelectorAll('.cam-btn').forEach(btn => {
     btn.addEventListener('click', () => {
-      const p = btn.getAttribute('data-cam') as 'isometric' | 'lateral' | 'dish' | 'hub';
+      const p = btn.getAttribute('data-cam') as 'isometric' | 'lateral' | 'dish' | 'hub' | 'spoke-delta';
       if (viewport) viewport.setCameraPreset(p);
     });
   });
 
-  // 6. RAYCAST INTERACTION EVENT HANDLERS
+  // Full Page Viewport Mode (Escapes parent container to fill 100% of browser page viewport)
+  const viewportCard = document.getElementById('viewport-card') as HTMLElement;
+  const btnFullpage = document.getElementById('btn-fullpage') as HTMLButtonElement;
+  const fpIcon = document.getElementById('fp-icon') as HTMLElement;
+  const fpLabel = document.getElementById('fp-label') as HTMLElement;
+
+  let isFullPage = false;
+  let placeholder: HTMLDivElement | null = null;
+  let originalParent: HTMLElement | null = null;
+
+  function toggleFullPage() {
+    if (!viewportCard) return;
+    isFullPage = !isFullPage;
+
+    if (isFullPage) {
+      // 1. Insert a placeholder in the column to maintain column height
+      originalParent = viewportCard.parentElement;
+      placeholder = document.createElement('div');
+      placeholder.className = 'h-[420px] sm:h-[480px] lg:h-[520px] w-full rounded-2xl border border-titanium-800/40 bg-titanium-950/20 flex items-center justify-center text-xs font-bold text-titanium-600 uppercase tracking-widest';
+      placeholder.textContent = '3D Viewport in Full Page Mode';
+      
+      if (originalParent) {
+        originalParent.insertBefore(placeholder, viewportCard);
+      }
+
+      // 2. Move viewportCard directly to document.body to bypass CSS transform containing blocks
+      document.body.appendChild(viewportCard);
+
+      // 3. Apply full page fixed dimensions
+      viewportCard.classList.add('fixed', 'inset-0', 'z-[9999]', 'w-screen', 'h-screen', 'rounded-none', 'bg-titanium-950/98', 'backdrop-blur-2xl');
+      viewportCard.classList.remove('relative', 'rounded-2xl', 'h-[420px]', 'sm:h-[480px]', 'lg:h-[520px]');
+      
+      if (fpIcon) fpIcon.textContent = '✕';
+      if (fpLabel) fpLabel.textContent = 'Exit Full Page';
+      if (btnFullpage) {
+        btnFullpage.classList.add('bg-red-950/80', 'text-red-300', 'border-red-500/50');
+        btnFullpage.classList.remove('bg-cyan-950/40', 'text-cyan-300', 'border-cyan-500/30');
+      }
+      document.body.style.overflow = 'hidden';
+    } else {
+      // 1. Restore viewportCard back to original column position
+      if (originalParent && placeholder) {
+        originalParent.insertBefore(viewportCard, placeholder);
+        placeholder.remove();
+        placeholder = null;
+      }
+
+      // 2. Restore normal card dimensions
+      viewportCard.classList.remove('fixed', 'inset-0', 'z-[9999]', 'w-screen', 'h-screen', 'rounded-none', 'bg-titanium-950/98', 'backdrop-blur-2xl');
+      viewportCard.classList.add('relative', 'rounded-2xl', 'h-[420px]', 'sm:h-[480px]', 'lg:h-[520px]');
+      
+      if (fpIcon) fpIcon.textContent = '🗖';
+      if (fpLabel) fpLabel.textContent = 'Full Page';
+      if (btnFullpage) {
+        btnFullpage.classList.remove('bg-red-950/80', 'text-red-300', 'border-red-500/50');
+        btnFullpage.classList.add('bg-cyan-950/40', 'text-cyan-300', 'border-cyan-500/30');
+      }
+      document.body.style.overflow = '';
+    }
+
+    // Trigger Three.js WebGL viewport resize
+    setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
+  }
+
+  if (btnFullpage) {
+    btnFullpage.addEventListener('click', toggleFullPage);
+  }
+
+  // Handle ESC key to exit full page view mode
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && isFullPage) {
+      toggleFullPage();
+    }
+  });
+
+  // 6. RAYCAST INTERACTION & 3D RULER EVENT HANDLERS
+  const tooltipExitBend = document.getElementById('tooltip-exitbend') as HTMLElement;
+  const tooltipDirect = document.getElementById('tooltip-direct') as HTMLElement;
+  const tooltipActual = document.getElementById('tooltip-actual') as HTMLElement;
+
+  const ruler3dBadge = document.getElementById('ruler-3d-badge') as HTMLElement;
+  const badgeDirectVal = document.getElementById('badge-direct-val') as HTMLElement;
+  const badgeActualVal = document.getElementById('badge-actual-val') as HTMLElement;
+  const badgeDeltaVal = document.getElementById('badge-delta-val') as HTMLElement;
+
+  window.addEventListener('ruler-screen-update', (e: any) => {
+    const { visible, direct3DLength, actualCurveLength } = e.detail;
+    if (!ruler3dBadge) return;
+
+    if (visible && direct3DLength > 0) {
+      ruler3dBadge.classList.remove('hidden');
+
+      if (badgeDirectVal) badgeDirectVal.textContent = `${direct3DLength.toFixed(1)} mm`;
+      if (badgeActualVal) badgeActualVal.textContent = `${actualCurveLength.toFixed(1)} mm`;
+      if (badgeDeltaVal) {
+        const delta = actualCurveLength - direct3DLength;
+        badgeDeltaVal.textContent = `${delta >= 0 ? '+' : ''}${delta.toFixed(1)} mm`;
+      }
+    } else {
+      ruler3dBadge.classList.add('hidden');
+    }
+  });
+
   window.addEventListener('spoke-hover', (e: any) => {
-    const { side, index, isLeading, length, bracingAngle, event } = e.detail;
+    const { side, index, isLeading, length, direct3DLength, actualCurveLength, bracingAngle, flangeExitBendAngle, event } = e.detail;
     
     // Position tooltip absolute near cursor
     tooltip.style.left = `${event.clientX - 10}px`;
-    tooltip.style.top = `${event.clientY - 110}px`;
+    tooltip.style.top = `${event.clientY - 170}px`;
     tooltip.classList.remove('hidden');
 
     tooltipTitle.innerHTML = `<span>${side} Side Spoke #${index + 1}</span><span class="text-[9px] px-1.5 py-0.5 rounded ${isLeading ? 'bg-cyan-950/50 text-cyan-400 border border-cyan-500/10' : 'bg-violet-950/50 text-violet-400 border border-violet-500/10'} font-bold uppercase">${isLeading ? 'Leading' : 'Trailing'}</span>`;
     tooltipLength.textContent = `${length.toFixed(1)} mm`;
+    if (tooltipDirect && direct3DLength !== undefined) {
+      tooltipDirect.textContent = `${direct3DLength.toFixed(1)} mm`;
+    }
+    if (tooltipActual && actualCurveLength !== undefined) {
+      tooltipActual.textContent = `${actualCurveLength.toFixed(1)} mm`;
+    }
     tooltipBracing.textContent = `${bracingAngle.toFixed(1)}°`;
+    if (tooltipExitBend && flangeExitBendAngle !== undefined) {
+      tooltipExitBend.textContent = `${flangeExitBendAngle.toFixed(1)}°`;
+    }
   });
 
   window.addEventListener('spoke-unhover', () => {
