@@ -1,0 +1,44 @@
+---
+import { rims } from '../data/rims';
+import { hubs } from '../data/hubs';
+---
+
+<header class="sticky top-0 z-50 bg-titanium-950/70 backdrop-blur-xl border-b border-titanium-800/80 px-6 py-4">
+  <div class="max-w-7xl mx-auto flex flex-col sm:flex-row items-center justify-between gap-4">
+    <!-- Brand Logo -->
+    <a href="/" class="flex items-center gap-3 group">
+      <div class="relative flex items-center justify-center w-10 h-10 rounded-full border border-cyan-500/30 bg-cyan-950/20 group-hover:border-cyan-400 group-hover:shadow-[0_0_15px_rgba(6,182,212,0.3)] transition-all duration-300">
+        <!-- Generic Hub-and-Spoke Logo -->
+        <svg class="w-6 h-6 text-cyan-400 group-hover:rotate-45 transition-transform duration-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" stroke-width="1.5">
+          <circle cx="12" cy="12" r="3" class="fill-cyan-950/50" />
+          <circle cx="12" cy="12" r="10" />
+          <path d="M12 2v7M12 15v7M2 12h7M15 12h7M4.93 4.93l4.93 4.93M14.14 14.14l4.93 4.93M4.93 19.07l4.93-4.93M14.14 9.86l4.93-4.93" />
+        </svg>
+      </div>
+      <div class="flex flex-col">
+        <h1 class="text-xl font-bold tracking-tight bg-gradient-to-r from-titanium-50 via-titanium-100 to-cyan-400 bg-clip-text text-transparent">
+          3D Spoke <span class="text-cyan-400 font-medium">Calculator</span>
+        </h1>
+        <p class="text-xs text-titanium-400 tracking-wider font-medium uppercase">Wheel Dimensioning Engine</p>
+      </div>
+    </a>
+
+    <!-- Live database counters -->
+    <div class="flex items-center gap-2 sm:gap-4 text-xs">
+      <div class="flex items-center gap-2 px-3 py-1.5 rounded-full border border-titanium-800 bg-titanium-900/50">
+        <span class="w-1.5 h-1.5 rounded-full bg-cyan-500 animate-pulse"></span>
+        <span class="text-titanium-400">Library:</span>
+        <span class="font-bold text-titanium-200 mono-data">{rims.length} Rims</span>
+        <span class="text-titanium-700">|</span>
+        <span class="font-bold text-titanium-200 mono-data">{hubs.length} Hubs</span>
+      </div>
+
+      <div class="hidden md:flex items-center gap-2 px-3 py-1.5 rounded-full border border-emerald-500/20 bg-emerald-950/10 text-emerald-400">
+        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12c0 1.268-.63 2.39-1.593 3.068a3.745 3.745 0 01-1.043 3.296 3.745 3.745 0 01-3.296 1.043A3.745 3.745 0 0112 21c-1.268 0-2.39-.63-3.068-1.593a3.746 3.746 0 01-3.296-1.043 3.745 3.745 0 01-1.043-3.296A3.745 3.745 0 013 12c0-1.268.63-2.39 1.593-3.068a3.745 3.745 0 011.043-3.296 3.746 3.746 0 013.296-1.043A3.746 3.746 0 0112 3c1.268 0 2.39.63 3.068 1.593a3.746 3.746 0 013.296 1.043 3.746 3.746 0 011.043 3.296A3.745 3.745 0 0121 12z"></path>
+        </svg>
+        <span class="font-semibold tracking-wide">3D Vector Physics Verified</span>
+      </div>
+    </div>
+  </div>
+</header>
