@@ -22,6 +22,16 @@ export class Viewport3D {
   public colorMode: 'classic' | 'side' | 'tension' = 'classic';
   public spokeThickness: number = 1.0; // Aero vs Heavy duty
 
+  // Interactive Lacing Mode
+  public lacingMode: boolean = false;
+  public lacingPlacedCount: number = 0; // 0 to N
+  public lacingCameraTracking: boolean = true; // true = auto-track active spoke, false = fixed
+  private lacingIndicatorGroup: THREE.Group = new THREE.Group();
+
+  // Lights Groups
+  private studioLightGroup: THREE.Group = new THREE.Group();
+  private headTorchGroup: THREE.Group = new THREE.Group();
+
   // Ruler visualization
   private rulerGroup: THREE.Group = new THREE.Group();
 
@@ -70,17 +80,34 @@ export class Viewport3D {
     const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
     this.scene.add(ambientLight);
 
+    // Standard Studio Fixed Lights (Main Wheel Assembly Tab)
     const dirLight1 = new THREE.DirectionalLight(0xffffff, 0.8);
     dirLight1.position.set(200, 400, 300);
-    this.scene.add(dirLight1);
+    this.studioLightGroup.add(dirLight1);
 
     const dirLight2 = new THREE.DirectionalLight(0xaaccff, 0.5);
     dirLight2.position.set(-200, -100, -300);
-    this.scene.add(dirLight2);
+    this.studioLightGroup.add(dirLight2);
 
     const pointLight = new THREE.PointLight(0xffffff, 0.6, 300);
     pointLight.position.set(0, 0, 50);
-    this.scene.add(pointLight);
+    this.studioLightGroup.add(pointLight);
+
+    this.scene.add(this.studioLightGroup);
+
+    // Head Torch Light (ONLY active in Interactive Lacing Tab - follows user's camera view)
+    const headTorch = new THREE.PointLight(0xfff8e7, 1.3, 1200);
+    headTorch.position.set(0, 0, 10);
+    this.headTorchGroup.add(headTorch);
+
+    const torchDir = new THREE.DirectionalLight(0xffffff, 0.7);
+    torchDir.position.set(20, 40, 30);
+    this.headTorchGroup.add(torchDir);
+
+    this.headTorchGroup.visible = false; // Initially OFF for main tab
+    this.camera.add(this.headTorchGroup);
+
+    this.scene.add(this.camera);
 
     // 6. Handle resizing
     window.addEventListener('resize', this.onWindowResize.bind(this));
@@ -217,10 +244,73 @@ export class Viewport3D {
     }
   }
 
+  public setLacingMode(enabled: boolean) {
+    this.lacingMode = enabled;
+    if (this.currentInputs) {
+      if (this.lacingMode && this.lacingPlacedCount === 0) {
+        this.lacingPlacedCount = 1;
+      }
+      this.update(this.currentInputs);
+    }
+  }
+
+  public setLacingPlacedCount(count: number) {
+    if (!this.currentInputs) return;
+    const total = this.currentInputs.spokeCount;
+    this.lacingPlacedCount = Math.max(0, Math.min(total, count));
+    this.update(this.currentInputs);
+  }
+
+  public setLacingCameraTracking(tracking: boolean) {
+    this.lacingCameraTracking = tracking;
+    if (this.lacingMode && this.currentInputs) {
+      this.update(this.currentInputs);
+    }
+  }
+
+  public nextLacingSpoke() {
+    if (!this.currentInputs) return;
+    this.setLacingPlacedCount(this.lacingPlacedCount + 1);
+  }
+
+  public prevLacingSpoke() {
+    if (!this.currentInputs) return;
+    this.setLacingPlacedCount(this.lacingPlacedCount - 1);
+  }
+
+  public nextLacingGroup() {
+    if (!this.currentInputs) return;
+    const total = this.currentInputs.spokeCount;
+    const gSize = total / 4;
+    const currentG = Math.floor(this.lacingPlacedCount / gSize);
+    const targetCount = Math.min(total, (currentG + 1) * gSize);
+    this.setLacingPlacedCount(targetCount);
+  }
+
+  public prevLacingGroup() {
+    if (!this.currentInputs) return;
+    const total = this.currentInputs.spokeCount;
+    const gSize = total / 4;
+    const currentG = Math.ceil(this.lacingPlacedCount / gSize);
+    const targetCount = Math.max(0, (currentG - 1) * gSize);
+    this.setLacingPlacedCount(targetCount);
+  }
+
   public update(inputs: WheelBuildInputs) {
     this.currentInputs = inputs;
     this.clearScene();
     this.spokeMeshes = [];
+
+    // Toggle lighting mode based on active tab
+    if (this.lacingMode) {
+      // Interactive Lacing Tab: Head Torch mounted to camera view
+      this.headTorchGroup.visible = true;
+      this.studioLightGroup.visible = false;
+    } else {
+      // Main Wheel Assembly Tab: Fixed studio lighting
+      this.headTorchGroup.visible = false;
+      this.studioLightGroup.visible = true;
+    }
 
     const {
       erd,
@@ -241,9 +331,9 @@ export class Viewport3D {
 
     // --- MATERIALS ---
     const rimMat = new THREE.MeshStandardMaterial({
-      color: 0x222224, // Carbon/Dark Titanium
-      roughness: 0.4,
-      metalness: 0.8,
+      color: 0x5a606d, // Brighter Metallic Alloy/Titanium Gray for high contrast on dark background
+      roughness: 0.35,
+      metalness: 0.75,
       side: THREE.DoubleSide,
     });
 
@@ -303,7 +393,48 @@ export class Viewport3D {
     rimMesh.position.z = -rimShift;
     this.scene.add(rimMesh);
 
-    // --- 2. GENERATE HUB (CNC Lathe Profile) ---
+    // --- 2. PRECOMPUTE VALVE ANGLE (Midpoint of widest angular gap on rim) ---
+    const Ns = spokeCount / 2;
+    const sidesForAngles = [
+      { crosses: crossesLeft, flangeOffsetAngle: 0 },
+      { crosses: crossesRight, flangeOffsetAngle: Math.PI / Ns },
+    ];
+
+    const allRimAngles: number[] = [];
+    sidesForAngles.forEach((s) => {
+      for (let j = 0; j < Ns; j++) {
+        const flangeAngle = j * (2 * Math.PI / Ns) + s.flangeOffsetAngle;
+        const isLeading = j % 2 === 0;
+        const directionSign = isLeading ? 1.0 : -1.0;
+        const thetaAngle = (720.0 * s.crosses) / spokeCount;
+        const thetaRad = thetaAngle * (Math.PI / 180.0);
+        let rimAngle = flangeAngle + directionSign * thetaRad;
+        rimAngle = ((rimAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
+        allRimAngles.push(rimAngle);
+      }
+    });
+
+    allRimAngles.sort((a, b) => a - b);
+
+    let maxGap = 0;
+    let valveAngle = Math.PI / Ns;
+
+    if (allRimAngles.length > 0) {
+      for (let k = 0; k < allRimAngles.length; k++) {
+        const nextAngle = (k === allRimAngles.length - 1)
+          ? allRimAngles[0] + 2 * Math.PI
+          : allRimAngles[k + 1];
+        const gap = nextAngle - allRimAngles[k];
+        if (gap > maxGap) {
+          maxGap = gap;
+          let mid = allRimAngles[k] + gap / 2;
+          if (mid >= 2 * Math.PI) mid -= 2 * Math.PI;
+          valveAngle = mid;
+        }
+      }
+    }
+
+    // --- 3. GENERATE HUB (CNC Lathe Profile) ---
     // Solid physical hub flange positions (hub geometry remains rigid and un-stretched)
     const zL = -centerToLeft + hubOffset;
     const zR = centerToRight + hubOffset;
@@ -322,8 +453,6 @@ export class Viewport3D {
     const offsetDist = (flangeThickness / 2) + spokeRad + 0.3;
 
     // Flange geometries with real drilled spoke holes
-    const Ns = spokeCount / 2;
-
     const flangeLGeom = this.createFlangeGeometry(
       flangePcdLeft / 2,
       Ns,
@@ -371,6 +500,58 @@ export class Viewport3D {
     centerTube.rotation.x = Math.PI / 2;
     centerTube.position.z = (zL + zR) / 2;
     hubShellGroup.add(centerTube);
+
+    // 3D Hub Brand Logo Badge (Aligned directly with Rim Valve Hole)
+    const logoCanvas = document.createElement('canvas');
+    logoCanvas.width = 512;
+    logoCanvas.height = 128;
+    const logoCtx = logoCanvas.getContext('2d');
+    if (logoCtx) {
+      logoCtx.fillStyle = '#111116';
+      logoCtx.fillRect(0, 0, 512, 128);
+
+      logoCtx.strokeStyle = '#d4af37';
+      logoCtx.lineWidth = 5;
+      logoCtx.strokeRect(8, 8, 496, 112);
+
+      logoCtx.strokeStyle = '#f59e0b';
+      logoCtx.lineWidth = 2;
+      logoCtx.strokeRect(16, 16, 480, 96);
+
+      logoCtx.fillStyle = '#f59e0b';
+      logoCtx.font = 'bold 20px sans-serif';
+      logoCtx.textAlign = 'center';
+      logoCtx.textBaseline = 'middle';
+      logoCtx.fillText('⚡ CNC PRECISION HUB ⚡', 256, 36);
+
+      logoCtx.fillStyle = '#ffffff';
+      logoCtx.font = '900 30px sans-serif';
+      logoCtx.fillText((inputs.hubName || 'PRO HUB').toUpperCase(), 256, 78);
+    }
+    const logoTexture = new THREE.CanvasTexture(logoCanvas);
+    logoTexture.needsUpdate = true;
+
+    const logoMat = new THREE.MeshStandardMaterial({
+      map: logoTexture,
+      roughness: 0.25,
+      metalness: 0.85,
+    });
+
+    const logoSectorGeom = new THREE.CylinderGeometry(
+      15.2,
+      15.2,
+      Math.max(2, Math.abs(zR - zL) - 8),
+      32,
+      1,
+      true,
+      -Math.PI / 3,
+      (2 * Math.PI) / 3
+    );
+    const logoMesh = new THREE.Mesh(logoSectorGeom, logoMat);
+    logoMesh.rotation.x = Math.PI / 2;
+    logoMesh.rotation.y = valveAngle + Math.PI / 2; // Facing valveAngle
+    logoMesh.position.z = (zL + zR) / 2;
+    hubShellGroup.add(logoMesh);
 
     // Drive Side Component:
     // REAR HUBS: Freehub driver body with cassette splines
@@ -492,6 +673,100 @@ export class Viewport3D {
       }
       return null;
     };
+
+    // --- 4. GENERATE TUBE PUMP VALVE HOLE & PRESTA VALVE STEM ---
+    const inwardRadDir = new THREE.Vector3(-Math.cos(valveAngle), -Math.sin(valveAngle), 0).normalize();
+    const P_valveBed = new THREE.Vector3(
+      R_bed * Math.cos(valveAngle),
+      R_bed * Math.sin(valveAngle),
+      -rimShift
+    );
+
+    const valveGroup = new THREE.Group();
+
+    // Valve Hole Materials
+    const valveRimMat = new THREE.MeshStandardMaterial({
+      color: 0x333338,
+      roughness: 0.3,
+      metalness: 0.8,
+    });
+    const valveHoleCoreMat = new THREE.MeshBasicMaterial({ color: 0x050508 }); // Dark hollow tube hole interior
+    const brassValveMat = new THREE.MeshStandardMaterial({
+      color: 0xd4af37, // Metallic Brass Presta valve body
+      roughness: 0.25,
+      metalness: 0.85,
+    });
+    const capMat = new THREE.MeshStandardMaterial({
+      color: 0x111115, // Anodized black valve cap
+      roughness: 0.5,
+      metalness: 0.3,
+    });
+
+    // A. Drilled Rim Valve Hole (6.5mm Presta hole drilled through double-wall rim)
+    const vHoleRimGeom = new THREE.CylinderGeometry(4.0, 4.0, rimDepth + 1.0, 24);
+    const vHoleRimMesh = new THREE.Mesh(vHoleRimGeom, valveRimMat);
+    vHoleRimMesh.position.y = -rimDepth / 2;
+    valveGroup.add(vHoleRimMesh);
+
+    const vHoleCoreGeom = new THREE.CylinderGeometry(3.2, 3.2, rimDepth + 1.6, 24);
+    const vHoleCoreMesh = new THREE.Mesh(vHoleCoreGeom, valveHoleCoreMat);
+    vHoleCoreMesh.position.y = -rimDepth / 2;
+    valveGroup.add(vHoleCoreMesh);
+
+    // B. Knurled Valve Stem Rim Locknut (Screwed against inner rim bed at R_bed)
+    const locknutGeom = new THREE.CylinderGeometry(5.2, 5.2, 3.0, 24);
+    const locknut = new THREE.Mesh(locknutGeom, brassValveMat);
+    locknut.position.y = 1.5;
+    valveGroup.add(locknut);
+
+    // C. Threaded Presta Valve Stem Barrel (Extending radially INWARD towards hub center for pump attachment)
+    const valveLength = 32.0;
+    const valveBarrelGeom = new THREE.CylinderGeometry(3.0, 3.0, valveLength, 24);
+    const valveBarrel = new THREE.Mesh(valveBarrelGeom, brassValveMat);
+    valveBarrel.position.y = valveLength / 2;
+    valveGroup.add(valveBarrel);
+
+    // D. Presta Valve Core Tip & Brass Lock Nut (at inner end of valve stem)
+    const pinGeom = new THREE.CylinderGeometry(1.0, 1.0, 6.0, 12);
+    const pinMesh = new THREE.Mesh(pinGeom, brassValveMat);
+    pinMesh.position.y = valveLength + 3.0;
+    valveGroup.add(pinMesh);
+
+    const pinNutGeom = new THREE.CylinderGeometry(1.8, 1.8, 2.5, 12);
+    const pinNut = new THREE.Mesh(pinNutGeom, brassValveMat);
+    pinNut.position.y = valveLength + 4.5;
+    valveGroup.add(pinNut);
+
+    // E. Removable Valve Dust Cap (Fitted on inner tip of valve stem for pump head interface)
+    const valveCapGeom = new THREE.CylinderGeometry(3.5, 3.5, 9.0, 20);
+    const valveCapMesh = new THREE.Mesh(valveCapGeom, capMat);
+    valveCapMesh.position.y = valveLength + 3.5;
+    valveGroup.add(valveCapMesh);
+
+    // Orient valve assembly pointing INWARDS towards hub center
+    valveGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), inwardRadDir);
+    valveGroup.position.copy(P_valveBed);
+    this.scene.add(valveGroup);
+
+    // 4. Collect spoke geometries across both sides and organize into 4 Lacing Groups
+    interface SpokeEntry {
+      side: 'Left' | 'Right';
+      j: number;
+      isLeading: boolean;
+      isHeadsOut: boolean;
+      group: 1 | 2 | 3 | 4;
+      groupName: string;
+      sp: typeof spokeData[0];
+      crossInfo?: { point: THREE.Vector3; t: number };
+      wEff: number;
+      colorHex: number;
+      flangeHoleIndex: number;
+      rimHoleIndex: number;
+      sequenceIndex: number;
+      angularDist: number;
+    }
+
+    const rawSpokeEntries: SpokeEntry[] = [];
 
     sides.forEach((s) => {
       if (!s.show) return;
@@ -651,324 +926,340 @@ export class Viewport3D {
         }
       }
 
-      // 3. Build spoke neck, head, elbow, and main shaft for each spoke
       for (let j = 0; j < fHolesCount; j++) {
         const sp = spokeData[j];
+        let groupNum: 1 | 2 | 3 | 4 = 1;
+        let groupNameStr = 'Group 1: Drive Side Trailing (Key Spokes)';
 
-        const isFocusSpoke = this.isSpokeDeltaMode && (s.sideName === 'Left' && j === 0);
-
-        let spokeMaterial: THREE.MeshStandardMaterial;
-
-        if (this.isSpokeDeltaMode) {
-          if (isFocusSpoke) {
-            // High contrast glowing Gold wire for the single inspected spoke
-            spokeMaterial = new THREE.MeshStandardMaterial({
-              color: 0xffd700, // Bright Gold
-              roughness: 0.1,
-              metalness: 0.9,
-            });
+        if (s.sideName === 'Right') {
+          if (!sp.isLeading) {
+            groupNum = 1;
+            groupNameStr = 'Group 1: Drive Side Trailing (Key Spokes)';
           } else {
-            // Ghosted background spoke (12% opacity)
-            spokeMaterial = new THREE.MeshStandardMaterial({
-              color: 0x444450,
-              roughness: 0.6,
-              metalness: 0.2,
-              transparent: true,
-              opacity: 0.12,
-            });
+            groupNum = 3;
+            groupNameStr = 'Group 3: Drive Side Leading (Cross Weave)';
           }
         } else {
-          let sColor = 0xbabac0; // titanium steel
-          if (this.colorMode === 'side') {
-            sColor = s.colorHex;
-          } else if (this.colorMode === 'tension') {
-            if (s.sideName === 'Left') {
-              sColor = s.wEff > sides[1].wEff ? 0x3b82f6 : 0x10b981;
-            } else {
-              sColor = sides[1].wEff > s.wEff ? 0xef4444 : 0x10b981;
-            }
+          if (!sp.isLeading) {
+            groupNum = 2;
+            groupNameStr = 'Group 2: Non-Drive Side Trailing';
+          } else {
+            groupNum = 4;
+            groupNameStr = 'Group 4: Non-Drive Side Leading (Final Weave)';
           }
-
-          spokeMaterial = new THREE.MeshStandardMaterial({
-            color: sColor,
-            roughness: 0.15,
-            metalness: 0.9,
-          });
         }
 
-        // 1. Spoke Head Cap (button cap at zHead)
-        const headGeom = new THREE.CylinderGeometry(spokeRad * 1.8, spokeRad * 1.8, 0.8, 12);
-        headGeom.rotateX(Math.PI / 2); // parallel to Z-axis
-        const headMesh = new THREE.Mesh(headGeom, spokeMaterial);
-        headMesh.position.copy(sp.P_head);
-        this.scene.add(headMesh);
+        const angDist = ((sp.rimHoleAngle - valveAngle + 4 * Math.PI) % (2 * Math.PI));
 
-        // 2. Continuous 3D Spoke Mesh with Stiff, Constant-Radius J-Hook Arc
-        const crossInfo = crossingMap.get(j);
-
-        const neckDir = new THREE.Vector3().subVectors(sp.P_holeExit, sp.P_head).normalize();
-        const targetPoint = !sp.isHeadsOut ? sp.P_flangeRim : (crossInfo ? crossInfo.point : sp.P_rim);
-        const shaftDir = new THREE.Vector3().subVectors(targetPoint, sp.P_holeExit).normalize();
-
-        // Stiff, manufactured bend radius of cold-formed J-hook wire (2.4mm)
-        const Rbend = Math.max(2.2, spokeRad * 2.6);
-
-        // Tangent points where the J-hook arc begins and ends
-        const P_arcStart = new THREE.Vector3().subVectors(sp.P_holeExit, neckDir.clone().multiplyScalar(Rbend * 0.8));
-        const P_arcEnd = new THREE.Vector3().addVectors(sp.P_holeExit, shaftDir.clone().multiplyScalar(Rbend * 0.8));
-
-        // Exact arc midpoint along bisector vector for stiff circular arc profile
-        const bisector = new THREE.Vector3().subVectors(shaftDir, neckDir).normalize();
-        const P_arcMid = new THREE.Vector3().addVectors(sp.P_holeExit, bisector.multiplyScalar(Rbend * 0.7));
-
-        // Complete control point sequence for the continuous J-bend spoke curve
-        const spokeCurvePoints: THREE.Vector3[] = [
-          sp.P_head,
-          P_arcStart,
-          P_arcMid,
-          P_arcEnd,
-        ];
-
-        if (!sp.isHeadsOut) {
-          // Heads-in spokes pass over outer flange rim edge
-          spokeCurvePoints.push(sp.P_flangeRim);
-        }
-        if (crossInfo) {
-          // 3D interlacing crossing point
-          spokeCurvePoints.push(crossInfo.point);
-        }
-        spokeCurvePoints.push(sp.P_rim);
-
-        // Centripetal spline preserving constant arc curvature at the J-bend and stiff wire alignment
-        const spokeCurve = new THREE.CatmullRomCurve3(spokeCurvePoints, false, 'centripetal');
-        const spokeTubeGeom = new THREE.TubeGeometry(spokeCurve, 56, spokeRad, 8, false);
-        const spokeMesh = new THREE.Mesh(spokeTubeGeom, spokeMaterial);
-
-        const dirToRim = new THREE.Vector3().subVectors(sp.P_rim, sp.P_holeExit).normalize();
-        const totalSpokeLength = sp.direct3DLength;
-        const exitBendAngleDeg = Math.acos(Math.abs(dirToRim.z)) * (180.0 / Math.PI);
-
-        // Real 3D wire path starting from the inner knee of the J-bend (P_arcMid) along all 3D bends to rim inside nipple
-        const shaftCurvePoints: THREE.Vector3[] = [
-          P_arcMid,
-          P_arcEnd,
-        ];
-        if (!sp.isHeadsOut) {
-          shaftCurvePoints.push(sp.P_flangeRim);
-        }
-        if (crossInfo) {
-          shaftCurvePoints.push(crossInfo.point);
-        }
-        shaftCurvePoints.push(sp.P_rim);
-
-        const shaftCurve = new THREE.CatmullRomCurve3(shaftCurvePoints, false, 'centripetal');
-        const actualCurveLength = shaftCurve.getLength();
-
-        spokeMesh.userData = {
+        rawSpokeEntries.push({
           side: s.sideName,
-          index: j,
+          j,
           isLeading: sp.isLeading,
-          length: totalSpokeLength,
-          direct3DLength: sp.direct3DLength, // Value 1: Distance from inner knee of J-bend to rim inside nipple
-          actualCurveLength: actualCurveLength, // Value 2: Actual Wire Path length from inner knee along 3D bends to rim inside nipple
-          holeCenter: sp.P_pureHole,
-          innerKnee: sp.P_innerKnee,
-          rimCenter: sp.P_rim,
-          bracingAngle: Math.asin(Math.min(1.0, s.wEff / sp.P_pureHole.distanceTo(sp.P_rim))) * (180.0 / Math.PI),
-          flangeExitBendAngle: exitBendAngleDeg,
-          start: sp.P_holeExit,
-          end: sp.P_rim,
-        };
-
-        this.scene.add(spokeMesh);
-        this.spokeMeshes.push(spokeMesh);
-
-        // --- ACCURATE 3D NIPPLE SEATED INSIDE THE RIM SPOKE BED ---
-        const nippleGroup = new THREE.Group();
-
-        // 1. Nipple Head (Flared domed head resting inside rim spoke bed channel)
-        const nHeadGeom = new THREE.CylinderGeometry(2.1, 1.7, 2.0, 16);
-        const nHead = new THREE.Mesh(nHeadGeom, nippleMat);
-        nHead.position.y = 1.0;
-        nippleGroup.add(nHead);
-
-        // 2. Nipple Neck (Shoulder passing through rim wall hole)
-        const nNeckGeom = new THREE.CylinderGeometry(1.6, 1.6, 2.0, 16);
-        const nNeck = new THREE.Mesh(nNeckGeom, nippleMat);
-        nNeck.position.y = -1.0;
-        nippleGroup.add(nNeck);
-
-        // 3. Nipple Barrel (Extending down spoke shaft towards hub)
-        const nBodyGeom = new THREE.CylinderGeometry(1.5, 1.5, 8.0, 16);
-        const nBody = new THREE.Mesh(nBodyGeom, nippleMat);
-        nBody.position.y = -6.0;
-        nippleGroup.add(nBody);
-
-        // 4. Square Wrench Flat Collar (14G 3.2mm square key)
-        const nCollarGeom = new THREE.BoxGeometry(2.7, 3.5, 2.7);
-        const nCollar = new THREE.Mesh(nCollarGeom, nippleMat);
-        nCollar.position.y = -6.5;
-        nippleGroup.add(nCollar);
-
-        const upVec = new THREE.Vector3(0, 1, 0);
-        // Vector along spoke inward towards hub
-        const inwardVector = new THREE.Vector3().subVectors(
-          sp.P_rim,
-          crossInfo ? crossInfo.point : sp.P_holeExit
-        ).negate().normalize();
-
-        nippleGroup.quaternion.setFromUnitVectors(upVec, inwardVector);
-        nippleGroup.position.copy(sp.P_rim);
-        this.scene.add(nippleGroup);
-
-        // --- 3D DRILLED RIM SPOKE HOLES (Double-Wall Inner & Outer Channel Cutouts) ---
-        const spokeHoleGroup = new THREE.Group();
-
-        // Hole Materials
-        const holeDarkMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0e, side: THREE.DoubleSide }); // Dark hollow interior
-        const holeRimMat = new THREE.MeshStandardMaterial({ color: 0x1a1a20, roughness: 0.4, metalness: 0.8 }); // Metallic hole eyelet
-
-        // 1. Inner Spoke Bed Hole (where nipple shoulder seats)
-        const innerRimGeom = new THREE.CylinderGeometry(2.8, 2.8, 2.2, 16);
-        const innerCoreGeom = new THREE.CylinderGeometry(2.1, 2.1, 2.4, 16);
-
-        const innerRimMesh = new THREE.Mesh(innerRimGeom, holeRimMat);
-        const innerCoreMesh = new THREE.Mesh(innerCoreGeom, holeDarkMat);
-
-        spokeHoleGroup.add(innerRimMesh);
-        spokeHoleGroup.add(innerCoreMesh);
-
-        // 2. Outer Tire Channel Access Hole (where nipple driver enters outer wall)
-        const outerHoleGroup = new THREE.Group();
-        const outerRimGeom = new THREE.CylinderGeometry(4.2, 4.2, 2.2, 16);
-        const outerCoreGeom = new THREE.CylinderGeometry(3.6, 3.6, 2.4, 16);
-
-        const outerRimMesh = new THREE.Mesh(outerRimGeom, holeRimMat);
-        const outerCoreMesh = new THREE.Mesh(outerCoreGeom, holeDarkMat);
-
-        outerHoleGroup.add(outerRimMesh);
-        outerHoleGroup.add(outerCoreMesh);
-        outerHoleGroup.position.y = 5.0; // 5mm radially outward into tire channel bed
-        spokeHoleGroup.add(outerHoleGroup);
-
-        const radDir = new THREE.Vector3(Math.cos(sp.rimHoleAngle), Math.sin(sp.rimHoleAngle), 0).normalize();
-        spokeHoleGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), radDir);
-        spokeHoleGroup.position.copy(sp.P_rimBase); // Anchored to stationary rim bed
-        this.scene.add(spokeHoleGroup);
+          isHeadsOut: sp.isHeadsOut,
+          group: groupNum,
+          groupName: groupNameStr,
+          sp,
+          crossInfo: crossingMap.get(j),
+          wEff: s.wEff,
+          colorHex: s.colorHex,
+          flangeHoleIndex: j,
+          rimHoleIndex: s.rimHoleIndices(j),
+          sequenceIndex: 0,
+          angularDist: angDist,
+        });
       }
     });
 
-    // --- 4. GENERATE TUBE PUMP VALVE HOLE & PRESTA VALVE STEM ---
-    // Dynamically calculate the widest open angular gap between spokes on the rim to prevent collision
-    const allRimAngles: number[] = [];
-    sides.forEach((s) => {
-      if (!s.show) return;
-      for (let j = 0; j < Ns; j++) {
-        const flangeAngle = j * (2 * Math.PI / Ns) + s.flangeOffsetAngle;
-        const isLeading = j % 2 === 0;
-        const directionSign = isLeading ? 1.0 : -1.0;
-        const thetaAngle = (720.0 * s.crosses) / N;
-        const thetaRad = thetaAngle * (Math.PI / 180.0);
-        let rimAngle = flangeAngle + directionSign * thetaRad;
-        
-        // Normalize angle to [0, 2PI)
-        rimAngle = ((rimAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-        allRimAngles.push(rimAngle);
-      }
+    // Group entries into 4 distinct groups
+    const g1 = rawSpokeEntries.filter((e) => e.group === 1).sort((a, b) => a.angularDist - b.angularDist);
+    const g2 = rawSpokeEntries.filter((e) => e.group === 2).sort((a, b) => a.angularDist - b.angularDist);
+    const g3 = rawSpokeEntries.filter((e) => e.group === 3).sort((a, b) => a.angularDist - b.angularDist);
+    const g4 = rawSpokeEntries.filter((e) => e.group === 4).sort((a, b) => a.angularDist - b.angularDist);
+
+    const lacingOrderedSpokes = [...g1, ...g2, ...g3, ...g4];
+    lacingOrderedSpokes.forEach((e, idx) => {
+      e.sequenceIndex = idx;
     });
 
-    allRimAngles.sort((a, b) => a - b);
+    // Build 3D Meshes for ordered spokes based on Lacing Mode / Standard Mode
+    lacingOrderedSpokes.forEach((entry) => {
+      const sp = entry.sp;
+      const crossInfo = entry.crossInfo;
+      const j = entry.j;
+      const m = entry.sequenceIndex;
 
-    let maxGap = 0;
-    let valveAngle = Math.PI / Ns;
+      // Always render stationary drilled rim spoke hole at P_rimBase
+      const spokeHoleGroup = new THREE.Group();
+      const holeDarkMat = new THREE.MeshBasicMaterial({ color: 0x0a0a0e, side: THREE.DoubleSide });
+      const holeRimMat = new THREE.MeshStandardMaterial({ color: 0x1a1a20, roughness: 0.4, metalness: 0.8 });
 
-    if (allRimAngles.length > 0) {
-      for (let k = 0; k < allRimAngles.length; k++) {
-        const nextAngle = (k === allRimAngles.length - 1)
-          ? allRimAngles[0] + 2 * Math.PI
-          : allRimAngles[k + 1];
-        const gap = nextAngle - allRimAngles[k];
-        if (gap > maxGap) {
-          maxGap = gap;
-          let mid = allRimAngles[k] + gap / 2;
-          if (mid >= 2 * Math.PI) mid -= 2 * Math.PI;
-          valveAngle = mid;
+      const innerRimMesh = new THREE.Mesh(new THREE.CylinderGeometry(2.8, 2.8, 2.2, 16), holeRimMat);
+      const innerCoreMesh = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 2.4, 16), holeDarkMat);
+      spokeHoleGroup.add(innerRimMesh);
+      spokeHoleGroup.add(innerCoreMesh);
+
+      const outerHoleGroup = new THREE.Group();
+      const outerRimMesh = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 2.2, 16), holeRimMat);
+      const outerCoreMesh = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 2.4, 16), holeDarkMat);
+      outerHoleGroup.add(outerRimMesh);
+      outerHoleGroup.add(outerCoreMesh);
+      outerHoleGroup.position.y = 5.0;
+      spokeHoleGroup.add(outerHoleGroup);
+
+      const radDir = new THREE.Vector3(Math.cos(sp.rimHoleAngle), Math.sin(sp.rimHoleAngle), 0).normalize();
+      spokeHoleGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), radDir);
+      spokeHoleGroup.position.copy(sp.P_rimBase);
+      this.scene.add(spokeHoleGroup);
+
+      // Evaluate whether this spoke should be rendered
+      const isPlaced = !this.lacingMode || (m < this.lacingPlacedCount);
+      if (!isPlaced) return; // Unplaced spokes are COMPLETELY hidden (not rendered)
+
+      const isActiveSpoke = this.lacingMode && (m === this.lacingPlacedCount - 1);
+
+      let spokeMaterial: THREE.MeshStandardMaterial;
+
+      if (isActiveSpoke) {
+        // High-contrast glowing Gold for newly placed active spoke
+        spokeMaterial = new THREE.MeshStandardMaterial({
+          color: 0xffd700,
+          roughness: 0.1,
+          metalness: 0.9,
+          emissive: 0xff8800,
+          emissiveIntensity: 0.5,
+        });
+      } else if (this.isSpokeDeltaMode) {
+        const isFocusSpoke = entry.side === 'Left' && j === 0;
+        spokeMaterial = new THREE.MeshStandardMaterial({
+          color: isFocusSpoke ? 0xffd700 : 0x444450,
+          roughness: isFocusSpoke ? 0.1 : 0.6,
+          metalness: isFocusSpoke ? 0.9 : 0.2,
+          transparent: !isFocusSpoke,
+          opacity: isFocusSpoke ? 1.0 : 0.12,
+        });
+      } else {
+        let sColor = 0xbabac0;
+        if (this.colorMode === 'side') {
+          sColor = entry.colorHex;
+        } else if (this.colorMode === 'tension') {
+          sColor = entry.side === 'Left' ? 0x3b82f6 : 0xef4444;
         }
+        spokeMaterial = new THREE.MeshStandardMaterial({
+          color: sColor,
+          roughness: 0.15,
+          metalness: 0.9,
+        });
       }
+
+      // 1. Spoke Head Cap
+      const headGeom = new THREE.CylinderGeometry(spokeRad * 1.8, spokeRad * 1.8, 0.8, 12);
+      headGeom.rotateX(Math.PI / 2);
+      const headMesh = new THREE.Mesh(headGeom, spokeMaterial);
+      headMesh.position.copy(sp.P_head);
+      this.scene.add(headMesh);
+
+      // 2. Continuous 3D Spoke Wire Tube
+      const neckDir = new THREE.Vector3().subVectors(sp.P_holeExit, sp.P_head).normalize();
+      const targetPoint = !sp.isHeadsOut ? sp.P_flangeRim : (crossInfo ? crossInfo.point : sp.P_rim);
+      const shaftDir = new THREE.Vector3().subVectors(targetPoint, sp.P_holeExit).normalize();
+
+      const Rbend = Math.max(2.2, spokeRad * 2.6);
+      const P_arcStart = new THREE.Vector3().subVectors(sp.P_holeExit, neckDir.clone().multiplyScalar(Rbend * 0.8));
+      const P_arcEnd = new THREE.Vector3().addVectors(sp.P_holeExit, shaftDir.clone().multiplyScalar(Rbend * 0.8));
+
+      const bisector = new THREE.Vector3().subVectors(shaftDir, neckDir).normalize();
+      const P_arcMid = new THREE.Vector3().addVectors(sp.P_holeExit, bisector.multiplyScalar(Rbend * 0.7));
+
+      const spokeCurvePoints: THREE.Vector3[] = [
+        sp.P_head,
+        P_arcStart,
+        P_arcMid,
+        P_arcEnd,
+      ];
+      if (!sp.isHeadsOut) spokeCurvePoints.push(sp.P_flangeRim);
+      if (crossInfo) spokeCurvePoints.push(crossInfo.point);
+      spokeCurvePoints.push(sp.P_rim);
+
+      const spokeCurve = new THREE.CatmullRomCurve3(spokeCurvePoints, false, 'centripetal');
+      const spokeTubeGeom = new THREE.TubeGeometry(spokeCurve, 56, spokeRad, 8, false);
+      const spokeMesh = new THREE.Mesh(spokeTubeGeom, spokeMaterial);
+
+      const dirToRim = new THREE.Vector3().subVectors(sp.P_rim, sp.P_holeExit).normalize();
+      const totalSpokeLength = sp.direct3DLength;
+      const exitBendAngleDeg = Math.acos(Math.abs(dirToRim.z)) * (180.0 / Math.PI);
+
+      const shaftCurvePoints: THREE.Vector3[] = [P_arcMid, P_arcEnd];
+      if (!sp.isHeadsOut) shaftCurvePoints.push(sp.P_flangeRim);
+      if (crossInfo) shaftCurvePoints.push(crossInfo.point);
+      shaftCurvePoints.push(sp.P_rim);
+
+      const shaftCurve = new THREE.CatmullRomCurve3(shaftCurvePoints, false, 'centripetal');
+      const actualCurveLength = shaftCurve.getLength();
+
+      spokeMesh.userData = {
+        side: entry.side,
+        index: j,
+        sequenceIndex: m,
+        group: entry.group,
+        groupName: entry.groupName,
+        isLeading: sp.isLeading,
+        length: totalSpokeLength,
+        direct3DLength: sp.direct3DLength,
+        actualCurveLength,
+        holeCenter: sp.P_pureHole,
+        innerKnee: sp.P_innerKnee,
+        rimCenter: sp.P_rim,
+        bracingAngle: Math.asin(Math.min(1.0, entry.wEff / sp.P_pureHole.distanceTo(sp.P_rim))) * (180.0 / Math.PI),
+        flangeExitBendAngle: exitBendAngleDeg,
+        start: sp.P_holeExit,
+        end: sp.P_rim,
+      };
+
+      this.scene.add(spokeMesh);
+      this.spokeMeshes.push(spokeMesh);
+
+      // 3. Nipple Group
+      const nippleGroup = new THREE.Group();
+      const nHead = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 1.7, 2.0, 16), nippleMat);
+      nHead.position.y = 1.0;
+      nippleGroup.add(nHead);
+
+      const nNeck = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 2.0, 16), nippleMat);
+      nNeck.position.y = -1.0;
+      nippleGroup.add(nNeck);
+
+      const nBody = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 8.0, 16), nippleMat);
+      nBody.position.y = -6.0;
+      nippleGroup.add(nBody);
+
+      const nCollar = new THREE.Mesh(new THREE.BoxGeometry(2.7, 3.5, 2.7), nippleMat);
+      nCollar.position.y = -6.5;
+      nippleGroup.add(nCollar);
+
+      const upVec = new THREE.Vector3(0, 1, 0);
+      const inwardVector = new THREE.Vector3().subVectors(
+        sp.P_rim,
+        crossInfo ? crossInfo.point : sp.P_holeExit
+      ).negate().normalize();
+
+      nippleGroup.quaternion.setFromUnitVectors(upVec, inwardVector);
+      nippleGroup.position.copy(sp.P_rim);
+      this.scene.add(nippleGroup);
+    });
+
+    // In Lacing Mode: Draw 3D Target Hole Indicators & Valve Hole Landmark
+    this.scene.remove(this.lacingIndicatorGroup);
+    this.lacingIndicatorGroup.clear();
+
+    if (this.lacingMode) {
+      if (this.lacingPlacedCount > 0 && lacingOrderedSpokes.length > 0) {
+        const activeIdx = Math.min(lacingOrderedSpokes.length - 1, this.lacingPlacedCount - 1);
+        const activeEntry = lacingOrderedSpokes[activeIdx];
+
+        // 1. Target Flange Hole Ring (Neon Cyan)
+        const fRingGeom = new THREE.TorusGeometry(spokeHoleDiameter * 0.9, 0.6, 12, 24);
+        const fRingMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+        const fRingMesh = new THREE.Mesh(fRingGeom, fRingMat);
+        fRingMesh.position.copy(activeEntry.sp.P_pureHole);
+        this.lacingIndicatorGroup.add(fRingMesh);
+
+        // 2. Target Rim Hole Ring (Emerald Green)
+        const rRingGeom = new THREE.TorusGeometry(3.6, 0.7, 12, 24);
+        const rRingMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
+        const rRingMesh = new THREE.Mesh(rRingGeom, rRingMat);
+        const rRadDir = new THREE.Vector3(Math.cos(activeEntry.sp.rimHoleAngle), Math.sin(activeEntry.sp.rimHoleAngle), 0).normalize();
+        rRingMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), rRadDir);
+        rRingMesh.position.copy(activeEntry.sp.P_rimBase);
+        this.lacingIndicatorGroup.add(rRingMesh);
+      }
+
+      // 3. Valve Hole Reference Marker (Glowing Yellow Pointer)
+      const vMarkerGeom = new THREE.ConeGeometry(3.8, 12.0, 16);
+      const vMarkerMat = new THREE.MeshBasicMaterial({ color: 0xffea00 });
+      const vMarkerMesh = new THREE.Mesh(vMarkerGeom, vMarkerMat);
+      vMarkerMesh.rotation.z = Math.PI / 2;
+      vMarkerMesh.position.copy(P_valveBed).add(inwardRadDir.clone().multiplyScalar(15));
+      this.lacingIndicatorGroup.add(vMarkerMesh);
+
+      // 4. Hub Brand Logo Reference Marker (Amber Ring on Hub Shell facing Valve Hole)
+      const logoCenterPos = new THREE.Vector3(
+        15.6 * Math.cos(valveAngle),
+        15.6 * Math.sin(valveAngle),
+        (zL + zR) / 2
+      );
+      const hLogoRingGeom = new THREE.TorusGeometry(8.0, 0.6, 12, 24);
+      const hLogoRingMat = new THREE.MeshBasicMaterial({ color: 0xf59e0b });
+      const hLogoRingMesh = new THREE.Mesh(hLogoRingGeom, hLogoRingMat);
+      hLogoRingMesh.quaternion.setFromUnitVectors(
+        new THREE.Vector3(0, 0, 1),
+        new THREE.Vector3(Math.cos(valveAngle), Math.sin(valveAngle), 0).normalize()
+      );
+      hLogoRingMesh.position.copy(logoCenterPos);
+      this.lacingIndicatorGroup.add(hLogoRingMesh);
+
+      this.scene.add(this.lacingIndicatorGroup);
+
+      // Auto-tracking camera focus
+      if (this.lacingCameraTracking && this.lacingPlacedCount > 0 && lacingOrderedSpokes.length > 0) {
+        const activeIdx = Math.min(lacingOrderedSpokes.length - 1, this.lacingPlacedCount - 1);
+        const activeEntry = lacingOrderedSpokes[activeIdx];
+
+        const midPoint = new THREE.Vector3().addVectors(activeEntry.sp.P_pureHole, activeEntry.sp.P_rimBase).multiplyScalar(0.5);
+        const viewDir = new THREE.Vector3().subVectors(midPoint, new THREE.Vector3(0, 0, 0)).normalize();
+        const camPos = midPoint.clone().add(viewDir.clone().multiplyScalar(170)).add(new THREE.Vector3(0, 0, activeEntry.sp.P_pureHole.z + 50));
+
+        this.camera.position.copy(camPos);
+        this.controls.target.copy(midPoint);
+        this.controls.update();
+      }
+
+      // Dispatch 'lacing-update' event for UI controls & instructions panel
+      const count = this.lacingPlacedCount;
+      const gSize = N / 4;
+      const g1Count = Math.min(gSize, Math.max(0, count));
+      const g2Count = Math.min(gSize, Math.max(0, count - gSize));
+      const g3Count = Math.min(gSize, Math.max(0, count - 2 * gSize));
+      const g4Count = Math.min(gSize, Math.max(0, count - 3 * gSize));
+
+      let currentG = 1;
+      if (count > 3 * gSize) currentG = 4;
+      else if (count > 2 * gSize) currentG = 3;
+      else if (count > gSize) currentG = 2;
+      else if (count === 0) currentG = 0;
+
+      const activeEntry = count > 0 ? lacingOrderedSpokes[Math.min(N - 1, count - 1)] : null;
+
+      const event = new CustomEvent('lacing-update', {
+        detail: {
+          placedCount: count,
+          totalSpokes: N,
+          currentGroup: currentG,
+          groupCounts: [g1Count, g2Count, g3Count, g4Count],
+          groupTotals: [gSize, gSize, gSize, gSize],
+          activeSpoke: activeEntry ? {
+            sequenceIndex: activeEntry.sequenceIndex,
+            side: activeEntry.side,
+            group: activeEntry.group,
+            groupName: activeEntry.groupName,
+            flangeHoleIndex: activeEntry.flangeHoleIndex + 1,
+            rimHoleIndex: activeEntry.rimHoleIndex + 1,
+            isLeading: activeEntry.isLeading,
+            headsDir: activeEntry.isHeadsOut ? 'Heads Out (Elbows In)' : 'Heads In (Elbows Out)',
+            length: activeEntry.sp.direct3DLength,
+          } : null,
+        },
+      });
+      window.dispatchEvent(event);
     }
 
-    const inwardRadDir = new THREE.Vector3(-Math.cos(valveAngle), -Math.sin(valveAngle), 0).normalize();
-    const P_valveBed = new THREE.Vector3(
-      R_bed * Math.cos(valveAngle),
-      R_bed * Math.sin(valveAngle),
-      -rimShift
-    );
-
-    const valveGroup = new THREE.Group();
-
-    // Valve Hole Materials
-    const valveRimMat = new THREE.MeshStandardMaterial({
-      color: 0x333338,
-      roughness: 0.3,
-      metalness: 0.8,
-    });
-    const valveHoleCoreMat = new THREE.MeshBasicMaterial({ color: 0x050508 }); // Dark hollow tube hole interior
-    const brassValveMat = new THREE.MeshStandardMaterial({
-      color: 0xd4af37, // Metallic Brass Presta valve body
-      roughness: 0.25,
-      metalness: 0.85,
-    });
-    const capMat = new THREE.MeshStandardMaterial({
-      color: 0x111115, // Anodized black valve cap
-      roughness: 0.5,
-      metalness: 0.3,
-    });
-
-    // A. Drilled Rim Valve Hole (6.5mm Presta hole drilled through double-wall rim)
-    const vHoleRimGeom = new THREE.CylinderGeometry(4.0, 4.0, rimDepth + 1.0, 24);
-    const vHoleRimMesh = new THREE.Mesh(vHoleRimGeom, valveRimMat);
-    vHoleRimMesh.position.y = -rimDepth / 2;
-    valveGroup.add(vHoleRimMesh);
-
-    const vHoleCoreGeom = new THREE.CylinderGeometry(3.2, 3.2, rimDepth + 1.6, 24);
-    const vHoleCoreMesh = new THREE.Mesh(vHoleCoreGeom, valveHoleCoreMat);
-    vHoleCoreMesh.position.y = -rimDepth / 2;
-    valveGroup.add(vHoleCoreMesh);
-
-    // B. Knurled Valve Stem Rim Locknut (Screwed against inner rim bed at R_bed)
-    const locknutGeom = new THREE.CylinderGeometry(5.2, 5.2, 3.0, 24);
-    const locknut = new THREE.Mesh(locknutGeom, brassValveMat);
-    locknut.position.y = 1.5;
-    valveGroup.add(locknut);
-
-    // C. Threaded Presta Valve Stem Barrel (Extending radially INWARD towards hub center for pump attachment)
-    const valveLength = 32.0;
-    const valveBarrelGeom = new THREE.CylinderGeometry(3.0, 3.0, valveLength, 24);
-    const valveBarrel = new THREE.Mesh(valveBarrelGeom, brassValveMat);
-    valveBarrel.position.y = valveLength / 2;
-    valveGroup.add(valveBarrel);
-
-    // D. Presta Valve Core Tip & Brass Lock Nut (at inner end of valve stem)
-    const pinGeom = new THREE.CylinderGeometry(1.0, 1.0, 6.0, 12);
-    const pinMesh = new THREE.Mesh(pinGeom, brassValveMat);
-    pinMesh.position.y = valveLength + 3.0;
-    valveGroup.add(pinMesh);
-
-    const pinNutGeom = new THREE.CylinderGeometry(1.8, 1.8, 2.5, 12);
-    const pinNut = new THREE.Mesh(pinNutGeom, brassValveMat);
-    pinNut.position.y = valveLength + 4.5;
-    valveGroup.add(pinNut);
-
-    // E. Removable Valve Dust Cap (Fitted on inner tip of valve stem for pump head interface)
-    const valveCapGeom = new THREE.CylinderGeometry(3.5, 3.5, 9.0, 20);
-    const valveCapMesh = new THREE.Mesh(valveCapGeom, capMat);
-    valveCapMesh.position.y = valveLength + 3.5;
-    valveGroup.add(valveCapMesh);
-
-    // Orient valve assembly pointing INWARDS towards hub center
-    valveGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0, 1, 0), inwardRadDir);
-    valveGroup.position.copy(P_valveBed);
-    this.scene.add(valveGroup);
+    // Draw initial 3D measurement ruler on primary spoke
+    if (this.showMeasurement && this.showRuler && this.spokeMeshes.length > 0) {
+      this.drawRulerForSpoke(this.spokeMeshes[0]);
+    } else if (this.rulerGroup) {
+      this.scene.remove(this.rulerGroup);
+      this.rulerGroup.clear();
+      this.activeRulerMidpoint = null;
+    }
 
     // Draw initial 3D measurement ruler on primary spoke
     if (this.showMeasurement && this.showRuler && this.spokeMeshes.length > 0) {
@@ -1126,12 +1417,17 @@ export class Viewport3D {
   }
 
   private clearScene() {
-    // Clear all existing objects except lights
+    // Clear all existing mesh and group objects except persistent lights and camera
     const toRemove: THREE.Object3D[] = [];
     this.scene.traverse((obj) => {
       if (
-        obj instanceof THREE.Mesh ||
-        obj instanceof THREE.Group
+        (obj instanceof THREE.Mesh || obj instanceof THREE.Group) &&
+        obj !== this.camera &&
+        obj.parent !== this.camera &&
+        obj !== this.studioLightGroup &&
+        obj.parent !== this.studioLightGroup &&
+        obj !== this.headTorchGroup &&
+        obj.parent !== this.headTorchGroup
       ) {
         toRemove.push(obj);
       }
