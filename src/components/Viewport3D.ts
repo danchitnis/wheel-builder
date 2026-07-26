@@ -349,26 +349,91 @@ export class Viewport3D {
     flangeR.position.z = zR;
     hubShellGroup.add(flangeR);
 
+    // Determine hub type (Front vs Rear), spacing, and disc brake interface
+    const hubNameLower = (inputs.hubName || '').toLowerCase();
+    const spacingStr = (inputs.spacing || '').toLowerCase();
+    const isRearHub = inputs.isRear !== undefined
+      ? inputs.isRear
+      : (hubNameLower.includes('rear') || spacingStr.includes('148') || spacingStr.includes('142') || spacingStr.includes('135') || spacingStr.includes('157') || spacingStr.includes('150') || (centerToRight < 28 && centerToLeft >= 30));
+
+    let axleWidth = 142;
+    if (spacingStr.includes('148') || (isRearHub && spacingStr.includes('boost'))) axleWidth = 148;
+    else if (spacingStr.includes('110') || (!isRearHub && spacingStr.includes('boost'))) axleWidth = 110;
+    else if (spacingStr.includes('100') || !isRearHub) axleWidth = 100;
+    else if (spacingStr.includes('157')) axleWidth = 157;
+    else if (spacingStr.includes('150')) axleWidth = 150;
+    else if (spacingStr.includes('135')) axleWidth = 135;
+
+    const discType = inputs.discType || (hubNameLower.includes('cl') || hubNameLower.includes('centerlock') ? 'Centerlock' : '6-Bolt');
+
     // Hub center tube connecting flanges
-    const centerTubeGeom = new THREE.CylinderGeometry(15, 15, Math.abs(zR - zL) - 4, 32);
+    const centerTubeGeom = new THREE.CylinderGeometry(15, 15, Math.max(2, Math.abs(zR - zL) - 4), 32);
     const centerTube = new THREE.Mesh(centerTubeGeom, hubMat);
     centerTube.rotation.x = Math.PI / 2;
     centerTube.position.z = (zL + zR) / 2;
     hubShellGroup.add(centerTube);
 
-    // Freehub body (drive side driver)
-    const fhGeom = new THREE.CylinderGeometry(18, 18, 28, 32);
-    const freehub = new THREE.Mesh(fhGeom, freehubMat);
-    freehub.rotation.x = Math.PI / 2;
-    freehub.position.z = zR + 15.0; // projects further right
-    hubShellGroup.add(freehub);
+    // Drive Side Component:
+    // REAR HUBS: Freehub driver body with cassette splines
+    if (isRearHub) {
+      const fhGeom = new THREE.CylinderGeometry(17.5, 17.5, 26, 32);
+      const freehub = new THREE.Mesh(fhGeom, freehubMat);
+      freehub.rotation.x = Math.PI / 2;
+      freehub.position.z = zR + 14.0;
+      hubShellGroup.add(freehub);
 
-    // Disc brake mount (6-bolt flange on left)
-    const discMountGeom = new THREE.CylinderGeometry(28, 28, 6, 6); // hexagonal/6-bolt aesthetic
-    const discMount = new THREE.Mesh(discMountGeom, freehubMat);
-    discMount.rotation.x = Math.PI / 2;
-    discMount.position.z = zL - 4.5;
-    hubShellGroup.add(discMount);
+      // Freehub lockring lip
+      const lockringGeom = new THREE.CylinderGeometry(14, 14, 4, 32);
+      const lockring = new THREE.Mesh(lockringGeom, hubMat);
+      lockring.rotation.x = Math.PI / 2;
+      lockring.position.z = zR + 28.0;
+      hubShellGroup.add(lockring);
+    } else {
+      // FRONT HUBS: Clean tapered front axle barrel (No freehub)
+      const frontTaperGeom = new THREE.CylinderGeometry(15, 12, 12, 32);
+      const frontTaper = new THREE.Mesh(frontTaperGeom, hubMat);
+      frontTaper.rotation.x = -Math.PI / 2;
+      frontTaper.position.z = zR + 6.0;
+      hubShellGroup.add(frontTaper);
+    }
+
+    // Disc Brake Rotor Interface (Left Side):
+    if (discType === '6-Bolt') {
+      const discMountGeom = new THREE.CylinderGeometry(28, 28, 6, 6); // 6-bolt mounting lobes
+      const discMount = new THREE.Mesh(discMountGeom, freehubMat);
+      discMount.rotation.x = Math.PI / 2;
+      discMount.position.z = zL - 4.5;
+      hubShellGroup.add(discMount);
+    } else if (discType === 'Centerlock') {
+      const clMountGeom = new THREE.CylinderGeometry(22, 22, 8, 32); // Splined Centerlock ring
+      const clMount = new THREE.Mesh(clMountGeom, freehubMat);
+      clMount.rotation.x = Math.PI / 2;
+      clMount.position.z = zL - 4.5;
+      hubShellGroup.add(clMount);
+    }
+
+    // Axle Tube & Thru-Axle End Caps
+    const axleHalfWidth = axleWidth / 2;
+    const leftCapZ = -axleHalfWidth + hubOffset - expSeparation;
+    const rightCapZ = axleHalfWidth + hubOffset + expSeparation;
+
+    const axleTubeGeom = new THREE.CylinderGeometry(7.5, 7.5, Math.abs(rightCapZ - leftCapZ), 32);
+    const axleTube = new THREE.Mesh(axleTubeGeom, freehubMat);
+    axleTube.rotation.x = Math.PI / 2;
+    axleTube.position.z = (leftCapZ + rightCapZ) / 2;
+    hubShellGroup.add(axleTube);
+
+    // Left & Right End Caps
+    const capGeom = new THREE.CylinderGeometry(11, 11, 6, 32);
+    const leftCap = new THREE.Mesh(capGeom, hubMat);
+    leftCap.rotation.x = Math.PI / 2;
+    leftCap.position.z = leftCapZ + 3.0;
+    hubShellGroup.add(leftCap);
+
+    const rightCap = new THREE.Mesh(capGeom, hubMat);
+    rightCap.rotation.x = Math.PI / 2;
+    rightCap.position.z = rightCapZ - 3.0;
+    hubShellGroup.add(rightCap);
 
     this.scene.add(hubShellGroup);
 

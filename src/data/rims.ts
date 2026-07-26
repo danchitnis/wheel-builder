@@ -2,17 +2,36 @@ export interface Rim {
   id: string;
   brand: string;
   name: string;
-  erd: number; // Effective Rim Diameter in mm
-  osb: number; // Offset Spoke Bed in mm (positive value moves spoke bed to non-drive/left side)
-  drillingOffsetLeft: number; // Left hole lateral offset in mm (usually 0 unless alternating)
-  drillingOffsetRight: number; // Right hole lateral offset in mm (usually 0 unless alternating)
-  weight?: number; // in grams
+  erd: number;                // Effective Rim Diameter in mm
+  osb: number;                // Offset Spoke Bed in mm
+  drillingOffsetLeft: number;  // Left hole lateral offset in mm
+  drillingOffsetRight: number; // Right hole lateral offset in mm
+  widthOuter?: number;        // Rim profile outer width in mm
+  widthInner?: number;        // Rim profile inner well width in mm
+  depth?: number;             // Rim profile height / depth in mm
+  weight?: number;            // in grams
   category: 'Road' | 'Gravel' | 'MTB' | 'BMX' | 'Urban';
-  maxTension?: number; // in kgf (or N)
+  maxTension?: number;        // in kgf
   notes?: string;
 }
 
 export const rims: Rim[] = [
+  {
+    id: 'sun-cr18-20-406',
+    brand: 'Sun Ringle',
+    name: 'CR18 20" (406)',
+    erd: 392.0,
+    osb: 0.0,
+    drillingOffsetLeft: 0.0,
+    drillingOffsetRight: 0.0,
+    widthOuter: 22.5,
+    widthInner: 17.5,
+    depth: 15.5,
+    weight: 350,
+    category: 'BMX',
+    maxTension: 1100,
+    notes: '22.5mm outer width, 17.5mm inner well width, 15.5mm profile depth. Measured ERD 392mm.'
+  },
   {
     id: 'dt-ex511-29',
     brand: 'DT Swiss',
@@ -21,10 +40,13 @@ export const rims: Rim[] = [
     osb: 0.0,
     drillingOffsetLeft: 0.0,
     drillingOffsetRight: 0.0,
+    widthOuter: 35.0,
+    widthInner: 30.0,
+    depth: 21.0,
     weight: 570,
     category: 'MTB',
     maxTension: 1200,
-    notes: 'Super-strong enduro rim. Internal width 30mm.'
+    notes: 'Super-strong enduro rim. Internal width 30mm, outer width 35mm, depth 21mm.'
   },
   {
     id: 'dt-ex511-275',
@@ -34,6 +56,9 @@ export const rims: Rim[] = [
     osb: 0.0,
     drillingOffsetLeft: 0.0,
     drillingOffsetRight: 0.0,
+    widthOuter: 35.0,
+    widthInner: 30.0,
+    depth: 21.0,
     weight: 535,
     category: 'MTB',
     maxTension: 1200,
@@ -47,6 +72,9 @@ export const rims: Rim[] = [
     osb: 3.0,
     drillingOffsetLeft: 0.0,
     drillingOffsetRight: 0.0,
+    widthOuter: 33.6,
+    widthInner: 30.0,
+    depth: 18.9,
     weight: 527,
     category: 'MTB',
     maxTension: 1300,
@@ -60,6 +88,9 @@ export const rims: Rim[] = [
     osb: 2.5,
     drillingOffsetLeft: 0.0,
     drillingOffsetRight: 0.0,
+    widthOuter: 31.4,
+    widthInner: 28.0,
+    depth: 18.9,
     weight: 480,
     category: 'MTB',
     maxTension: 1300,
@@ -73,6 +104,9 @@ export const rims: Rim[] = [
     osb: 0.0,
     drillingOffsetLeft: 0.0,
     drillingOffsetRight: 0.0,
+    widthOuter: 23.0,
+    widthInner: 17.5,
+    depth: 25.0,
     weight: 470,
     category: 'Road',
     maxTension: 1200,
@@ -86,6 +120,9 @@ export const rims: Rim[] = [
     osb: 0.0,
     drillingOffsetLeft: 0.0,
     drillingOffsetRight: 0.0,
+    widthOuter: 25.0,
+    widthInner: 20.0,
+    depth: 23.0,
     weight: 440,
     category: 'Gravel',
     maxTension: 1250,
@@ -99,6 +136,9 @@ export const rims: Rim[] = [
     osb: 0.0,
     drillingOffsetLeft: 0.0,
     drillingOffsetRight: 0.0,
+    widthOuter: 28.0,
+    widthInner: 24.0,
+    depth: 25.0,
     weight: 500,
     category: 'Gravel',
     maxTension: 1300,
@@ -112,6 +152,9 @@ export const rims: Rim[] = [
     osb: 0.0,
     drillingOffsetLeft: 0.0,
     drillingOffsetRight: 0.0,
+    widthOuter: 30.0,
+    widthInner: 26.6,
+    depth: 20.0,
     weight: 425,
     category: 'MTB',
     maxTension: 110,
@@ -125,22 +168,12 @@ export const rims: Rim[] = [
     osb: 4.5,
     drillingOffsetLeft: 0.0,
     drillingOffsetRight: 0.0,
+    widthOuter: 34.0,
+    widthInner: 30.0,
+    depth: 20.0,
     weight: 615,
     category: 'MTB',
     maxTension: 1200,
     notes: 'Dual I-Beam support, extreme enduro/gravity rim with 4.5mm offset.'
-  },
-  {
-    id: 'sun-cr18-20-406',
-    brand: 'Sun Ringle',
-    name: 'CR18 20" (406)',
-    erd: 393.0,
-    osb: 0.0,
-    drillingOffsetLeft: 0.0,
-    drillingOffsetRight: 0.0,
-    weight: 360,
-    category: 'BMX',
-    maxTension: 1100,
-    notes: 'Classic, super-durable single-eyelet rim popular for folding bikes, BMX, and recumbents.'
   }
 ];

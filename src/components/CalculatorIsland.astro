@@ -3,418 +3,634 @@ import { rims } from '../data/rims';
 import { hubs } from '../data/hubs';
 ---
 
-<div class="max-w-7xl mx-auto px-4 py-6 flex-grow flex flex-col lg:flex-row gap-8">
-  <!-- LEFT COLUMN: CONTROLS (Scrollable on large screens) -->
-  <div class="w-full lg:w-[460px] flex-shrink-0 flex flex-col gap-6 lg:max-h-[calc(100vh-140px)] lg:overflow-y-auto pr-0 lg:pr-2">
-    <!-- Preset Selection Card -->
-    <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl animate-fade-in">
-      <div class="flex items-center gap-2.5 mb-4">
-        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
-        </svg>
-        <h2 class="text-base font-bold text-titanium-50 uppercase tracking-wider">Presets Library</h2>
+<!-- TAB NAVIGATION BAR -->
+<div class="max-w-7xl mx-auto px-4 pt-6 pb-2 w-full">
+  <div class="flex items-center justify-between border-b border-titanium-800/80 pb-4 flex-wrap gap-4">
+    <!-- Left: Title & Subtitle -->
+    <div class="flex items-center gap-3">
+      <div class="w-10 h-10 rounded-2xl bg-cyan-950/60 border border-cyan-500/30 flex items-center justify-center text-cyan-400 font-bold text-lg shadow-lg">
+        ⚡
       </div>
+      <div>
+        <h1 class="text-lg font-bold text-titanium-50 tracking-tight flex items-center gap-2">
+          Wheel CAD Engine
+          <span class="text-[10px] bg-cyan-950/80 text-cyan-400 border border-cyan-500/30 px-2.5 py-0.5 rounded-full font-mono uppercase tracking-wider">2D CAD & 3D</span>
+        </h1>
+        <p class="text-xs text-titanium-400">High-Fidelity Bicycle Wheel Geometry & Technical Cross-Section Inspector</p>
+      </div>
+    </div>
 
-      <div class="flex flex-col gap-4">
-        <!-- Rim Select -->
-        <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-titanium-400 uppercase tracking-wider">Select Rim Preset</label>
-          <select id="rim-preset" class="w-full bg-titanium-950 border border-titanium-800 rounded-xl px-3 py-2.5 text-sm text-titanium-100 hover:border-titanium-700 focus:border-cyan-500 focus:outline-none transition-all cursor-pointer">
-            <option value="custom">Custom / Manual Rim Specs</option>
-            {rims.map(r => (
-              <option value={r.id} data-erd={r.erd} data-osb={r.osb} data-ol={r.drillingOffsetLeft} data-or={r.drillingOffsetRight}>
-                {r.brand} - {r.name} ({r.category})
-              </option>
-            ))}
-          </select>
+    <!-- Right: Navigation Tabs -->
+    <div class="flex items-center bg-titanium-900/90 border border-titanium-800 p-1.5 rounded-2xl gap-1 shadow-2xl backdrop-blur-md">
+      <button id="btn-tab-assembly" class="tab-btn active px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 bg-cyan-500/20 text-cyan-300 border border-cyan-500/40 shadow-md">
+        <span>🎡</span>
+        <span>Wheel Assembly (3D)</span>
+      </button>
+
+      <button id="btn-tab-hub" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-titanium-400 hover:text-titanium-200 hover:bg-titanium-800/50">
+        <span>⚙️</span>
+        <span>Hub Configuration (2D CAD)</span>
+      </button>
+
+      <button id="btn-tab-rim" class="tab-btn px-4 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-titanium-400 hover:text-titanium-200 hover:bg-titanium-800/50">
+        <span>⭕</span>
+        <span>Rim Configuration (2D CAD)</span>
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- MAIN TABBED CONTENT AREA -->
+<div class="max-w-7xl mx-auto px-4 py-4 flex-grow flex flex-col w-full">
+
+  <!-- ================= TAB 1: WHEEL ASSEMBLY & 3D ENGINE ================= -->
+  <div id="tab-content-assembly" class="tab-pane flex flex-col lg:flex-row gap-8 w-full">
+    <!-- LEFT COLUMN: CONTROLS -->
+    <div class="w-full lg:w-[440px] flex-shrink-0 flex flex-col gap-6 lg:max-h-[calc(100vh-160px)] lg:overflow-y-auto pr-0 lg:pr-2">
+      
+      <!-- Active Selected Components Summary Card -->
+      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl animate-fade-in flex flex-col gap-3">
+        <div class="flex items-center justify-between border-b border-titanium-800 pb-2">
+          <div class="flex items-center gap-2">
+            <span class="text-cyan-400">🧩</span>
+            <h2 class="text-xs font-bold text-titanium-50 uppercase tracking-wider">Selected Components</h2>
+          </div>
+          <span class="text-[10px] text-titanium-500 font-mono">Synced Across Tabs</span>
         </div>
 
-        <!-- Hub Select -->
+        <div class="flex flex-col gap-2.5">
+          <!-- Hub Summary -->
+          <div class="bg-titanium-950/60 border border-titanium-800/60 rounded-xl p-3 flex items-center justify-between gap-2">
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <span class="text-[10px] font-bold text-titanium-400 uppercase tracking-wider">Hub Model</span>
+              <span id="summary-hub-name" class="text-xs font-bold text-cyan-300 truncate mono-data">Hope Pro 5 Rear 148 6-Bolt</span>
+            </div>
+            <button id="btn-edit-hub" class="px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-900/40 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold rounded-lg transition-all flex-shrink-0">
+              ⚙️ Config
+            </button>
+          </div>
+
+          <!-- Rim Summary -->
+          <div class="bg-titanium-950/60 border border-titanium-800/60 rounded-xl p-3 flex items-center justify-between gap-2">
+            <div class="flex flex-col gap-0.5 min-w-0">
+              <span class="text-[10px] font-bold text-titanium-400 uppercase tracking-wider">Rim Model</span>
+              <span id="summary-rim-name" class="text-xs font-bold text-cyan-300 truncate mono-data">Sun Ringle CR18 20" (406)</span>
+            </div>
+            <button id="btn-edit-rim" class="px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-900/40 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold rounded-lg transition-all flex-shrink-0">
+              ⭕ Config
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Wheel Assembly Lacing Card -->
+      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl animate-fade-in" style="animation-delay: 0.1s;">
+        <div class="flex items-center gap-2.5 mb-5">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
+          </svg>
+          <h2 class="text-base font-bold text-titanium-50 uppercase tracking-wider">Assembly Parameters</h2>
+        </div>
+
+        <div class="flex flex-col gap-4">
+          <div class="flex flex-col gap-1.5">
+            <div class="flex justify-between items-center text-xs text-titanium-400">
+              <label class="font-medium">Total Spoke Count (N)</label>
+              <span id="label-count" class="font-bold text-titanium-100 bg-titanium-950 px-2.5 py-0.5 rounded border border-titanium-800 mono-data">32</span>
+            </div>
+            <input type="range" id="input-count" min="16" max="40" step="4" value="32" class="w-full accent-cyan-500 h-1.5 bg-titanium-950 rounded-lg appearance-none cursor-pointer border border-titanium-800" />
+          </div>
+
+          <div class="grid grid-cols-2 gap-4">
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-titanium-400">NDS (Left) Crosses</label>
+              <select id="input-crossl" class="bg-titanium-950 border border-titanium-800 rounded-lg px-2.5 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none cursor-pointer">
+                <option value="0">Radial (0x)</option>
+                <option value="1">1 Cross (1x)</option>
+                <option value="2">2 Crosses (2x)</option>
+                <option value="3" selected="selected">3 Crosses (3x)</option>
+                <option value="4">4 Crosses (4x)</option>
+              </select>
+            </div>
+            <div class="flex flex-col gap-1">
+              <label class="text-xs font-medium text-titanium-400">DS (Right) Crosses</label>
+              <select id="input-crossr" class="bg-titanium-950 border border-titanium-800 rounded-lg px-2.5 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none cursor-pointer">
+                <option value="0">Radial (0x)</option>
+                <option value="1">1 Cross (1x)</option>
+                <option value="2">2 Crosses (2x)</option>
+                <option value="3" selected="selected">3 Crosses (3x)</option>
+                <option value="4">4 Crosses (4x)</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Asymmetric Rim Orientation (Rim Flip)</label>
+            <select id="input-rimflip" class="bg-titanium-950 border border-titanium-800 rounded-lg px-2.5 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none cursor-pointer">
+              <option value="Auto" selected="selected">Auto-Balance Tension</option>
+              <option value="Left">Orient Left (Standard)</option>
+              <option value="Right">Orient Right (Flipped)</option>
+            </select>
+          </div>
+        </div>
+      </div>
+
+      <!-- Share Configuration Card -->
+      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-4 shadow-xl animate-fade-in flex items-center justify-between gap-3">
+        <div class="flex flex-col gap-0.5">
+          <span class="text-xs font-bold text-titanium-50 uppercase tracking-wide">Share Build</span>
+          <span class="text-[10px] text-titanium-500">Copy URL to save or send specs</span>
+        </div>
+        <button id="copy-url-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-950/20 hover:bg-cyan-900/30 border border-cyan-500/20 hover:border-cyan-500/50 text-cyan-400 hover:text-cyan-300 text-xs font-bold rounded-xl transition-all">
+          <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
+          </svg>
+          Copy Link
+        </button>
+      </div>
+    </div>
+
+    <!-- RIGHT COLUMN: 3D VIEWPORT & OUTCOMES -->
+    <div class="flex-grow flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.15s;">
+      <!-- 3D Viewport Box -->
+      <div id="viewport-card" class="relative bg-titanium-900/40 border border-titanium-850 rounded-2xl h-[420px] sm:h-[480px] lg:h-[520px] overflow-hidden shadow-2xl flex flex-col transition-all duration-300">
+        <!-- 3D Canvas Container -->
+        <div id="canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+
+        <!-- Fixed 3D Measurement HUD Panel (Top-Left) -->
+        <div id="ruler-3d-badge" class="absolute top-4 left-4 hidden bg-titanium-950/85 backdrop-blur-md border border-cyan-500/40 p-3 rounded-xl shadow-2xl text-xs flex flex-col gap-1.5 z-20 pointer-events-none select-none min-w-[210px]">
+          <div class="flex items-center gap-1.5 font-bold text-cyan-400 border-b border-titanium-800 pb-1">
+            <span>📏 3D Vector Measurement</span>
+          </div>
+          <div class="flex justify-between gap-4">
+            <span class="text-titanium-400">Straight 3D Vector:</span>
+            <span id="badge-direct-val" class="font-bold text-cyan-300 mono-data">-- mm</span>
+          </div>
+          <div class="flex justify-between gap-4">
+            <span class="text-titanium-400">Actual Wire (bends):</span>
+            <span id="badge-actual-val" class="font-bold text-yellow-400 mono-data">-- mm</span>
+          </div>
+          <div class="flex justify-between gap-4 border-t border-titanium-800/80 pt-1">
+            <span class="text-titanium-400 font-medium">Path Delta (bends):</span>
+            <span id="badge-delta-val" class="font-bold text-emerald-400 mono-data">+-- mm</span>
+          </div>
+        </div>
+
+        <!-- Hover Tooltip -->
+        <div id="spoke-tooltip" class="absolute hidden bg-titanium-950/90 backdrop-blur-md border border-cyan-500/30 p-3 rounded-xl shadow-2xl text-xs flex flex-col gap-1 pointer-events-none z-30 min-w-[180px]">
+          <div id="tooltip-title" class="font-bold text-cyan-400 flex items-center justify-between gap-2 border-b border-titanium-800 pb-1">
+            <span>Spoke</span>
+          </div>
+          <div class="flex justify-between gap-4 mt-1">
+            <span class="text-titanium-500">Spoke Order Length:</span>
+            <span id="tooltip-length" class="font-bold text-titanium-100 mono-data">-- mm</span>
+          </div>
+          <div class="flex justify-between gap-4">
+            <span class="text-titanium-500">Straight 3D Vector:</span>
+            <span id="tooltip-direct" class="font-bold text-cyan-400 mono-data">-- mm</span>
+          </div>
+          <div class="flex justify-between gap-4">
+            <span class="text-titanium-500">Actual Wire (bends):</span>
+            <span id="tooltip-actual" class="font-bold text-yellow-400 mono-data">-- mm</span>
+          </div>
+          <div class="flex justify-between gap-4">
+            <span class="text-titanium-500">Bracing Angle:</span>
+            <span id="tooltip-bracing" class="font-semibold text-titanium-100 mono-data">--°</span>
+          </div>
+          <div class="flex justify-between gap-4">
+            <span class="text-titanium-500">Exit Bend Angle:</span>
+            <span id="tooltip-exitbend" class="font-semibold text-cyan-400 mono-data">--°</span>
+          </div>
+        </div>
+
+        <!-- Camera Overlay controls -->
+        <div class="absolute bottom-4 left-4 flex flex-wrap gap-2 z-20">
+          <button data-cam="isometric" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Iso</button>
+          <button data-cam="lateral" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Side (Lacing)</button>
+          <button data-cam="dish" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Dish (Alignment)</button>
+          <button data-cam="hub" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Hub</button>
+          <button data-cam="spoke-delta" class="cam-btn px-2.5 py-1.5 bg-yellow-950/40 border border-yellow-500/30 text-[11px] font-bold text-yellow-300 rounded-lg hover:text-yellow-100 hover:border-yellow-400 transition-all" title="Highlight single spoke path delta (Straight Vector vs Actual Bends)">🔬 Spoke Delta</button>
+          <button id="btn-fullpage" class="px-2.5 py-1.5 bg-cyan-950/40 border border-cyan-500/30 text-[11px] font-bold text-cyan-300 rounded-lg hover:text-cyan-100 hover:border-cyan-400 transition-all flex items-center gap-1.5" title="Expand 3D Viewport to Full Page">
+            <span id="fp-icon">🗖</span>
+            <span id="fp-label">Full Page</span>
+          </button>
+        </div>
+
+        <!-- Settings Overlay controls -->
+        <div class="absolute top-4 right-4 flex flex-col gap-2.5 z-20 items-end max-w-[200px]">
+          <!-- Exploded Slider -->
+          <div class="flex flex-col gap-1 px-3 py-2 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 rounded-xl w-full">
+            <div class="flex justify-between text-[10px] font-bold text-titanium-400">
+              <span>EXPLODE HUB</span>
+              <span id="explode-val" class="mono-data">0%</span>
+            </div>
+            <input type="range" id="slider-explode" min="0" max="1" step="0.05" value="0" class="w-full h-1 bg-titanium-900 rounded appearance-none cursor-pointer accent-cyan-500" />
+          </div>
+
+          <!-- Visibility / Color / Interlacing / Ruler Selects -->
+          <div class="flex flex-wrap gap-1 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 p-1 rounded-xl">
+            <button id="toggle-l-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">NDS (L)</button>
+            <button id="toggle-r-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">DS (R)</button>
+            <button id="toggle-interlace" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all" title="Toggle 3D Spoke Over/Under Interlacing Weave">Interlaced</button>
+            <button id="toggle-ruler" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-yellow-950/40 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/60 transition-all" title="Toggle Direct 3D Straight Measurement Vector Ruler">📏 Ruler</button>
+            <select id="select-colormode" class="bg-titanium-950 border border-titanium-800 rounded-lg text-[10px] font-bold px-1 py-1 text-titanium-200 cursor-pointer focus:outline-none">
+              <option value="classic">Titanium Steel</option>
+              <option value="side">Side Colors</option>
+              <option value="tension">Tension Guide</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Quick help text -->
+        <div class="absolute bottom-4 right-4 pointer-events-none select-none text-[10px] text-titanium-500 font-semibold uppercase tracking-widest hidden md:block">
+          Drag to Rotate • Scroll to Zoom • Hover Spoke to Measure
+        </div>
+      </div>
+
+      <!-- CALCULATIONS GRID & ANALYTICS -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Side-by-Side Outputs Table -->
+        <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl">
+          <h2 class="text-sm font-bold text-titanium-50 uppercase tracking-wider mb-4 border-b border-titanium-800 pb-2 flex justify-between">
+            <span>Engine Output Metrics</span>
+            <span class="text-xs font-semibold text-cyan-400 lowercase italic">Calculated</span>
+          </h2>
+
+          <div class="flex flex-col gap-4">
+            <!-- Spoke Length Primary display -->
+            <div class="grid grid-cols-2 gap-4">
+              <!-- Left Side Length Card -->
+              <div class="bg-titanium-950/50 border border-blue-500/10 p-3.5 rounded-xl flex flex-col gap-0.5">
+                <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">NDS (Left) Spoke Length</span>
+                <span id="out-len-l" class="text-3xl font-bold text-titanium-50 tracking-tight mono-data">--<span class="text-lg text-titanium-500 ml-1">mm</span></span>
+                <span id="out-len-l-round" class="text-xs text-titanium-400">Order: <span class="font-bold mono-data">-- mm</span></span>
+              </div>
+
+              <!-- Right Side Length Card -->
+              <div class="bg-titanium-950/50 border border-red-500/10 p-3.5 rounded-xl flex flex-col gap-0.5">
+                <span class="text-[10px] font-bold text-red-400 uppercase tracking-wider">DS (Right) Spoke Length</span>
+                <span id="out-len-r" class="text-3xl font-bold text-titanium-50 tracking-tight mono-data">--<span class="text-lg text-titanium-500 ml-1">mm</span></span>
+                <span id="out-len-r-round" class="text-xs text-titanium-400">Order: <span class="font-bold mono-data">-- mm</span></span>
+              </div>
+            </div>
+
+            <!-- Extended physics analytics table -->
+            <div class="flex flex-col gap-2.5 text-xs">
+              <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
+                <span class="text-titanium-400 font-medium">Effective Flange Offset</span>
+                <div class="flex gap-6 font-bold mono-data">
+                  <span id="out-weff-l" class="text-blue-400">-- mm</span>
+                  <span id="out-weff-r" class="text-red-400">-- mm</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
+                <span class="text-titanium-400 font-medium">Lateral Bracing Angle</span>
+                <div class="flex gap-6 font-semibold mono-data">
+                  <span id="out-bracing-l" class="text-blue-400">--°</span>
+                  <span id="out-bracing-r" class="text-red-400">--°</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
+                <span class="text-titanium-400 font-medium">Rim Wrap Angle (2D)</span>
+                <div class="flex gap-6 font-semibold mono-data">
+                  <span id="out-wrap-l">--°</span>
+                  <span id="out-wrap-r">--°</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
+                <span class="text-titanium-400 font-medium">Total Rim Angle (3D)</span>
+                <div class="flex gap-6 font-semibold mono-data">
+                  <span id="out-tot-l">--°</span>
+                  <span id="out-tot-r">--°</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
+                <span class="text-titanium-400 font-medium">Flange Exit Angle</span>
+                <div class="flex gap-6 font-semibold mono-data">
+                  <span id="out-exit-l">--°</span>
+                  <span id="out-exit-r">--°</span>
+                </div>
+              </div>
+
+              <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
+                <span class="text-titanium-400 font-medium">Rotational Offset (Theta)</span>
+                <div class="flex gap-6 font-semibold mono-data">
+                  <span id="out-theta-l">--°</span>
+                  <span id="out-theta-r">--°</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Charts & Tension Balance Panel -->
+        <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
+          <h2 class="text-sm font-bold text-titanium-50 uppercase tracking-wider border-b border-titanium-800 pb-2">
+            Physics Analysis & Balance
+          </h2>
+
+          <!-- Relative Tension Meter -->
+          <div class="flex flex-col gap-2 bg-titanium-950/40 border border-titanium-850 p-4 rounded-xl">
+            <div class="flex justify-between items-end text-xs">
+              <div class="flex flex-col gap-0.5">
+                <span class="font-bold text-titanium-400 uppercase tracking-wider text-[10px]">Tension Balance</span>
+                <span id="tension-ratio-label" class="text-lg font-bold text-cyan-400 mono-data">-- % : 100 %</span>
+              </div>
+              <span class="text-[10px] text-titanium-500 font-medium uppercase tracking-wide">Inversely proportional to W_eff</span>
+            </div>
+
+            <!-- Progress Bars -->
+            <div class="flex flex-col gap-1.5 mt-2">
+              <div class="flex flex-col gap-0.5">
+                <div class="flex justify-between text-[10px] font-bold text-titanium-400">
+                  <span>NDS (LEFT) TENSION</span>
+                  <span id="bar-pct-l" class="mono-data">--%</span>
+                </div>
+                <div class="w-full bg-titanium-950 rounded-full h-2 overflow-hidden border border-titanium-800">
+                  <div id="bar-fill-l" class="bg-gradient-to-r from-blue-600 to-blue-400 h-full transition-all duration-300" style="width: 0%;"></div>
+                </div>
+              </div>
+
+              <div class="flex flex-col gap-0.5">
+                <div class="flex justify-between text-[10px] font-bold text-titanium-400">
+                  <span>DS (RIGHT) TENSION</span>
+                  <span id="bar-pct-r" class="mono-data">100%</span>
+                </div>
+                <div class="w-full bg-titanium-950 rounded-full h-2 overflow-hidden border border-titanium-800">
+                  <div id="bar-fill-r" class="bg-gradient-to-r from-red-600 to-red-400 h-full transition-all duration-300" style="width: 0%;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Bracing Angle Comparison Chart -->
+          <div class="flex-grow flex items-center justify-center min-h-[140px] relative">
+            <canvas id="balanceChart" class="max-h-[160px]"></canvas>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+
+  <!-- ================= TAB 2: HUB CONFIGURATION & 2D CAD ================= -->
+  <div id="tab-content-hub" class="tab-pane hidden flex flex-col lg:flex-row gap-8 w-full">
+    <!-- LEFT COLUMN: HUB INPUTS & PRESET DROPDOWN -->
+    <div class="w-full lg:w-[440px] flex-shrink-0 flex flex-col gap-6">
+      
+      <!-- Hub Model Preset Selector Card -->
+      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl">
+        <div class="flex items-center gap-2.5 mb-3">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+          <h2 class="text-base font-bold text-titanium-50 uppercase tracking-wider">Hub Preset Library</h2>
+        </div>
+
         <div class="flex flex-col gap-1.5">
-          <label class="text-xs font-semibold text-titanium-400 uppercase tracking-wider">Select Hub Preset</label>
+          <label class="text-xs font-semibold text-titanium-400 uppercase tracking-wider">Select Hub Model</label>
           <select id="hub-preset" class="w-full bg-titanium-950 border border-titanium-800 rounded-xl px-3 py-2.5 text-sm text-titanium-100 hover:border-titanium-700 focus:border-cyan-500 focus:outline-none transition-all cursor-pointer">
             <option value="custom">Custom / Manual Hub Specs</option>
-            {hubs.map(h => (
-              <option value={h.id} data-pcdl={h.flangePcdLeft} data-pcdr={h.flangePcdRight} data-wl={h.centerToLeft} data-wr={h.centerToRight} data-sh={h.spokeHoleDiameter}>
+            {hubs.map((h, i) => (
+              <option value={h.id} selected={i === 0} data-pcdl={h.flangePcdLeft} data-pcdr={h.flangePcdRight} data-wl={h.centerToLeft} data-wr={h.centerToRight} data-sh={h.spokeHoleDiameter} data-ft={h.flangeThickness || 3.0} data-brand={h.brand} data-name={h.name} data-spacing={h.spacing} data-disctype={h.discType} data-hubtype={h.name.toLowerCase().includes('rear') ? 'Rear' : 'Front'}>
                 {h.brand} - {h.name} ({h.spacing})
               </option>
             ))}
           </select>
         </div>
       </div>
-    </div>
 
-    <!-- Main Build Parameters Card -->
-    <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl animate-fade-in" style="animation-delay: 0.1s;">
-      <div class="flex items-center gap-2.5 mb-5">
-        <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 6h9.75M10.5 6a1.5 1.5 0 11-3 0m3 0a1.5 1.5 0 10-3 0M3.75 6H7.5m3 12h9.75m-9.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-3.75 0H7.5m9-6h3.75m-3.75 0a1.5 1.5 0 01-3 0m3 0a1.5 1.5 0 00-3 0m-9.75 0h9.75" />
-        </svg>
-        <h2 class="text-base font-bold text-titanium-50 uppercase tracking-wider">Manual Specifications</h2>
+      <!-- Hub Geometry Card -->
+      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl">
+        <div class="flex items-center gap-2.5 mb-5">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M10.343 3.94c.09-.542.56-.94 1.11-.94h1.093c.55 0 1.02.398 1.11.94l.149.894c.07.424.384.764.78.93.398.164.855.142 1.205-.108l.737-.527a1.125 1.125 0 011.45.12l.773.774c.39.389.44 1.002.12 1.45l-.527.737c-.25.35-.272.806-.107 1.204.165.397.505.71.93.78l.893.15c.543.09.94.559.94 1.109v1.094c0 .55-.397 1.02-.94 1.11l-.894.149c-.424.07-.764.383-.929.78-.165.398-.143.854.107 1.204l.527.738c.32.447.27 1.06-.12 1.451l-.774.773a1.125 1.125 0 01-1.449.12l-.738-.527c-.35-.25-.806-.272-1.203-.107-.398.165-.71.505-.781.929l-.149.894c-.09.542-.56.94-1.11.94h-1.094c-.55 0-1.019-.398-1.11-.94l-.148-.894c-.071-.424-.384-.764-.781-.93-.398-.164-.854-.142-1.204.108l-.738.527a1.125 1.125 0 01-1.45-.12l-.773-.774a1.125 1.125 0 01-.12-1.45l.527-.737c.25-.35.273-.806.108-1.204-.165-.397-.506-.71-.93-.78l-.894-.15c-.542-.09-.94-.56-.94-1.109v-1.094c0-.55.398-1.02.94-1.11l.894-.149c.424-.07.765-.383.93-.78.165-.398.143-.854-.108-1.204l-.526-.738a1.125 1.125 0 01.12-1.451l.773-.773a1.125 1.125 0 011.45-.12l.737.527c.35.25.807.272 1.204.107.397-.165.71-.505.78-.929l.149-.894z" />
+          </svg>
+          <h2 class="text-base font-bold text-titanium-50 uppercase tracking-wider">Hub Geometry Specifications</h2>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Left Flange PCD (dL)</label>
+            <input type="number" id="input-pcdl" step="0.1" value="57.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Right Flange PCD (dR)</label>
+            <input type="number" id="input-pcdr" step="0.1" value="59.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Left Center-Flange (wL)</label>
+            <input type="number" id="input-wl" step="0.1" value="35.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Right Center-Flange (wR)</label>
+            <input type="number" id="input-wr" step="0.1" value="22.6" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Spoke Hole Dia (s)</label>
+            <input type="number" id="input-sh" step="0.1" value="2.6" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Flange Thickness (t)</label>
+            <input type="number" id="input-ft" step="0.1" value="3.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-col gap-1 col-span-2">
+            <label class="text-xs font-medium text-titanium-400">Hub Center Offset (ho)</label>
+            <input type="number" id="input-ho" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+        </div>
       </div>
 
-      <!-- Tabs or Form Sections -->
-      <div class="flex flex-col gap-6">
-        <!-- 1. RIM SPECS -->
-        <div class="flex flex-col gap-4 border-b border-titanium-800/50 pb-5">
-          <h3 class="text-xs font-bold text-cyan-400 tracking-widest uppercase">Rim Geometry</h3>
-          <div class="grid grid-cols-2 gap-4">
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">ERD (mm)</label>
-              <input type="number" id="input-erd" step="0.1" value="601.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">Asymmetric OSB (mm)</label>
-              <input type="number" id="input-osb" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">NDS Drilling Offset</label>
-              <input type="number" id="input-ol" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">DS Drilling Offset</label>
-              <input type="number" id="input-or" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-          </div>
+      <!-- Hub Derived Geometry Summary Card -->
+      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
+        <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider">Derived Hub Dimensions</h3>
+        <div class="flex justify-between items-center text-xs py-1 border-b border-titanium-800/50">
+          <span class="text-titanium-400">Total Flange Distance (wL + wR):</span>
+          <span id="hub-total-flange" class="font-bold text-titanium-100 mono-data">57.6 mm</span>
         </div>
-
-        <!-- 2. HUB SPECS -->
-        <div class="flex flex-col gap-4 border-b border-titanium-800/50 pb-5">
-          <h3 class="text-xs font-bold text-cyan-400 tracking-widest uppercase">Hub Geometry</h3>
-          <div class="grid grid-cols-2 gap-4">
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">Left Flange PCD (dL)</label>
-              <input type="number" id="input-pcdl" step="0.1" value="58.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">Right Flange PCD (dR)</label>
-              <input type="number" id="input-pcdr" step="0.1" value="52.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">Left Center-Flange (wL)</label>
-              <input type="number" id="input-wl" step="0.1" value="36.8" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">Right Center-Flange (wR)</label>
-              <input type="number" id="input-wr" step="0.1" value="21.8" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">Spoke Hole Dia (mm)</label>
-              <input type="number" id="input-sh" step="0.1" value="2.6" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">Hub Center Offset (ho)</label>
-              <input type="number" id="input-ho" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none focus:ring-1 focus:ring-cyan-500/30" />
-            </div>
-          </div>
+        <div class="flex justify-between items-center text-xs py-1 border-b border-titanium-800/50">
+          <span class="text-titanium-400">Flange Symmetry Ratio (wR / wL):</span>
+          <span id="hub-flange-ratio" class="font-bold text-cyan-400 mono-data">0.65</span>
         </div>
-
-        <!-- 3. BUILD PARAMETERS -->
-        <div class="flex flex-col gap-4">
-          <h3 class="text-xs font-bold text-cyan-400 tracking-widest uppercase">Wheel Assembly</h3>
-          <div class="flex flex-col gap-3">
-            <div class="flex flex-col gap-1.5">
-              <div class="flex justify-between items-center text-xs text-titanium-400">
-                <label class="font-medium">Total Spoke Count (N)</label>
-                <span id="label-count" class="font-bold text-titanium-100 bg-titanium-950 px-2 py-0.5 rounded border border-titanium-800 mono-data">32</span>
-              </div>
-              <input type="range" id="input-count" min="16" max="40" step="4" value="32" class="w-full accent-cyan-500 h-1.5 bg-titanium-950 rounded-lg appearance-none cursor-pointer border border-titanium-800" />
-            </div>
-
-            <div class="grid grid-cols-2 gap-4">
-              <div class="flex flex-col gap-1">
-                <label class="text-xs font-medium text-titanium-400">Left Crosses</label>
-                <select id="input-crossl" class="bg-titanium-950 border border-titanium-800 rounded-lg px-2 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none cursor-pointer">
-                  <option value="0">Radial (0x)</option>
-                  <option value="1">1 Cross (1x)</option>
-                  <option value="2">2 Crosses (2x)</option>
-                  <option value="3" selected="selected">3 Crosses (3x)</option>
-                  <option value="4">4 Crosses (4x)</option>
-                </select>
-              </div>
-              <div class="flex flex-col gap-1">
-                <label class="text-xs font-medium text-titanium-400">Right Crosses</label>
-                <select id="input-crossr" class="bg-titanium-950 border border-titanium-800 rounded-lg px-2 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none cursor-pointer">
-                  <option value="0">Radial (0x)</option>
-                  <option value="1">1 Cross (1x)</option>
-                  <option value="2">2 Crosses (2x)</option>
-                  <option value="3" selected="selected">3 Crosses (3x)</option>
-                  <option value="4">4 Crosses (4x)</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">Asymmetric Rim Orientation (Rim Flip)</label>
-              <select id="input-rimflip" class="bg-titanium-950 border border-titanium-800 rounded-lg px-2 py-1.5 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none cursor-pointer">
-                <option value="Auto" selected="selected">Auto-Balance Tension</option>
-                <option value="Left">Orient Left (Standard)</option>
-                <option value="Right">Orient Right (Flipped)</option>
-              </select>
-            </div>
-          </div>
+        <div class="flex justify-between items-center text-xs py-1">
+          <span class="text-titanium-400">PCD Difference (|dL - dR|):</span>
+          <span id="hub-pcd-diff" class="font-bold text-titanium-100 mono-data">2.0 mm</span>
         </div>
       </div>
     </div>
-    
-    <!-- Share Configuration Card -->
-    <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-4 shadow-xl animate-fade-in flex items-center justify-between gap-3">
-      <div class="flex flex-col gap-0.5">
-        <span class="text-xs font-bold text-titanium-50 uppercase tracking-wide">Share Build</span>
-        <span class="text-[10px] text-titanium-500">Copy URL to save or send specs</span>
+
+    <!-- RIGHT COLUMN: 2D CAD HUB CROSS-SECTION VIEWPORT -->
+    <div class="flex-grow flex flex-col gap-4">
+      <div class="relative bg-titanium-900/40 border border-titanium-850 rounded-2xl h-[520px] overflow-hidden shadow-2xl flex flex-col">
+        <!-- CAD Canvas Container -->
+        <div id="hub-cad-container" class="w-full h-full"></div>
+
+        <!-- Overlay Control Buttons -->
+        <div class="absolute top-4 right-4 flex gap-2">
+          <button id="btn-reset-hub-cad" class="px-3 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-xs font-bold text-titanium-300 rounded-xl hover:text-cyan-400 hover:border-cyan-500/40 transition-all flex items-center gap-1.5">
+            <span>↺</span> Reset Zoom & Pan
+          </button>
+        </div>
+
+        <div class="absolute bottom-4 left-4 pointer-events-none text-[10px] text-titanium-500 font-semibold uppercase tracking-widest">
+          Mouse Drag to Pan • Scroll Wheel to Zoom • Live 2D Technical CAD
+        </div>
       </div>
-      <button id="copy-url-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-950/20 hover:bg-cyan-900/30 border border-cyan-500/20 hover:border-cyan-500/50 text-cyan-400 hover:text-cyan-300 text-xs font-bold rounded-xl transition-all">
-        <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M13.19 8.688a4.5 4.5 0 011.242 7.244l-4.5 4.5a4.5 4.5 0 01-6.364-6.364l1.757-1.757m13.35-.622l1.757-1.757a4.5 4.5 0 00-6.364-6.364l-4.5 4.5a4.5 4.5 0 001.242 7.244" />
-        </svg>
-        Copy Link
-      </button>
     </div>
   </div>
 
-  <!-- RIGHT COLUMN: VIEWPORT & OUTCOMES -->
-  <div class="flex-grow flex flex-col gap-6 animate-fade-in" style="animation-delay: 0.15s;">
-    <!-- 3D Viewport Box -->
-    <div id="viewport-card" class="relative bg-titanium-900/40 border border-titanium-850 rounded-2xl h-[420px] sm:h-[480px] lg:h-[520px] overflow-hidden shadow-2xl flex flex-col transition-all duration-300">
-      <!-- 3D Canvas Container -->
-      <div id="canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
 
-      <!-- Fixed 3D Measurement HUD Panel (Top-Left) -->
-      <div id="ruler-3d-badge" class="absolute top-4 left-4 hidden bg-titanium-950/85 backdrop-blur-md border border-cyan-500/40 p-3 rounded-xl shadow-2xl text-xs flex flex-col gap-1.5 z-20 pointer-events-none select-none min-w-[210px]">
-        <div class="flex items-center gap-1.5 font-bold text-cyan-400 border-b border-titanium-800 pb-1">
-          <span>📏 3D Vector Measurement</span>
-        </div>
-        <div class="flex justify-between gap-4">
-          <span class="text-titanium-400">Straight 3D Vector:</span>
-          <span id="badge-direct-val" class="font-bold text-cyan-300 mono-data">-- mm</span>
-        </div>
-        <div class="flex justify-between gap-4">
-          <span class="text-titanium-400">Actual Wire (bends):</span>
-          <span id="badge-actual-val" class="font-bold text-yellow-400 mono-data">-- mm</span>
-        </div>
-        <div class="flex justify-between gap-4 border-t border-titanium-800/80 pt-1">
-          <span class="text-titanium-400 font-medium">Path Delta (bends):</span>
-          <span id="badge-delta-val" class="font-bold text-emerald-400 mono-data">+-- mm</span>
-        </div>
-      </div>
-
-      <!-- Hover Tooltip -->
-      <div id="spoke-tooltip" class="absolute hidden bg-titanium-950/90 backdrop-blur-md border border-cyan-500/30 p-3 rounded-xl shadow-2xl text-xs flex flex-col gap-1 pointer-events-none z-30 min-w-[180px]">
-        <div id="tooltip-title" class="font-bold text-cyan-400 flex items-center justify-between gap-2 border-b border-titanium-800 pb-1">
-          <span>Spoke</span>
-        </div>
-        <div class="flex justify-between gap-4 mt-1">
-          <span class="text-titanium-500">Spoke Order Length:</span>
-          <span id="tooltip-length" class="font-bold text-titanium-100 mono-data">-- mm</span>
-        </div>
-        <div class="flex justify-between gap-4">
-          <span class="text-titanium-500">Straight 3D Vector:</span>
-          <span id="tooltip-direct" class="font-bold text-cyan-400 mono-data">-- mm</span>
-        </div>
-        <div class="flex justify-between gap-4">
-          <span class="text-titanium-500">Actual Wire (bends):</span>
-          <span id="tooltip-actual" class="font-bold text-yellow-400 mono-data">-- mm</span>
-        </div>
-        <div class="flex justify-between gap-4">
-          <span class="text-titanium-500">Bracing Angle:</span>
-          <span id="tooltip-bracing" class="font-semibold text-titanium-100 mono-data">--°</span>
-        </div>
-        <div class="flex justify-between gap-4">
-          <span class="text-titanium-500">Exit Bend Angle:</span>
-          <span id="tooltip-exitbend" class="font-semibold text-cyan-400 mono-data">--°</span>
-        </div>
-      </div>
-
-      <!-- Camera Overlay controls -->
-      <div class="absolute bottom-4 left-4 flex flex-wrap gap-2 z-20">
-        <button data-cam="isometric" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Iso</button>
-        <button data-cam="lateral" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Side (Lacing)</button>
-        <button data-cam="dish" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Dish (Alignment)</button>
-        <button data-cam="hub" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Hub</button>
-        <button data-cam="spoke-delta" class="cam-btn px-2.5 py-1.5 bg-yellow-950/40 border border-yellow-500/30 text-[11px] font-bold text-yellow-300 rounded-lg hover:text-yellow-100 hover:border-yellow-400 transition-all" title="Highlight single spoke path delta (Straight Vector vs Actual Bends)">🔬 Spoke Delta</button>
-        <button id="btn-fullpage" class="px-2.5 py-1.5 bg-cyan-950/40 border border-cyan-500/30 text-[11px] font-bold text-cyan-300 rounded-lg hover:text-cyan-100 hover:border-cyan-400 transition-all flex items-center gap-1.5" title="Expand 3D Viewport to Full Page">
-          <span id="fp-icon">🗖</span>
-          <span id="fp-label">Full Page</span>
-        </button>
-      </div>
-
-      <!-- Settings Overlay controls -->
-      <div class="absolute top-4 right-4 flex flex-col gap-2.5 z-20 items-end max-w-[200px]">
-        <!-- Exploded Slider -->
-        <div class="flex flex-col gap-1 px-3 py-2 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 rounded-xl w-full">
-          <div class="flex justify-between text-[10px] font-bold text-titanium-400">
-            <span>EXPLODE HUB</span>
-            <span id="explode-val" class="mono-data">0%</span>
-          </div>
-          <input type="range" id="slider-explode" min="0" max="1" step="0.05" value="0" class="w-full h-1 bg-titanium-900 rounded appearance-none cursor-pointer accent-cyan-500" />
+  <!-- ================= TAB 3: RIM CONFIGURATION & 2D CAD ================= -->
+  <div id="tab-content-rim" class="tab-pane hidden flex flex-col lg:flex-row gap-8 w-full">
+    <!-- LEFT COLUMN: RIM INPUTS & PRESET DROPDOWN -->
+    <div class="w-full lg:w-[440px] flex-shrink-0 flex flex-col gap-6">
+      
+      <!-- Rim Model Preset Selector Card -->
+      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl">
+        <div class="flex items-center gap-2.5 mb-3">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M20.25 7.5l-.625 10.632a2.25 2.25 0 01-2.247 2.118H6.622a2.25 2.25 0 01-2.247-2.118L3.75 7.5M10 11.25h4M3.375 7.5h17.25c.621 0 1.125-.504 1.125-1.125v-1.5c0-.621-.504-1.125-1.125-1.125H3.375c-.621 0-1.125.504-1.125 1.125v1.5c0 .621.504 1.125 1.125 1.125z" />
+          </svg>
+          <h2 class="text-base font-bold text-titanium-50 uppercase tracking-wider">Rim Preset Library</h2>
         </div>
 
-        <!-- Visibility / Color / Interlacing / Ruler Selects -->
-        <div class="flex flex-wrap gap-1 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 p-1 rounded-xl">
-          <button id="toggle-l-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">NDS (L)</button>
-          <button id="toggle-r-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">DS (R)</button>
-          <button id="toggle-interlace" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all" title="Toggle 3D Spoke Over/Under Interlacing Weave">Interlaced</button>
-          <button id="toggle-ruler" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-yellow-950/40 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/60 transition-all" title="Toggle Direct 3D Straight Measurement Vector Ruler">📏 Ruler</button>
-          <select id="select-colormode" class="bg-titanium-950 border border-titanium-800 rounded-lg text-[10px] font-bold px-1 py-1 text-titanium-200 cursor-pointer focus:outline-none">
-            <option value="classic">Titanium Steel</option>
-            <option value="side">Side Colors</option>
-            <option value="tension">Tension Guide</option>
+        <div class="flex flex-col gap-1.5">
+          <label class="text-xs font-semibold text-titanium-400 uppercase tracking-wider">Select Rim Model</label>
+          <select id="rim-preset" class="w-full bg-titanium-950 border border-titanium-800 rounded-xl px-3 py-2.5 text-sm text-titanium-100 hover:border-titanium-700 focus:border-cyan-500 focus:outline-none transition-all cursor-pointer">
+            <option value="custom">Custom / Manual Rim Specs</option>
+            {rims.map((r, i) => (
+              <option value={r.id} selected={i === 0} data-erd={r.erd} data-osb={r.osb} data-ol={r.drillingOffsetLeft} data-or={r.drillingOffsetRight} data-wo={r.widthOuter || 22.5} data-wi={r.widthInner || 17.5} data-dep={r.depth || 15.5} data-brand={r.brand} data-name={r.name} data-cat={r.category}>
+                {r.brand} - {r.name} ({r.category})
+              </option>
+            ))}
           </select>
         </div>
       </div>
 
-      <!-- Quick help text -->
-      <div class="absolute bottom-4 right-4 pointer-events-none select-none text-[10px] text-titanium-500 font-semibold uppercase tracking-widest hidden md:block">
-        Drag to Rotate • Scroll to Zoom • Hover Spoke to Measure
+      <!-- Rim Geometry Card -->
+      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl">
+        <div class="flex items-center gap-2.5 mb-5">
+          <svg class="w-5 h-5 text-cyan-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+          </svg>
+          <h2 class="text-base font-bold text-titanium-50 uppercase tracking-wider">Rim Geometry Specifications</h2>
+        </div>
+
+        <div class="grid grid-cols-2 gap-4">
+          <div class="flex flex-col gap-1 col-span-2">
+            <label class="text-xs font-medium text-titanium-400">ERD - Spoke Bed Diameter (mm)</label>
+            <input type="number" id="input-erd" step="0.1" value="392.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Outer Width (mm)</label>
+            <input type="number" id="input-rim-wo" step="0.1" value="22.5" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Inner Well Width (mm)</label>
+            <input type="number" id="input-rim-wi" step="0.1" value="17.5" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Profile Depth (mm)</label>
+            <input type="number" id="input-rim-dep" step="0.1" value="15.5" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">Asymmetric OSB (mm)</label>
+            <input type="number" id="input-osb" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">NDS Drilling Offset (oL)</label>
+            <input type="number" id="input-ol" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+          <div class="flex flex-col gap-1">
+            <label class="text-xs font-medium text-titanium-400">DS Drilling Offset (oR)</label>
+            <input type="number" id="input-or" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+          </div>
+        </div>
+      </div>
+
+      <!-- Rim Derived Specs Summary Card -->
+      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
+        <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider">Derived Rim Dimensions</h3>
+        <div class="flex justify-between items-center text-xs py-1 border-b border-titanium-800/50">
+          <span class="text-titanium-400">Effective Spoke Radius (ERD / 2):</span>
+          <span id="rim-radius" class="font-bold text-titanium-100 mono-data">196.0 mm</span>
+        </div>
+        <div class="flex justify-between items-center text-xs py-1 border-b border-titanium-800/50">
+          <span class="text-titanium-400">ERD Circumference (π × ERD):</span>
+          <span id="rim-circumference" class="font-bold text-titanium-100 mono-data">1231.5 mm</span>
+        </div>
+        <div class="flex justify-between items-center text-xs py-1">
+          <span class="text-titanium-400">Net Asymmetric Offset Shift:</span>
+          <span id="rim-net-shift" class="font-bold text-cyan-400 mono-data">0.0 mm</span>
+        </div>
       </div>
     </div>
 
-    <!-- CALCULATIONS GRID & ANALYTICS -->
-    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-      <!-- Side-by-Side Outputs Table -->
-      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl">
-        <h2 class="text-sm font-bold text-titanium-50 uppercase tracking-wider mb-4 border-b border-titanium-800 pb-2 flex justify-between">
-          <span>Engine Output Metrics</span>
-          <span class="text-xs font-semibold text-cyan-400 lowercase italic">Calculated</span>
-        </h2>
+    <!-- RIGHT COLUMN: 2D CAD RIM CROSS-SECTION VIEWPORT -->
+    <div class="flex-grow flex flex-col gap-4">
+      <div class="relative bg-titanium-900/40 border border-titanium-850 rounded-2xl h-[520px] overflow-hidden shadow-2xl flex flex-col">
+        <!-- CAD Canvas Container -->
+        <div id="rim-cad-container" class="w-full h-full"></div>
 
-        <div class="flex flex-col gap-4">
-          <!-- Spoke Length Primary display -->
-          <div class="grid grid-cols-2 gap-4">
-            <!-- Left Side Length Card -->
-            <div class="bg-titanium-950/50 border border-blue-500/10 p-3.5 rounded-xl flex flex-col gap-0.5">
-              <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">NDS (Left) Spoke Length</span>
-              <span id="out-len-l" class="text-3xl font-bold text-titanium-50 tracking-tight mono-data">--<span class="text-lg text-titanium-500 ml-1">mm</span></span>
-              <span id="out-len-l-round" class="text-xs text-titanium-400">Order: <span class="font-bold mono-data">-- mm</span></span>
-            </div>
-
-            <!-- Right Side Length Card -->
-            <div class="bg-titanium-950/50 border border-red-500/10 p-3.5 rounded-xl flex flex-col gap-0.5">
-              <span class="text-[10px] font-bold text-red-400 uppercase tracking-wider">DS (Right) Spoke Length</span>
-              <span id="out-len-r" class="text-3xl font-bold text-titanium-50 tracking-tight mono-data">--<span class="text-lg text-titanium-500 ml-1">mm</span></span>
-              <span id="out-len-r-round" class="text-xs text-titanium-400">Order: <span class="font-bold mono-data">-- mm</span></span>
-            </div>
-          </div>
-
-          <!-- Extended physics analytics table -->
-          <div class="flex flex-col gap-2.5 text-xs">
-            <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
-              <span class="text-titanium-400 font-medium">Effective Flange Offset</span>
-              <div class="flex gap-6 font-bold mono-data">
-                <span id="out-weff-l" class="text-blue-400">-- mm</span>
-                <span id="out-weff-r" class="text-red-400">-- mm</span>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
-              <span class="text-titanium-400 font-medium">Lateral Bracing Angle</span>
-              <div class="flex gap-6 font-semibold mono-data">
-                <span id="out-bracing-l" class="text-blue-400">--°</span>
-                <span id="out-bracing-r" class="text-red-400">--°</span>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
-              <span class="text-titanium-400 font-medium">Rim Wrap Angle (2D)</span>
-              <div class="flex gap-6 font-semibold mono-data">
-                <span id="out-wrap-l">--°</span>
-                <span id="out-wrap-r">--°</span>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
-              <span class="text-titanium-400 font-medium">Total Rim Angle (3D)</span>
-              <div class="flex gap-6 font-semibold mono-data">
-                <span id="out-tot-l">--°</span>
-                <span id="out-tot-r">--°</span>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
-              <span class="text-titanium-400 font-medium">Flange Exit Angle</span>
-              <div class="flex gap-6 font-semibold mono-data">
-                <span id="out-exit-l">--°</span>
-                <span id="out-exit-r">--°</span>
-              </div>
-            </div>
-
-            <div class="flex items-center justify-between py-1.5 border-b border-titanium-800/40">
-              <span class="text-titanium-400 font-medium">Rotational Offset (Theta)</span>
-              <div class="flex gap-6 font-semibold mono-data">
-                <span id="out-theta-l">--°</span>
-                <span id="out-theta-r">--°</span>
-              </div>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- Charts & Tension Balance Panel -->
-      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
-        <h2 class="text-sm font-bold text-titanium-50 uppercase tracking-wider border-b border-titanium-800 pb-2">
-          Physics Analysis & Balance
-        </h2>
-
-        <!-- Relative Tension Meter (Visual Component) -->
-        <div class="flex flex-col gap-2 bg-titanium-950/40 border border-titanium-850 p-4 rounded-xl">
-          <div class="flex justify-between items-end text-xs">
-            <div class="flex flex-col gap-0.5">
-              <span class="font-bold text-titanium-400 uppercase tracking-wider text-[10px]">Tension Balance</span>
-              <span id="tension-ratio-label" class="text-lg font-bold text-cyan-400 mono-data">-- % : 100 %</span>
-            </div>
-            <span class="text-[10px] text-titanium-500 font-medium uppercase tracking-wide">Inversely proportional to W_eff</span>
-          </div>
-
-          <!-- Progress Bars -->
-          <div class="flex flex-col gap-1.5 mt-2">
-            <!-- Left Side Bar -->
-            <div class="flex flex-col gap-0.5">
-              <div class="flex justify-between text-[10px] font-bold text-titanium-400">
-                <span>NDS (LEFT) TENSION</span>
-                <span id="bar-pct-l" class="mono-data">--%</span>
-              </div>
-              <div class="w-full bg-titanium-950 rounded-full h-2 overflow-hidden border border-titanium-800">
-                <div id="bar-fill-l" class="bg-gradient-to-r from-blue-600 to-blue-400 h-full transition-all duration-300" style="width: 0%;"></div>
-              </div>
-            </div>
-
-            <!-- Right Side Bar -->
-            <div class="flex flex-col gap-0.5">
-              <div class="flex justify-between text-[10px] font-bold text-titanium-400">
-                <span>DS (RIGHT) TENSION</span>
-                <span id="bar-pct-r" class="mono-data">100%</span>
-              </div>
-              <div class="w-full bg-titanium-950 rounded-full h-2 overflow-hidden border border-titanium-800">
-                <div id="bar-fill-r" class="bg-gradient-to-r from-red-600 to-red-400 h-full transition-all duration-300" style="width: 0%;"></div>
-              </div>
-            </div>
-          </div>
+        <!-- Overlay Control Buttons -->
+        <div class="absolute top-4 right-4 flex gap-2">
+          <button id="btn-reset-rim-cad" class="px-3 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-xs font-bold text-titanium-300 rounded-xl hover:text-cyan-400 hover:border-cyan-500/40 transition-all flex items-center gap-1.5">
+            <span>↺</span> Reset Zoom & Pan
+          </button>
         </div>
 
-        <!-- Bracing Angle Comparison Radial/Doughnut Chart -->
-        <div class="flex-grow flex items-center justify-center min-h-[140px] relative">
-          <canvas id="balanceChart" class="max-h-[160px]"></canvas>
+        <div class="absolute bottom-4 left-4 pointer-events-none text-[10px] text-titanium-500 font-semibold uppercase tracking-widest">
+          Mouse Drag to Pan • Scroll Wheel to Zoom • Live 2D Technical CAD
         </div>
       </div>
     </div>
   </div>
+
 </div>
 
 <script>
-  // Dynamic imports and rendering executed strictly on client-side
   import { calculateWheelBuild } from '../utils/physicsCalculator';
   import { Viewport3D } from './Viewport3D';
+  import { HubCadVisualizer } from './HubCadVisualizer';
+  import { RimCadVisualizer } from './RimCadVisualizer';
   import { Chart } from 'chart.js/auto';
 
-  let viewport: Viewport3D;
+  let viewport: Viewport3D | null = null;
+  let hubCad: HubCadVisualizer | null = null;
+  let rimCad: RimCadVisualizer | null = null;
   let chartInstance: Chart | null = null;
+
+  // DOM Elements - Tabs
+  const btnTabAssembly = document.getElementById('btn-tab-assembly') as HTMLButtonElement;
+  const btnTabHub = document.getElementById('btn-tab-hub') as HTMLButtonElement;
+  const btnTabRim = document.getElementById('btn-tab-rim') as HTMLButtonElement;
+
+  const paneAssembly = document.getElementById('tab-content-assembly') as HTMLElement;
+  const paneHub = document.getElementById('tab-content-hub') as HTMLElement;
+  const paneRim = document.getElementById('tab-content-rim') as HTMLElement;
 
   // DOM Elements - Presets
   const rimPreset = document.getElementById('rim-preset') as HTMLSelectElement;
   const hubPreset = document.getElementById('hub-preset') as HTMLSelectElement;
 
+  // DOM Elements - Summary Badges
+  const summaryHubName = document.getElementById('summary-hub-name') as HTMLElement;
+  const summaryRimName = document.getElementById('summary-rim-name') as HTMLElement;
+  const btnEditHub = document.getElementById('btn-edit-hub') as HTMLButtonElement;
+  const btnEditRim = document.getElementById('btn-edit-rim') as HTMLButtonElement;
+
   // DOM Elements - Inputs
   const erdIn = document.getElementById('input-erd') as HTMLInputElement;
+  const woIn = document.getElementById('input-rim-wo') as HTMLInputElement;
+  const wiIn = document.getElementById('input-rim-wi') as HTMLInputElement;
+  const depIn = document.getElementById('input-rim-dep') as HTMLInputElement;
   const osbIn = document.getElementById('input-osb') as HTMLInputElement;
   const olIn = document.getElementById('input-ol') as HTMLInputElement;
   const orIn = document.getElementById('input-or') as HTMLInputElement;
@@ -424,6 +640,7 @@ import { hubs } from '../data/hubs';
   const wlIn = document.getElementById('input-wl') as HTMLInputElement;
   const wrIn = document.getElementById('input-wr') as HTMLInputElement;
   const shIn = document.getElementById('input-sh') as HTMLInputElement;
+  const ftIn = document.getElementById('input-ft') as HTMLInputElement;
   const hoIn = document.getElementById('input-ho') as HTMLInputElement;
 
   const countIn = document.getElementById('input-count') as HTMLInputElement;
@@ -460,6 +677,15 @@ import { hubs } from '../data/hubs';
   const outThetaL = document.getElementById('out-theta-l') as HTMLElement;
   const outThetaR = document.getElementById('out-theta-r') as HTMLElement;
 
+  // Derived Hub/Rim DOM Elements
+  const hubTotalFlange = document.getElementById('hub-total-flange') as HTMLElement;
+  const hubFlangeRatio = document.getElementById('hub-flange-ratio') as HTMLElement;
+  const hubPcdDiff = document.getElementById('hub-pcd-diff') as HTMLElement;
+
+  const rimRadius = document.getElementById('rim-radius') as HTMLElement;
+  const rimCircumference = document.getElementById('rim-circumference') as HTMLElement;
+  const rimNetShift = document.getElementById('rim-net-shift') as HTMLElement;
+
   // DOM Elements - Balance Meters
   const tensionRatioLabel = document.getElementById('tension-ratio-label') as HTMLElement;
   const barPctL = document.getElementById('bar-pct-l') as HTMLElement;
@@ -476,84 +702,234 @@ import { hubs } from '../data/hubs';
   const tooltipLength = document.getElementById('tooltip-length') as HTMLElement;
   const tooltipBracing = document.getElementById('tooltip-bracing') as HTMLElement;
 
-  // 1. GATHER ALL INPUT VALUES
+  // 1. SWITCH TAB LOGIC
+  function switchTab(tab: 'assembly' | 'hub' | 'rim') {
+    const tabs = [
+      { id: 'assembly', btn: btnTabAssembly, pane: paneAssembly },
+      { id: 'hub', btn: btnTabHub, pane: paneHub },
+      { id: 'rim', btn: btnTabRim, pane: paneRim },
+    ];
+
+    tabs.forEach(t => {
+      if (t.id === tab) {
+        t.pane.classList.remove('hidden');
+        t.btn.classList.add('bg-cyan-500/20', 'text-cyan-300', 'border-cyan-500/40', 'shadow-md');
+        t.btn.classList.remove('text-titanium-400', 'hover:text-titanium-200', 'hover:bg-titanium-800/50');
+      } else {
+        t.pane.classList.add('hidden');
+        t.btn.classList.remove('bg-cyan-500/20', 'text-cyan-300', 'border-cyan-500/40', 'shadow-md');
+        t.btn.classList.add('text-titanium-400', 'hover:text-titanium-200', 'hover:bg-titanium-800/50');
+      }
+    });
+
+    // Handle canvas resizes when tab becomes visible
+    setTimeout(() => {
+      if (tab === 'hub' && hubCad) hubCad.resize();
+      if (tab === 'rim' && rimCad) rimCad.resize();
+      if (tab === 'assembly' && viewport) window.dispatchEvent(new Event('resize'));
+    }, 50);
+  }
+
+  btnTabAssembly.addEventListener('click', () => switchTab('assembly'));
+  btnTabHub.addEventListener('click', () => switchTab('hub'));
+  btnTabRim.addEventListener('click', () => switchTab('rim'));
+
+  if (btnEditHub) btnEditHub.addEventListener('click', () => switchTab('hub'));
+  if (btnEditRim) btnEditRim.addEventListener('click', () => switchTab('rim'));
+
+  // CAD Reset View buttons
+  document.getElementById('btn-reset-hub-cad')?.addEventListener('click', () => hubCad?.resetView());
+  document.getElementById('btn-reset-rim-cad')?.addEventListener('click', () => rimCad?.resetView());
+
+  // 2. GATHER ALL INPUT VALUES
   function getInputs() {
+    const hubOpt = hubPreset.options[hubPreset.selectedIndex];
+    const hubBrand = hubOpt?.getAttribute('data-brand') || '';
+    const hubName = hubOpt?.getAttribute('data-name') || 'Custom Hub';
+    const hubSpacing = hubOpt?.getAttribute('data-spacing') || '';
+    const hubDisc = (hubOpt?.getAttribute('data-disctype') as '6-Bolt' | 'Centerlock' | 'None') || '6-Bolt';
+    const hubTypeAttr = hubOpt?.getAttribute('data-hubtype');
+    const isRear = hubTypeAttr ? hubTypeAttr === 'Rear' : (hubName.toLowerCase().includes('rear') || hubSpacing.includes('148') || hubSpacing.includes('142') || hubSpacing.includes('135') || hubSpacing.includes('157'));
+
     return {
-      erd: parseFloat(erdIn.value) || 601.0,
+      erd: parseFloat(erdIn.value) || 392.0,
+      rimWidthOuter: parseFloat(woIn.value) || 22.5,
+      rimWidthInner: parseFloat(wiIn.value) || 17.5,
+      rimDepth: parseFloat(depIn.value) || 15.5,
       osb: parseFloat(osbIn.value) || 0.0,
       drillingOffsetLeft: parseFloat(olIn.value) || 0.0,
       drillingOffsetRight: parseFloat(orIn.value) || 0.0,
       spokeCount: parseInt(countIn.value) || 32,
       spokeHoleDiameter: parseFloat(shIn.value) || 2.6,
+      flangeThickness: parseFloat(ftIn.value) || 3.0,
       hubOffset: parseFloat(hoIn.value) || 0.0,
       rimFlip: rimflipIn.value as 'Auto' | 'Left' | 'Right',
-      flangePcdLeft: parseFloat(pcdlIn.value) || 58.0,
-      centerToLeft: parseFloat(wlIn.value) || 36.8,
+      flangePcdLeft: parseFloat(pcdlIn.value) || 57.0,
+      centerToLeft: parseFloat(wlIn.value) || 35.0,
       crossesLeft: parseInt(crosslIn.value) || 3,
-      flangePcdRight: parseFloat(pcdrIn.value) || 52.0,
-      centerToRight: parseFloat(wrIn.value) || 21.8,
+      flangePcdRight: parseFloat(pcdrIn.value) || 59.0,
+      centerToRight: parseFloat(wrIn.value) || 22.6,
       crossesRight: parseInt(crossrIn.value) || 3,
+      hubName: hubPreset.value === 'custom' ? 'Custom Hub' : `${hubBrand} ${hubName}`,
+      spacing: hubSpacing,
+      discType: hubDisc,
+      isRear,
     };
   }
 
-  // 2. RUN CALCULATIONS & RE-RENDER
+  // Helpers to apply preset selection to form fields
+  function applyRimPreset() {
+    const selectedOpt = rimPreset.options[rimPreset.selectedIndex];
+    if (rimPreset.value !== 'custom' && selectedOpt) {
+      if (selectedOpt.hasAttribute('data-erd')) erdIn.value = selectedOpt.getAttribute('data-erd') || '392.0';
+      if (selectedOpt.hasAttribute('data-osb')) osbIn.value = selectedOpt.getAttribute('data-osb') || '0.0';
+      if (selectedOpt.hasAttribute('data-ol')) olIn.value = selectedOpt.getAttribute('data-ol') || '0.0';
+      if (selectedOpt.hasAttribute('data-or')) orIn.value = selectedOpt.getAttribute('data-or') || '0.0';
+      if (selectedOpt.hasAttribute('data-wo')) woIn.value = selectedOpt.getAttribute('data-wo') || '22.5';
+      if (selectedOpt.hasAttribute('data-wi')) wiIn.value = selectedOpt.getAttribute('data-wi') || '17.5';
+      if (selectedOpt.hasAttribute('data-dep')) depIn.value = selectedOpt.getAttribute('data-dep') || '15.5';
+    }
+  }
+
+  function applyHubPreset() {
+    const selectedOpt = hubPreset.options[hubPreset.selectedIndex];
+    if (hubPreset.value !== 'custom' && selectedOpt) {
+      if (selectedOpt.hasAttribute('data-pcdl')) pcdlIn.value = selectedOpt.getAttribute('data-pcdl') || '57.0';
+      if (selectedOpt.hasAttribute('data-pcdr')) pcdrIn.value = selectedOpt.getAttribute('data-pcdr') || '59.0';
+      if (selectedOpt.hasAttribute('data-wl')) wlIn.value = selectedOpt.getAttribute('data-wl') || '35.0';
+      if (selectedOpt.hasAttribute('data-wr')) wrIn.value = selectedOpt.getAttribute('data-wr') || '22.6';
+      if (selectedOpt.hasAttribute('data-sh')) shIn.value = selectedOpt.getAttribute('data-sh') || '2.6';
+      if (selectedOpt.hasAttribute('data-ft')) ftIn.value = selectedOpt.getAttribute('data-ft') || '3.0';
+    }
+  }
+
+  // 3. RUN CALCULATIONS & RE-RENDER ALL VISUALIZERS
   function updateAll() {
     const inputs = getInputs();
 
-    // Set label spoke count
-    countLabel.textContent = inputs.spokeCount.toString();
+    // Label spoke count
+    if (countLabel) countLabel.textContent = inputs.spokeCount.toString();
 
     // Trigger math engine
     const results = calculateWheelBuild(inputs);
 
     // Update Numerical DOM Output
-    outLenL.innerHTML = `${results.left.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
-    outLenLRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.left.calculatedSpokeLength)} mm</span>`;
-    outLenR.innerHTML = `${results.right.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
-    outLenRRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.right.calculatedSpokeLength)} mm</span>`;
+    if (outLenL) outLenL.innerHTML = `${results.left.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
+    if (outLenLRound) outLenLRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.left.calculatedSpokeLength)} mm</span>`;
+    if (outLenR) outLenR.innerHTML = `${results.right.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
+    if (outLenRRound) outLenRRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.right.calculatedSpokeLength)} mm</span>`;
 
-    outWeffL.textContent = `${results.left.effectiveFlangeDistance.toFixed(1)} mm`;
-    outWeffR.textContent = `${results.right.effectiveFlangeDistance.toFixed(1)} mm`;
+    if (outWeffL) outWeffL.textContent = `${results.left.effectiveFlangeDistance.toFixed(1)} mm`;
+    if (outWeffR) outWeffR.textContent = `${results.right.effectiveFlangeDistance.toFixed(1)} mm`;
 
-    outBracingL.textContent = `${results.left.bracingAngle.toFixed(1)}°`;
-    outBracingR.textContent = `${results.right.bracingAngle.toFixed(1)}°`;
+    if (outBracingL) outBracingL.textContent = `${results.left.bracingAngle.toFixed(1)}°`;
+    if (outBracingR) outBracingR.textContent = `${results.right.bracingAngle.toFixed(1)}°`;
 
-    outWrapL.textContent = `${results.left.wrapAngleAtRim.toFixed(1)}°`;
-    outWrapR.textContent = `${results.right.wrapAngleAtRim.toFixed(1)}°`;
+    if (outWrapL) outWrapL.textContent = `${results.left.wrapAngleAtRim.toFixed(1)}°`;
+    if (outWrapR) outWrapR.textContent = `${results.right.wrapAngleAtRim.toFixed(1)}°`;
 
-    outTotL.textContent = `${results.left.totalAngleAtRim.toFixed(1)}°`;
-    outTotR.textContent = `${results.right.totalAngleAtRim.toFixed(1)}°`;
+    if (outTotL) outTotL.textContent = `${results.left.totalAngleAtRim.toFixed(1)}°`;
+    if (outTotR) outTotR.textContent = `${results.right.totalAngleAtRim.toFixed(1)}°`;
 
-    outExitL.textContent = `${results.left.flangeExitAngle.toFixed(1)}°`;
-    outExitR.textContent = `${results.right.flangeExitAngle.toFixed(1)}°`;
+    if (outExitL) outExitL.textContent = `${results.left.flangeExitAngle.toFixed(1)}°`;
+    if (outExitR) outExitR.textContent = `${results.right.flangeExitAngle.toFixed(1)}°`;
 
-    outThetaL.textContent = `${results.left.thetaAngle.toFixed(1)}°`;
-    outThetaR.textContent = `${results.right.thetaAngle.toFixed(1)}°`;
+    if (outThetaL) outThetaL.textContent = `${results.left.thetaAngle.toFixed(1)}°`;
+    if (outThetaR) outThetaR.textContent = `${results.right.thetaAngle.toFixed(1)}°`;
+
+    // Derived Hub Specs
+    const totalFlange = inputs.centerToLeft + inputs.centerToRight;
+    const ratio = inputs.centerToLeft > 0 ? (inputs.centerToRight / inputs.centerToLeft) : 0;
+    const pcdDiff = Math.abs(inputs.flangePcdLeft - inputs.flangePcdRight);
+
+    if (hubTotalFlange) hubTotalFlange.textContent = `${totalFlange.toFixed(1)} mm`;
+    if (hubFlangeRatio) hubFlangeRatio.textContent = `${ratio.toFixed(2)}`;
+    if (hubPcdDiff) hubPcdDiff.textContent = `${pcdDiff.toFixed(1)} mm`;
+
+    // Derived Rim Specs
+    const rad = inputs.erd / 2;
+    const circ = Math.PI * inputs.erd;
+    if (rimRadius) rimRadius.textContent = `${rad.toFixed(1)} mm`;
+    if (rimCircumference) rimCircumference.textContent = `${circ.toFixed(1)} mm`;
+    if (rimNetShift) rimNetShift.textContent = `${inputs.osb.toFixed(1)} mm (${inputs.rimFlip})`;
 
     // Tension Balance Meters
     const tL = results.tensionRatioLeft;
     const tR = results.tensionRatioRight;
-    tensionRatioLabel.textContent = `${tL.toFixed(0)} % : ${tR.toFixed(0)} %`;
+    if (tensionRatioLabel) tensionRatioLabel.textContent = `${tL.toFixed(0)} % : ${tR.toFixed(0)} %`;
     
-    barPctL.textContent = `${tL.toFixed(0)}%`;
-    barPctR.textContent = `${tR.toFixed(0)}%`;
+    if (barPctL) barPctL.textContent = `${tL.toFixed(0)}%`;
+    if (barPctR) barPctR.textContent = `${tR.toFixed(0)}%`;
 
-    barFillL.style.width = `${tL}%`;
-    barFillR.style.width = `${tR}%`;
+    if (barFillL) barFillL.style.width = `${tL}%`;
+    if (barFillR) barFillR.style.width = `${tR}%`;
 
-    // Trigger Three.js Re-build
+    // Selected Preset Names & Summary Card Synchronizer
+    const hubOpt = hubPreset.options[hubPreset.selectedIndex];
+    const hubBrand = hubOpt?.getAttribute('data-brand') || '';
+    const hubName = hubOpt?.getAttribute('data-name') || 'Custom Hub';
+    const hubSpacing = hubOpt?.getAttribute('data-spacing') || '';
+
+    const rimOpt = rimPreset.options[rimPreset.selectedIndex];
+    const rimBrand = rimOpt?.getAttribute('data-brand') || '';
+    const rimName = rimOpt?.getAttribute('data-name') || 'Custom Rim';
+
+    if (summaryHubName) {
+      summaryHubName.textContent = hubPreset.value === 'custom' 
+        ? `Custom Hub (dL: ${inputs.flangePcdLeft} / dR: ${inputs.flangePcdRight})` 
+        : `${hubBrand} ${hubName}`;
+    }
+    if (summaryRimName) {
+      summaryRimName.textContent = rimPreset.value === 'custom' 
+        ? `Custom Rim (ERD: ${inputs.erd}mm)` 
+        : `${rimBrand} ${rimName}`;
+    }
+
+    // 1. Update 2D CAD Hub Visualizer
+    if (hubCad) {
+      hubCad.updateData({
+        flangePcdLeft: inputs.flangePcdLeft,
+        flangePcdRight: inputs.flangePcdRight,
+        centerToLeft: inputs.centerToLeft,
+        centerToRight: inputs.centerToRight,
+        spokeHoleDiameter: inputs.spokeHoleDiameter,
+        flangeThickness: inputs.flangeThickness,
+        hubOffset: inputs.hubOffset,
+        brand: hubBrand,
+        name: hubName,
+        spacing: hubSpacing,
+      });
+    }
+
+    // 2. Update 2D CAD Rim Visualizer
+    if (rimCad) {
+      rimCad.updateData({
+        erd: inputs.erd,
+        osb: inputs.osb,
+        drillingOffsetLeft: inputs.drillingOffsetLeft,
+        drillingOffsetRight: inputs.drillingOffsetRight,
+        rimWidthOuter: inputs.rimWidthOuter,
+        rimWidthInner: inputs.rimWidthInner,
+        rimDepth: inputs.rimDepth,
+        rimFlip: inputs.rimFlip,
+        brand: rimBrand,
+        name: rimName,
+      });
+    }
+
+    // 3. Update Three.js 3D Viewport
     if (viewport) {
       viewport.update(inputs);
     }
 
-    // Trigger Charts Re-build
+    // 4. Update Chart
     updateCharts(results.left.bracingAngle, results.right.bracingAngle);
 
-    // Update URL Hash for saving/sharing
+    // 5. Update URL Hash
     updateHash(inputs);
   }
 
-  // 3. CHARTS UPDATES (Using Chart.js)
+  // 4. CHARTS UPDATES
   function updateCharts(bracingL: number, bracingR: number) {
     const ctx = (document.getElementById('balanceChart') as HTMLCanvasElement)?.getContext('2d');
     if (!ctx) return;
@@ -599,35 +975,22 @@ import { hubs } from '../data/hubs';
     }
   }
 
-  // 4. PRESETS EVENT LISTENERS
+  // 5. PRESETS LISTENERS
   rimPreset.addEventListener('change', () => {
-    const selectedOpt = rimPreset.options[rimPreset.selectedIndex];
-    if (rimPreset.value !== 'custom') {
-      erdIn.value = selectedOpt.getAttribute('data-erd') || '';
-      osbIn.value = selectedOpt.getAttribute('data-osb') || '0';
-      olIn.value = selectedOpt.getAttribute('data-ol') || '0';
-      orIn.value = selectedOpt.getAttribute('data-or') || '0';
-      updateAll();
-    }
+    applyRimPreset();
+    updateAll();
   });
 
   hubPreset.addEventListener('change', () => {
-    const selectedOpt = hubPreset.options[hubPreset.selectedIndex];
-    if (hubPreset.value !== 'custom') {
-      pcdlIn.value = selectedOpt.getAttribute('data-pcdl') || '';
-      pcdrIn.value = selectedOpt.getAttribute('data-pcdr') || '';
-      wlIn.value = selectedOpt.getAttribute('data-wl') || '';
-      wrIn.value = selectedOpt.getAttribute('data-wr') || '';
-      shIn.value = selectedOpt.getAttribute('data-sh') || '';
-      updateAll();
-    }
+    applyHubPreset();
+    updateAll();
   });
 
-  // Automatically decouple presets if values are manually edited
-  const manualInputs = [erdIn, osbIn, olIn, orIn, pcdlIn, pcdrIn, wlIn, wrIn, shIn, hoIn];
+  // Decouple presets on manual inputs
+  const manualInputs = [erdIn, woIn, wiIn, depIn, osbIn, olIn, orIn, pcdlIn, pcdrIn, wlIn, wrIn, shIn, ftIn, hoIn];
   manualInputs.forEach(elem => {
     elem.addEventListener('input', () => {
-      if (elem === erdIn || elem === osbIn || elem === olIn || elem === orIn) {
+      if (elem === erdIn || elem === woIn || elem === wiIn || elem === depIn || elem === osbIn || elem === olIn || elem === orIn) {
         rimPreset.value = 'custom';
       } else {
         hubPreset.value = 'custom';
@@ -636,47 +999,52 @@ import { hubs } from '../data/hubs';
     });
   });
 
-  // Other form event listeners
   countIn.addEventListener('input', updateAll);
   crosslIn.addEventListener('change', updateAll);
   crossrIn.addEventListener('change', updateAll);
   rimflipIn.addEventListener('change', updateAll);
 
-  // 5. VIEWPORT DISPLAY CONTROLS
-  sliderExplode.addEventListener('input', () => {
-    const val = parseFloat(sliderExplode.value);
-    explodeValLabel.textContent = `${Math.round(val * 100)}%`;
-    if (viewport) {
-      viewport.explodedValue = val;
-      viewport.update(getInputs());
-    }
-  });
+  // 6. VIEWPORT DISPLAY CONTROLS
+  if (sliderExplode) {
+    sliderExplode.addEventListener('input', () => {
+      const val = parseFloat(sliderExplode.value);
+      if (explodeValLabel) explodeValLabel.textContent = `${Math.round(val * 100)}%`;
+      if (viewport) {
+        viewport.explodedValue = val;
+        viewport.update(getInputs());
+      }
+    });
+  }
 
   let showLeft = true;
-  toggleLSpokes.addEventListener('click', () => {
-    showLeft = !showLeft;
-    toggleLSpokes.classList.toggle('bg-cyan-950/30', showLeft);
-    toggleLSpokes.classList.toggle('text-cyan-400', showLeft);
-    toggleLSpokes.classList.toggle('bg-titanium-950', !showLeft);
-    toggleLSpokes.classList.toggle('text-titanium-500', !showLeft);
-    if (viewport) {
-      viewport.showLeftSpokes = showLeft;
-      viewport.update(getInputs());
-    }
-  });
+  if (toggleLSpokes) {
+    toggleLSpokes.addEventListener('click', () => {
+      showLeft = !showLeft;
+      toggleLSpokes.classList.toggle('bg-cyan-950/30', showLeft);
+      toggleLSpokes.classList.toggle('text-cyan-400', showLeft);
+      toggleLSpokes.classList.toggle('bg-titanium-950', !showLeft);
+      toggleLSpokes.classList.toggle('text-titanium-500', !showLeft);
+      if (viewport) {
+        viewport.showLeftSpokes = showLeft;
+        viewport.update(getInputs());
+      }
+    });
+  }
 
   let showRight = true;
-  toggleRSpokes.addEventListener('click', () => {
-    showRight = !showRight;
-    toggleRSpokes.classList.toggle('bg-cyan-950/30', showRight);
-    toggleRSpokes.classList.toggle('text-cyan-400', showRight);
-    toggleRSpokes.classList.toggle('bg-titanium-950', !showRight);
-    toggleRSpokes.classList.toggle('text-titanium-500', !showRight);
-    if (viewport) {
-      viewport.showRightSpokes = showRight;
-      viewport.update(getInputs());
-    }
-  });
+  if (toggleRSpokes) {
+    toggleRSpokes.addEventListener('click', () => {
+      showRight = !showRight;
+      toggleRSpokes.classList.toggle('bg-cyan-950/30', showRight);
+      toggleRSpokes.classList.toggle('text-cyan-400', showRight);
+      toggleRSpokes.classList.toggle('bg-titanium-950', !showRight);
+      toggleRSpokes.classList.toggle('text-titanium-500', !showRight);
+      if (viewport) {
+        viewport.showRightSpokes = showRight;
+        viewport.update(getInputs());
+      }
+    });
+  }
 
   if (toggleInterlace) {
     toggleInterlace.addEventListener('click', () => {
@@ -707,12 +1075,14 @@ import { hubs } from '../data/hubs';
     });
   }
 
-  selectColorMode.addEventListener('change', () => {
-    if (viewport) {
-      viewport.colorMode = selectColorMode.value as 'classic' | 'side' | 'tension';
-      viewport.update(getInputs());
-    }
-  });
+  if (selectColorMode) {
+    selectColorMode.addEventListener('change', () => {
+      if (viewport) {
+        viewport.colorMode = selectColorMode.value as 'classic' | 'side' | 'tension';
+        viewport.update(getInputs());
+      }
+    });
+  }
 
   // Camera preset selectors
   document.querySelectorAll('.cam-btn').forEach(btn => {
@@ -722,7 +1092,7 @@ import { hubs } from '../data/hubs';
     });
   });
 
-  // Full Page Viewport Mode (Escapes parent container to fill 100% of browser page viewport)
+  // Full Page Viewport Mode
   const viewportCard = document.getElementById('viewport-card') as HTMLElement;
   const btnFullpage = document.getElementById('btn-fullpage') as HTMLButtonElement;
   const fpIcon = document.getElementById('fp-icon') as HTMLElement;
@@ -737,23 +1107,17 @@ import { hubs } from '../data/hubs';
     isFullPage = !isFullPage;
 
     if (isFullPage) {
-      // 1. Insert a placeholder in the column to maintain column height
       originalParent = viewportCard.parentElement;
       placeholder = document.createElement('div');
       placeholder.className = 'h-[420px] sm:h-[480px] lg:h-[520px] w-full rounded-2xl border border-titanium-800/40 bg-titanium-950/20 flex items-center justify-center text-xs font-bold text-titanium-600 uppercase tracking-widest';
       placeholder.textContent = '3D Viewport in Full Page Mode';
-      
-      if (originalParent) {
-        originalParent.insertBefore(placeholder, viewportCard);
-      }
 
-      // 2. Move viewportCard directly to document.body to bypass CSS transform containing blocks
+      if (originalParent) originalParent.insertBefore(placeholder, viewportCard);
       document.body.appendChild(viewportCard);
 
-      // 3. Apply full page fixed dimensions
       viewportCard.classList.add('fixed', 'inset-0', 'z-[9999]', 'w-screen', 'h-screen', 'rounded-none', 'bg-titanium-950/98', 'backdrop-blur-2xl');
       viewportCard.classList.remove('relative', 'rounded-2xl', 'h-[420px]', 'sm:h-[480px]', 'lg:h-[520px]');
-      
+
       if (fpIcon) fpIcon.textContent = '✕';
       if (fpLabel) fpLabel.textContent = 'Exit Full Page';
       if (btnFullpage) {
@@ -762,17 +1126,15 @@ import { hubs } from '../data/hubs';
       }
       document.body.style.overflow = 'hidden';
     } else {
-      // 1. Restore viewportCard back to original column position
       if (originalParent && placeholder) {
         originalParent.insertBefore(viewportCard, placeholder);
         placeholder.remove();
         placeholder = null;
       }
 
-      // 2. Restore normal card dimensions
       viewportCard.classList.remove('fixed', 'inset-0', 'z-[9999]', 'w-screen', 'h-screen', 'rounded-none', 'bg-titanium-950/98', 'backdrop-blur-2xl');
       viewportCard.classList.add('relative', 'rounded-2xl', 'h-[420px]', 'sm:h-[480px]', 'lg:h-[520px]');
-      
+
       if (fpIcon) fpIcon.textContent = '🗖';
       if (fpLabel) fpLabel.textContent = 'Full Page';
       if (btnFullpage) {
@@ -782,22 +1144,16 @@ import { hubs } from '../data/hubs';
       document.body.style.overflow = '';
     }
 
-    // Trigger Three.js WebGL viewport resize
     setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
   }
 
-  if (btnFullpage) {
-    btnFullpage.addEventListener('click', toggleFullPage);
-  }
+  if (btnFullpage) btnFullpage.addEventListener('click', toggleFullPage);
 
-  // Handle ESC key to exit full page view mode
   window.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape' && isFullPage) {
-      toggleFullPage();
-    }
+    if (e.key === 'Escape' && isFullPage) toggleFullPage();
   });
 
-  // 6. RAYCAST INTERACTION & 3D RULER EVENT HANDLERS
+  // 7. RAYCAST & TOOLTIP EVENTS
   const tooltipExitBend = document.getElementById('tooltip-exitbend') as HTMLElement;
   const tooltipDirect = document.getElementById('tooltip-direct') as HTMLElement;
   const tooltipActual = document.getElementById('tooltip-actual') as HTMLElement;
@@ -813,7 +1169,6 @@ import { hubs } from '../data/hubs';
 
     if (visible && direct3DLength > 0) {
       ruler3dBadge.classList.remove('hidden');
-
       if (badgeDirectVal) badgeDirectVal.textContent = `${direct3DLength.toFixed(1)} mm`;
       if (badgeActualVal) badgeActualVal.textContent = `${actualCurveLength.toFixed(1)} mm`;
       if (badgeDeltaVal) {
@@ -827,41 +1182,33 @@ import { hubs } from '../data/hubs';
 
   window.addEventListener('spoke-hover', (e: any) => {
     const { side, index, isLeading, length, direct3DLength, actualCurveLength, bracingAngle, flangeExitBendAngle, event } = e.detail;
-    
-    // Position tooltip absolute near cursor
+
+    if (!tooltip) return;
     tooltip.style.left = `${event.clientX - 10}px`;
     tooltip.style.top = `${event.clientY - 170}px`;
     tooltip.classList.remove('hidden');
 
-    tooltipTitle.innerHTML = `<span>${side} Side Spoke #${index + 1}</span><span class="text-[9px] px-1.5 py-0.5 rounded ${isLeading ? 'bg-cyan-950/50 text-cyan-400 border border-cyan-500/10' : 'bg-violet-950/50 text-violet-400 border border-violet-500/10'} font-bold uppercase">${isLeading ? 'Leading' : 'Trailing'}</span>`;
-    tooltipLength.textContent = `${length.toFixed(1)} mm`;
-    if (tooltipDirect && direct3DLength !== undefined) {
-      tooltipDirect.textContent = `${direct3DLength.toFixed(1)} mm`;
-    }
-    if (tooltipActual && actualCurveLength !== undefined) {
-      tooltipActual.textContent = `${actualCurveLength.toFixed(1)} mm`;
-    }
-    tooltipBracing.textContent = `${bracingAngle.toFixed(1)}°`;
-    if (tooltipExitBend && flangeExitBendAngle !== undefined) {
-      tooltipExitBend.textContent = `${flangeExitBendAngle.toFixed(1)}°`;
-    }
+    if (tooltipTitle) tooltipTitle.innerHTML = `<span>${side} Side Spoke #${index + 1}</span><span class="text-[9px] px-1.5 py-0.5 rounded ${isLeading ? 'bg-cyan-950/50 text-cyan-400 border border-cyan-500/10' : 'bg-violet-950/50 text-violet-400 border border-violet-500/10'} font-bold uppercase">${isLeading ? 'Leading' : 'Trailing'}</span>`;
+    if (tooltipLength) tooltipLength.textContent = `${length.toFixed(1)} mm`;
+    if (tooltipDirect && direct3DLength !== undefined) tooltipDirect.textContent = `${direct3DLength.toFixed(1)} mm`;
+    if (tooltipActual && actualCurveLength !== undefined) tooltipActual.textContent = `${actualCurveLength.toFixed(1)} mm`;
+    if (tooltipBracing) tooltipBracing.textContent = `${bracingAngle.toFixed(1)}°`;
+    if (tooltipExitBend && flangeExitBendAngle !== undefined) tooltipExitBend.textContent = `${flangeExitBendAngle.toFixed(1)}°`;
   });
 
   window.addEventListener('spoke-unhover', () => {
-    tooltip.classList.add('hidden');
+    if (tooltip) tooltip.classList.add('hidden');
   });
 
-  // 7. URL HASH SHARING
+  // 8. URL HASH SHARING
   function updateHash(inputs: ReturnType<typeof getInputs>) {
     const params = new URLSearchParams();
     for (const [key, val] of Object.entries(inputs)) {
       params.set(key, val.toString());
     }
-    // Update preset names too
     params.set('rp', rimPreset.value);
     params.set('hp', hubPreset.value);
 
-    // Silent hash update
     history.replaceState(null, '', `#${params.toString()}`);
   }
 
@@ -871,14 +1218,11 @@ import { hubs } from '../data/hubs';
 
     try {
       const params = new URLSearchParams(hash.substring(1));
-      
-      // Load presets first
       const rpVal = params.get('rp');
       const hpVal = params.get('hp');
-      if (rpVal) rimPreset.value = rpVal;
-      if (hpVal) hubPreset.value = hpVal;
+      if (rpVal && rimPreset) rimPreset.value = rpVal;
+      if (hpVal && hubPreset) hubPreset.value = hpVal;
 
-      // Load specific geometry fields
       const mapField = (id: string, paramName: string) => {
         const input = document.getElementById(id) as HTMLInputElement;
         const val = params.get(paramName);
@@ -886,6 +1230,9 @@ import { hubs } from '../data/hubs';
       };
 
       mapField('input-erd', 'erd');
+      mapField('input-rim-wo', 'rimWidthOuter');
+      mapField('input-rim-wi', 'rimWidthInner');
+      mapField('input-rim-dep', 'rimDepth');
       mapField('input-osb', 'osb');
       mapField('input-ol', 'ol');
       mapField('input-or', 'or');
@@ -894,6 +1241,7 @@ import { hubs } from '../data/hubs';
       mapField('input-wl', 'centerToLeft');
       mapField('input-wr', 'centerToRight');
       mapField('input-sh', 'spokeHoleDiameter');
+      mapField('input-ft', 'flangeThickness');
       mapField('input-ho', 'hubOffset');
       mapField('input-count', 'spokeCount');
       mapField('input-crossl', 'crossesLeft');
@@ -907,40 +1255,82 @@ import { hubs } from '../data/hubs';
     }
   }
 
-  copyUrlBtn.addEventListener('click', () => {
-    navigator.clipboard.writeText(window.location.href);
-    
-    // Quick copy visual feedback
-    const originalText = copyUrlBtn.innerHTML;
-    copyUrlBtn.innerHTML = `
-      <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-      </svg>
-      Link Copied!
-    `;
-    copyUrlBtn.classList.remove('bg-cyan-950/20', 'border-cyan-500/20', 'text-cyan-400');
-    copyUrlBtn.classList.add('bg-emerald-950/20', 'border-emerald-500/50', 'text-emerald-400');
+  if (copyUrlBtn) {
+    copyUrlBtn.addEventListener('click', () => {
+      navigator.clipboard.writeText(window.location.href);
 
-    setTimeout(() => {
-      copyUrlBtn.innerHTML = originalText;
-      copyUrlBtn.classList.add('bg-cyan-950/20', 'border-cyan-500/20', 'text-cyan-400');
-      copyUrlBtn.classList.remove('bg-emerald-950/20', 'border-emerald-500/50', 'text-emerald-400');
-    }, 2000);
-  });
+      const originalText = copyUrlBtn.innerHTML;
+      copyUrlBtn.innerHTML = `
+        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
+        </svg>
+        Link Copied!
+      `;
+      copyUrlBtn.classList.remove('bg-cyan-950/20', 'border-cyan-500/20', 'text-cyan-400');
+      copyUrlBtn.classList.add('bg-emerald-950/20', 'border-emerald-500/50', 'text-emerald-400');
 
-  // 8. BOOTSTRAP INITIALIZATION
+      setTimeout(() => {
+        copyUrlBtn.innerHTML = originalText;
+        copyUrlBtn.classList.add('bg-cyan-950/20', 'border-cyan-500/20', 'text-cyan-400');
+        copyUrlBtn.classList.remove('bg-emerald-950/20', 'border-emerald-500/50', 'text-emerald-400');
+      }, 2000);
+    });
+  }
+
+  // 9. INITIALIZATION
   window.addEventListener('DOMContentLoaded', () => {
-    const canvasContainer = document.getElementById('canvas-container');
-    if (!canvasContainer) return;
+    const hasHash = loadHash();
+    if (!hasHash) {
+      applyHubPreset();
+      applyRimPreset();
+    }
 
-    // Load any shared configuration from URL hash
-    loadHash();
+    const initialInputs = getInputs();
 
     // Initialize 3D Viewport
-    viewport = new Viewport3D(canvasContainer);
-    viewport.setCameraPreset('isometric');
+    const canvasContainer = document.getElementById('canvas-container');
+    if (canvasContainer) {
+      viewport = new Viewport3D(canvasContainer);
+      viewport.setCameraPreset('isometric');
+    }
 
-    // Initial update trigger
+    // Initialize 2D CAD Hub Visualizer
+    const hubCadContainer = document.getElementById('hub-cad-container');
+    if (hubCadContainer) {
+      const hubOpt = hubPreset.options[hubPreset.selectedIndex];
+      hubCad = new HubCadVisualizer(hubCadContainer, {
+        flangePcdLeft: initialInputs.flangePcdLeft,
+        flangePcdRight: initialInputs.flangePcdRight,
+        centerToLeft: initialInputs.centerToLeft,
+        centerToRight: initialInputs.centerToRight,
+        spokeHoleDiameter: initialInputs.spokeHoleDiameter,
+        flangeThickness: initialInputs.flangeThickness,
+        hubOffset: initialInputs.hubOffset,
+        brand: hubOpt?.getAttribute('data-brand') || '',
+        name: hubOpt?.getAttribute('data-name') || '',
+        spacing: hubOpt?.getAttribute('data-spacing') || '',
+      });
+    }
+
+    // Initialize 2D CAD Rim Visualizer
+    const rimCadContainer = document.getElementById('rim-cad-container');
+    if (rimCadContainer) {
+      const rimOpt = rimPreset.options[rimPreset.selectedIndex];
+      rimCad = new RimCadVisualizer(rimCadContainer, {
+        erd: initialInputs.erd,
+        osb: initialInputs.osb,
+        drillingOffsetLeft: initialInputs.drillingOffsetLeft,
+        drillingOffsetRight: initialInputs.drillingOffsetRight,
+        rimWidthOuter: initialInputs.rimWidthOuter,
+        rimWidthInner: initialInputs.rimWidthInner,
+        rimDepth: initialInputs.rimDepth,
+        rimFlip: initialInputs.rimFlip,
+        brand: rimOpt?.getAttribute('data-brand') || '',
+        name: rimOpt?.getAttribute('data-name') || '',
+      });
+    }
+
+    // Initial Trigger
     updateAll();
   });
 </script>
