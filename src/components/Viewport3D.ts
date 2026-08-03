@@ -66,6 +66,13 @@ export class Viewport3D {
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
+    // Constrain canvas so it never forces the flex/grid container wider than its
+    // available space. Without this, a full-page-sized canvas keeps the container
+    // (and the whole layout) stuck at that width when exiting full-page mode,
+    // preventing the renderer from resizing back down.
+    this.renderer.domElement.style.maxWidth = '100%';
+    this.renderer.domElement.style.maxHeight = '100%';
+    this.renderer.domElement.style.display = 'block';
     this.container.appendChild(this.renderer.domElement);
 
     // 4. Controls

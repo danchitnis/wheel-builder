@@ -31,6 +31,7 @@ export interface WheelBuildInputs {
 
 export interface SideCalculations {
   effectiveFlangeDistance: number; // W_eff in mm
+  effectiveFlangeDistanceValid: boolean; // false when W_eff <= 0 (invalid input)
   thetaAngle: number;              // γ in degrees
   projectedLength2D: number;       // D2 in mm
   rawLength3D: number;             // L_raw in mm
@@ -136,6 +137,7 @@ export function calculateWheelBuild(inputs: WheelBuildInputs): WheelBuildCalcula
 
     return {
       effectiveFlangeDistance: wEff,
+      effectiveFlangeDistanceValid: wEff > 0,
       thetaAngle,
       projectedLength2D,
       rawLength3D,

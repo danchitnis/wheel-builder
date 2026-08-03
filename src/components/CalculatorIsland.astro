@@ -160,7 +160,7 @@ import { hubs } from '../data/hubs';
       <!-- 3D Viewport Host Container -->
       <div id="assembly-viewport-host" class="w-full flex-grow flex flex-col">
         <!-- 3D Viewport Box -->
-        <div id="viewport-card" class="relative bg-titanium-900/40 border border-titanium-850 rounded-2xl h-[420px] sm:h-[480px] lg:h-[520px] overflow-hidden shadow-2xl flex flex-col transition-all duration-300">
+        <div id="viewport-card" class="relative bg-titanium-900/40 border border-titanium-850 rounded-2xl h-[420px] sm:h-[480px] lg:h-[520px] overflow-hidden shadow-2xl flex flex-col transition-[background-color,border-color,box-shadow] duration-300">
         <!-- 3D Canvas Container -->
         <div id="canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
 
@@ -281,6 +281,9 @@ import { hubs } from '../data/hubs';
                 <span id="out-len-r-round" class="text-xs text-titanium-400">Order: <span class="font-bold mono-data">-- mm</span></span>
               </div>
             </div>
+
+            <!-- Invalid effective flange distance warning banner -->
+            <div id="weff-warning" class="hidden bg-yellow-950/40 border border-yellow-500/40 text-yellow-200 rounded-xl px-3.5 py-2.5 text-xs font-medium"></div>
 
             <!-- Extended physics analytics table -->
             <div class="flex flex-col gap-2.5 text-xs">
@@ -892,6 +895,7 @@ import { hubs } from '../data/hubs';
   const outLenLRound = document.getElementById('out-len-l-round') as HTMLElement;
   const outLenR = document.getElementById('out-len-r') as HTMLElement;
   const outLenRRound = document.getElementById('out-len-r-round') as HTMLElement;
+  const weffWarning = document.getElementById('weff-warning') as HTMLElement;
 
   const outWeffL = document.getElementById('out-weff-l') as HTMLElement;
   const outWeffR = document.getElementById('out-weff-r') as HTMLElement;
@@ -1066,9 +1070,24 @@ import { hubs } from '../data/hubs';
 
     // Update Numerical DOM Output
     if (outLenL) outLenL.innerHTML = `${results.left.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
-    if (outLenLRound) outLenLRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.left.calculatedSpokeLength)} mm</span>`;
+    if (outLenLRound) outLenLRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.ceil(results.left.calculatedSpokeLength)} mm</span>`;
     if (outLenR) outLenR.innerHTML = `${results.right.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
-    if (outLenRRound) outLenRRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.right.calculatedSpokeLength)} mm</span>`;
+    if (outLenRRound) outLenRRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.ceil(results.right.calculatedSpokeLength)} mm</span>`;
+
+    // Warn when an effective flange distance is invalid (<= 0)
+    if (weffWarning) {
+      const sides = [
+        { name: 'NDS (Left)', valid: results.left.effectiveFlangeDistanceValid, w: results.left.effectiveFlangeDistance },
+        { name: 'DS (Right)', valid: results.right.effectiveFlangeDistanceValid, w: results.right.effectiveFlangeDistance },
+      ].filter(s => !s.valid);
+      if (sides.length > 0) {
+        const detail = sides.map(s => `${s.name}: ${s.w.toFixed(1)} mm`).join(' · ');
+        weffWarning.textContent = `⚠ Effective flange distance invalid for ${detail}. Reduce rim/hub offsets to obtain a positive value.`;
+        weffWarning.classList.remove('hidden');
+      } else {
+        weffWarning.classList.add('hidden');
+      }
+    }
 
     if (outWeffL) outWeffL.textContent = `${results.left.effectiveFlangeDistance.toFixed(1)} mm`;
     if (outWeffR) outWeffR.textContent = `${results.right.effectiveFlangeDistance.toFixed(1)} mm`;
