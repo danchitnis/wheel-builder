@@ -12,6 +12,10 @@ export interface HubCadData {
   centerToLeft: number;       // wL (mm)
   centerToRight: number;      // wR (mm)
   spokeHoleDiameter: number;  // s (mm)
+  flangeThicknessLeft?: number;
+  flangeThicknessRight?: number;
+  flangeOuterDiameterLeft?: number;
+  flangeOuterDiameterRight?: number;
   flangeThickness: number;    // t (mm)
   hubOffset: number;          // ho (mm)
   brand?: string;
@@ -154,17 +158,21 @@ export class HubCadVisualizer {
     // Compute flange radii in mm
     const rL = dL / 2;
     const rR = dR / 2;
+    const ftLeft = this.data.flangeThicknessLeft ?? ft_mm;
+    const ftRight = this.data.flangeThicknessRight ?? ft_mm;
+    const outerLeft = (this.data.flangeOuterDiameterLeft ?? (dL + 7)) / 2;
+    const outerRight = (this.data.flangeOuterDiameterRight ?? (dR + 7)) / 2;
 
     // Flange Center Positions in CAD space
     const xL_mm = -wL + ho;
     const xR_mm = wR + ho;
 
     // Flange Outer and Inner Face X positions (straight vertical disc faces)
-    const xL_outer_mm = xL_mm - ft_mm / 2;
-    const xL_inner_mm = xL_mm + ft_mm / 2;
+    const xL_outer_mm = xL_mm - ftLeft / 2;
+    const xL_inner_mm = xL_mm + ftLeft / 2;
 
-    const xR_inner_mm = xR_mm - ft_mm / 2;
-    const xR_outer_mm = xR_mm + ft_mm / 2;
+    const xR_inner_mm = xR_mm - ftRight / 2;
+    const xR_outer_mm = xR_mm + ftRight / 2;
 
     // Convert mm to screen coords
     const toScreenX = (mmX: number) => originX + mmX * scale;
@@ -196,12 +204,12 @@ export class HubCadVisualizer {
     const flangeMargin_mm = 3.5; // margin above spoke hole center to outer flange rim
 
     // Y Screen coordinates
-    const yL_top = toScreenY(rL + flangeMargin_mm);
-    const yR_top = toScreenY(rR + flangeMargin_mm);
+    const yL_top = toScreenY(outerLeft);
+    const yR_top = toScreenY(outerRight);
     const yBarrel_top = toScreenY(bodyRadius_mm);
 
-    const yL_bot = toScreenY(-(rL + flangeMargin_mm));
-    const yR_bot = toScreenY(-(rR + flangeMargin_mm));
+    const yL_bot = toScreenY(-(outerLeft));
+    const yR_bot = toScreenY(-(outerRight));
     const yBarrel_bot = toScreenY(-bodyRadius_mm);
 
     // 2. Draw Hub Axle Tube
@@ -378,7 +386,7 @@ export class HubCadVisualizer {
       this.ctx,
       { x: xL_outer, y: yL_top },
       { x: xL_inner, y: yL_top },
-      `t: ${ft_mm.toFixed(1)} mm`,
+      `tL: ${ftLeft.toFixed(1)} / tR: ${ftRight.toFixed(1)} mm`,
       {
         offset: 20 * scale,
         color: '#f59e0b',

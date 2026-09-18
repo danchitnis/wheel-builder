@@ -1,4 +1,10 @@
-export interface Rim {
+export interface RimAppearance {
+  rimProfile?: 'shallow-double-wall' | 'standard';
+  rimEyelets?: boolean;
+  rimValveDiameter?: number; // Nominal drilling diameter, mm
+}
+
+export interface Rim extends RimAppearance {
   id: string;
   brand: string;
   name: string;
@@ -15,7 +21,26 @@ export interface Rim {
   notes?: string;
 }
 
+export const DEFAULT_RIM_ID = 'brompton-g-line-20-406-rear-presta';
+
 export const rims: Rim[] = [
+  {
+    id: DEFAULT_RIM_ID,
+    brand: 'Brompton',
+    name: 'G Line 20" (406), 32-hole rear — eyelets, Presta',
+    erd: 382.3,
+    osb: 0,
+    drillingOffsetLeft: 0,
+    drillingOffsetRight: 0,
+    widthOuter: 28,
+    widthInner: 22,
+    depth: 12.3,
+    category: 'Urban',
+    rimProfile: 'shallow-double-wall',
+    rimEyelets: true,
+    rimValveDiameter: 6.5,
+    notes: 'User-measured ERD: 382.3 mm; approximate body depth: 12.3 mm excluding eyelets. Published widths: 28 mm outer / 22 mm inner (SJS Cycles G Line rear rim listing). User-specified Presta drilling, nominal 6.5 mm. User confirmed all spoke holes share the rim centreline: zero spoke-bed and left/right drilling offsets. Internal wall and eyelet geometry are visual approximations.'
+  },
   {
     id: 'sun-cr18-20-406',
     brand: 'Sun Ringle',
@@ -177,3 +202,5 @@ export const rims: Rim[] = [
     notes: 'Dual I-Beam support, extreme enduro/gravity rim with 4.5mm offset.'
   }
 ];
+
+export const defaultRim = rims.find(rim => rim.id === DEFAULT_RIM_ID)!;

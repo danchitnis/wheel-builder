@@ -1,6 +1,6 @@
 ---
-import { rims } from '../data/rims';
-import { hubs } from '../data/hubs';
+import { rims, defaultRim } from '../data/rims';
+import { hubs, defaultHub } from '../data/hubs';
 ---
 
 <!-- TAB NAVIGATION BAR -->
@@ -68,7 +68,7 @@ import { hubs } from '../data/hubs';
           <div class="bg-titanium-950/60 border border-titanium-800/60 rounded-xl p-3 flex items-center justify-between gap-2">
             <div class="flex flex-col gap-0.5 min-w-0">
               <span class="text-[10px] font-bold text-titanium-400 uppercase tracking-wider">Hub Model</span>
-              <span id="summary-hub-name" class="text-xs font-bold text-cyan-300 truncate mono-data">Hope Pro 5 Rear 148 6-Bolt</span>
+              <span id="summary-hub-name" class="text-xs font-bold text-cyan-300 truncate mono-data">{defaultHub.brand} {defaultHub.name}</span>
             </div>
             <button id="btn-edit-hub" class="px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-900/40 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold rounded-lg transition-all flex-shrink-0">
               ⚙️ Config
@@ -79,7 +79,7 @@ import { hubs } from '../data/hubs';
           <div class="bg-titanium-950/60 border border-titanium-800/60 rounded-xl p-3 flex items-center justify-between gap-2">
             <div class="flex flex-col gap-0.5 min-w-0">
               <span class="text-[10px] font-bold text-titanium-400 uppercase tracking-wider">Rim Model</span>
-              <span id="summary-rim-name" class="text-xs font-bold text-cyan-300 truncate mono-data">Sun Ringle CR18 20" (406)</span>
+              <span id="summary-rim-name" class="text-xs font-bold text-cyan-300 truncate mono-data">{defaultRim.brand} {defaultRim.name}</span>
             </div>
             <button id="btn-edit-rim" class="px-2.5 py-1 bg-cyan-950/40 hover:bg-cyan-900/40 border border-cyan-500/30 text-cyan-400 text-[11px] font-bold rounded-lg transition-all flex-shrink-0">
               ⭕ Config
@@ -108,22 +108,22 @@ import { hubs } from '../data/hubs';
 
           <div class="grid grid-cols-2 gap-4">
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">NDS (Left) Crosses</label>
+              <label class="text-xs font-medium text-titanium-400">Left crosses</label>
               <select id="input-crossl" class="bg-titanium-950 border border-titanium-800 rounded-lg px-2.5 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none cursor-pointer">
                 <option value="0">Radial (0x)</option>
                 <option value="1">1 Cross (1x)</option>
-                <option value="2">2 Crosses (2x)</option>
-                <option value="3" selected="selected">3 Crosses (3x)</option>
+                <option value="2" selected="selected">2 Crosses (2x)</option>
+                <option value="3">3 Crosses (3x)</option>
                 <option value="4">4 Crosses (4x)</option>
               </select>
             </div>
             <div class="flex flex-col gap-1">
-              <label class="text-xs font-medium text-titanium-400">DS (Right) Crosses</label>
+              <label class="text-xs font-medium text-titanium-400">Right crosses</label>
               <select id="input-crossr" class="bg-titanium-950 border border-titanium-800 rounded-lg px-2.5 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none cursor-pointer">
                 <option value="0">Radial (0x)</option>
                 <option value="1">1 Cross (1x)</option>
-                <option value="2">2 Crosses (2x)</option>
-                <option value="3" selected="selected">3 Crosses (3x)</option>
+                <option value="2" selected="selected">2 Crosses (2x)</option>
+                <option value="3">3 Crosses (3x)</option>
                 <option value="4">4 Crosses (4x)</option>
               </select>
             </div>
@@ -170,15 +170,15 @@ import { hubs } from '../data/hubs';
             <span>📏 3D Vector Measurement</span>
           </div>
           <div class="flex justify-between gap-4">
-            <span class="text-titanium-400">Straight 3D Vector:</span>
+            <span class="text-titanium-400">Matching shaft chord:</span>
             <span id="badge-direct-val" class="font-bold text-cyan-300 mono-data">-- mm</span>
           </div>
           <div class="flex justify-between gap-4">
-            <span class="text-titanium-400">Actual Wire (bends):</span>
+            <span class="text-titanium-400">Estimated 3D shaft path:</span>
             <span id="badge-actual-val" class="font-bold text-yellow-400 mono-data">-- mm</span>
           </div>
           <div class="flex justify-between gap-4 border-t border-titanium-800/80 pt-1">
-            <span class="text-titanium-400 font-medium">Path Delta (bends):</span>
+            <span class="text-titanium-400 font-medium">Extra path from bends:</span>
             <span id="badge-delta-val" class="font-bold text-emerald-400 mono-data">+-- mm</span>
           </div>
         </div>
@@ -189,15 +189,15 @@ import { hubs } from '../data/hubs';
             <span>Spoke</span>
           </div>
           <div class="flex justify-between gap-4 mt-1">
-            <span class="text-titanium-500">Spoke Order Length:</span>
+            <span class="text-titanium-500">Traditional length:</span>
             <span id="tooltip-length" class="font-bold text-titanium-100 mono-data">-- mm</span>
           </div>
           <div class="flex justify-between gap-4">
-            <span class="text-titanium-500">Straight 3D Vector:</span>
+            <span class="text-titanium-500">Matching shaft chord:</span>
             <span id="tooltip-direct" class="font-bold text-cyan-400 mono-data">-- mm</span>
           </div>
           <div class="flex justify-between gap-4">
-            <span class="text-titanium-500">Actual Wire (bends):</span>
+            <span class="text-titanium-500">Estimated 3D shaft path:</span>
             <span id="tooltip-actual" class="font-bold text-yellow-400 mono-data">-- mm</span>
           </div>
           <div class="flex justify-between gap-4">
@@ -216,7 +216,7 @@ import { hubs } from '../data/hubs';
           <button data-cam="lateral" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Side (Lacing)</button>
           <button data-cam="dish" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Dish (Alignment)</button>
           <button data-cam="hub" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Hub</button>
-          <button data-cam="spoke-delta" class="cam-btn px-2.5 py-1.5 bg-yellow-950/40 border border-yellow-500/30 text-[11px] font-bold text-yellow-300 rounded-lg hover:text-yellow-100 hover:border-yellow-400 transition-all" title="Highlight single spoke path delta (Straight Vector vs Actual Bends)">🔬 Spoke Delta</button>
+          <button data-cam="spoke-delta" class="cam-btn px-2.5 py-1.5 bg-yellow-950/40 border border-yellow-500/30 text-[11px] font-bold text-yellow-300 rounded-lg hover:text-yellow-100 hover:border-yellow-400 transition-all" title="Highlight single spoke path delta (Straight chord and estimated bend path)">🔬 Spoke Delta</button>
           <button id="btn-fullpage" class="px-2.5 py-1.5 bg-cyan-950/40 border border-cyan-500/30 text-[11px] font-bold text-cyan-300 rounded-lg hover:text-cyan-100 hover:border-cyan-400 transition-all flex items-center gap-1.5" title="Expand 3D Viewport to Full Page">
             <span id="fp-icon">🗖</span>
             <span id="fp-label">Full Page</span>
@@ -238,7 +238,7 @@ import { hubs } from '../data/hubs';
           <div class="flex flex-wrap gap-1 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 p-1 rounded-xl">
             <button id="toggle-l-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">NDS (L)</button>
             <button id="toggle-r-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">DS (R)</button>
-            <button id="toggle-interlace" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all" title="Toggle 3D Spoke Over/Under Interlacing Weave">Interlaced</button>
+            <button id="toggle-interlace" aria-pressed="false" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-titanium-950 text-titanium-500 border border-cyan-500/20 hover:border-cyan-500/50 transition-all" title="Toggle 3D Spoke Over/Under Interlacing Weave">Non-interlaced</button>
             <button id="toggle-ruler" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-yellow-950/40 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/60 transition-all" title="Toggle Direct 3D Straight Measurement Vector Ruler">📏 Ruler</button>
             <select id="select-colormode" class="bg-titanium-950 border border-titanium-800 rounded-lg text-[10px] font-bold px-1 py-1 text-titanium-200 cursor-pointer focus:outline-none">
               <option value="classic">Titanium Steel</option>
@@ -256,7 +256,7 @@ import { hubs } from '../data/hubs';
     </div>
 
       <!-- CALCULATIONS GRID & ANALYTICS -->
-      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div class="grid grid-cols-1 2xl:grid-cols-2 gap-6">
         <!-- Side-by-Side Outputs Table -->
         <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl">
           <h2 class="text-sm font-bold text-titanium-50 uppercase tracking-wider mb-4 border-b border-titanium-800 pb-2 flex justify-between">
@@ -269,18 +269,27 @@ import { hubs } from '../data/hubs';
             <div class="grid grid-cols-2 gap-4">
               <!-- Left Side Length Card -->
               <div class="bg-titanium-950/50 border border-blue-500/10 p-3.5 rounded-xl flex flex-col gap-0.5">
-                <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">NDS (Left) Spoke Length</span>
+                <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider" data-side-label="left-length">Left / non-drive — traditional</span>
                 <span id="out-len-l" class="text-3xl font-bold text-titanium-50 tracking-tight mono-data">--<span class="text-lg text-titanium-500 ml-1">mm</span></span>
-                <span id="out-len-l-round" class="text-xs text-titanium-400">Order: <span class="font-bold mono-data">-- mm</span></span>
+                <span id="out-len-l-round" class="text-xs text-titanium-400">Nearest whole millimetre: <span class="font-bold mono-data">-- mm</span></span>
               </div>
 
               <!-- Right Side Length Card -->
               <div class="bg-titanium-950/50 border border-red-500/10 p-3.5 rounded-xl flex flex-col gap-0.5">
-                <span class="text-[10px] font-bold text-red-400 uppercase tracking-wider">DS (Right) Spoke Length</span>
+                <span class="text-[10px] font-bold text-red-400 uppercase tracking-wider" data-side-label="right-length">Right / drive — traditional</span>
                 <span id="out-len-r" class="text-3xl font-bold text-titanium-50 tracking-tight mono-data">--<span class="text-lg text-titanium-500 ml-1">mm</span></span>
-                <span id="out-len-r-round" class="text-xs text-titanium-400">Order: <span class="font-bold mono-data">-- mm</span></span>
+                <span id="out-len-r-round" class="text-xs text-titanium-400">Nearest whole millimetre: <span class="font-bold mono-data">-- mm</span></span>
               </div>
             </div>
+
+            <div class="overflow-x-auto">
+              <table class="w-full text-xs text-left"><caption class="text-left text-cyan-300 font-bold mb-2">Estimated 3D path — millimetres</caption>
+                <thead class="text-titanium-400"><tr><th class="py-2">Spoke group</th><th>3D shaft</th><th>Extra from bends</th><th>Traditional + allowance</th></tr></thead>
+                <tbody id="path-results" class="mono-data text-titanium-100"></tbody>
+              </table>
+            </div>
+            <p class="text-xs text-titanium-400">The bend allowance compares the shaft path with its own straight chord, excluding the manufactured J-bend. These are geometric estimates, not validated purchase lengths. Final stock length depends on measured ERD and nipple engagement.</p>
+            <p id="path-errors" role="status" class="text-xs text-amber-300"></p>
 
             <!-- Invalid effective flange distance warning banner -->
             <div id="weff-warning" class="hidden bg-yellow-950/40 border border-yellow-500/40 text-yellow-200 rounded-xl px-3.5 py-2.5 text-xs font-medium"></div>
@@ -358,7 +367,7 @@ import { hubs } from '../data/hubs';
             <div class="flex flex-col gap-1.5 mt-2">
               <div class="flex flex-col gap-0.5">
                 <div class="flex justify-between text-[10px] font-bold text-titanium-400">
-                  <span>NDS (LEFT) TENSION</span>
+                  <span>LEFT TENSION</span>
                   <span id="bar-pct-l" class="mono-data">--%</span>
                 </div>
                 <div class="w-full bg-titanium-950 rounded-full h-2 overflow-hidden border border-titanium-800">
@@ -368,7 +377,7 @@ import { hubs } from '../data/hubs';
 
               <div class="flex flex-col gap-0.5">
                 <div class="flex justify-between text-[10px] font-bold text-titanium-400">
-                  <span>DS (RIGHT) TENSION</span>
+                  <span>RIGHT TENSION</span>
                   <span id="bar-pct-r" class="mono-data">100%</span>
                 </div>
                 <div class="w-full bg-titanium-950 rounded-full h-2 overflow-hidden border border-titanium-800">
@@ -407,11 +416,14 @@ import { hubs } from '../data/hubs';
           <select id="hub-preset" class="w-full bg-titanium-950 border border-titanium-800 rounded-xl px-3 py-2.5 text-sm text-titanium-100 hover:border-titanium-700 focus:border-cyan-500 focus:outline-none transition-all cursor-pointer">
             <option value="custom">Custom / Manual Hub Specs</option>
             {hubs.map((h, i) => (
-              <option value={h.id} selected={i === 0} data-pcdl={h.flangePcdLeft} data-pcdr={h.flangePcdRight} data-wl={h.centerToLeft} data-wr={h.centerToRight} data-sh={h.spokeHoleDiameter} data-ft={h.flangeThickness || 3.0} data-brand={h.brand} data-name={h.name} data-spacing={h.spacing} data-disctype={h.discType} data-hubtype={h.name.toLowerCase().includes('rear') ? 'Rear' : 'Front'}>
+              <option value={h.id} selected={h.id === defaultHub.id} hidden={h.extraOption} data-extra={String(h.extraOption ?? false)} data-count={h.spokeCount} data-odl={h.flangeOuterDiameterLeft} data-odr={h.flangeOuterDiameterRight} data-ftl={h.flangeThicknessLeft ?? h.flangeThickness} data-ftr={h.flangeThicknessRight ?? h.flangeThickness} data-provenance={h.geometryProvenance} data-source={h.sourceUrl} data-exploded={h.explodedUrl} data-pcdl={h.flangePcdLeft} data-pcdr={h.flangePcdRight} data-wl={h.centerToLeft} data-wr={h.centerToRight} data-sh={h.spokeHoleDiameter} data-ft={h.flangeThickness || 3.0} data-brand={h.brand} data-name={h.name} data-spacing={h.spacing} data-disctype={h.discType} data-hubtype={h.name.toLowerCase().includes('rear') ? 'Rear' : 'Front'}>
                 {h.brand} - {h.name} ({h.spacing})
               </option>
             ))}
           </select>
+          <label class="text-xs text-titanium-300 flex items-center gap-2"><input id="extra-hope" type="checkbox" class="accent-cyan-500" /> Extra Hope hubs</label>
+          <p id="hub-count-note" class="text-xs text-cyan-300">This preset uses 32 spokes. Select Custom for other counts.</p>
+          <div id="hub-sources" class="text-xs text-cyan-300 flex gap-4"></div>
         </div>
       </div>
 
@@ -435,19 +447,15 @@ import { hubs } from '../data/hubs';
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-titanium-400">Left Center-Flange (wL)</label>
-            <input type="number" id="input-wl" step="0.1" value="35.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+            <input type="number" id="input-wl" step="0.1" value={defaultHub.centerToLeft} class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-titanium-400">Right Center-Flange (wR)</label>
-            <input type="number" id="input-wr" step="0.1" value="22.6" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+            <input type="number" id="input-wr" step="0.1" value={defaultHub.centerToRight} class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-titanium-400">Spoke Hole Dia (s)</label>
             <input type="number" id="input-sh" step="0.1" value="2.6" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
-          </div>
-          <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-titanium-400">Flange Thickness (t)</label>
-            <input type="number" id="input-ft" step="0.1" value="3.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
           <div class="flex flex-col gap-1 col-span-2">
             <label class="text-xs font-medium text-titanium-400">Hub Center Offset (ho)</label>
@@ -456,16 +464,29 @@ import { hubs } from '../data/hubs';
         </div>
       </div>
 
+      <details class="bg-titanium-900/60 border border-titanium-800 rounded-2xl p-5">
+        <summary class="font-bold text-cyan-300 cursor-pointer">3D path geometry</summary>
+        <p id="geometry-provenance" class="text-xs text-titanium-400 mt-3">{defaultHub.geometryProvenance}</p>
+        <div class="grid grid-cols-2 gap-3 mt-4">
+          <label class="text-xs text-titanium-300">Left flange outside diameter (mm)<input id="input-odl" type="number" min="0.1" step="0.1" value="67" class="block w-full mt-1 bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm" /></label>
+          <label class="text-xs text-titanium-300">Right flange outside diameter (mm)<input id="input-odr" type="number" min="0.1" step="0.1" value="67" class="block w-full mt-1 bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm" /></label>
+          <label class="text-xs text-titanium-300">Left flange thickness (mm)<input id="input-ftl" type="number" min="0.1" step="0.1" value="4" class="block w-full mt-1 bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm" /></label>
+          <label class="text-xs text-titanium-300">Right flange thickness (mm)<input id="input-ftr" type="number" min="0.1" step="0.1" value="4" class="block w-full mt-1 bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm" /></label>
+          <label class="text-xs text-titanium-300">Physical spoke diameter (mm)<input id="input-sd" type="number" min="0.1" step="0.1" value="2" class="block w-full mt-1 bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm" /></label>
+        </div>
+        <p class="text-xs text-titanium-400 mt-3">Approximate user measurements; both hub flanges initially assumed equal. Sharp flange edges and a taut shaft are model assumptions. Crossing contact is approximated geometrically. No elastic stretch or bend stiffness is included.</p>
+      </details>
+
       <!-- Hub Derived Geometry Summary Card -->
       <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
         <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider">Derived Hub Dimensions</h3>
         <div class="flex justify-between items-center text-xs py-1 border-b border-titanium-800/50">
           <span class="text-titanium-400">Total Flange Distance (wL + wR):</span>
-          <span id="hub-total-flange" class="font-bold text-titanium-100 mono-data">57.6 mm</span>
+          <span id="hub-total-flange" class="font-bold text-titanium-100 mono-data">51.6 mm</span>
         </div>
         <div class="flex justify-between items-center text-xs py-1 border-b border-titanium-800/50">
           <span class="text-titanium-400">Flange Symmetry Ratio (wR / wL):</span>
-          <span id="hub-flange-ratio" class="font-bold text-cyan-400 mono-data">0.65</span>
+          <span id="hub-flange-ratio" class="font-bold text-cyan-400 mono-data">0.61</span>
         </div>
         <div class="flex justify-between items-center text-xs py-1">
           <span class="text-titanium-400">PCD Difference (|dL - dR|):</span>
@@ -513,14 +534,16 @@ import { hubs } from '../data/hubs';
           <label class="text-xs font-semibold text-titanium-400 uppercase tracking-wider">Select Rim Model</label>
           <select id="rim-preset" class="w-full bg-titanium-950 border border-titanium-800 rounded-xl px-3 py-2.5 text-sm text-titanium-100 hover:border-titanium-700 focus:border-cyan-500 focus:outline-none transition-all cursor-pointer">
             <option value="custom">Custom / Manual Rim Specs</option>
-            {rims.map((r, i) => (
-              <option value={r.id} selected={i === 0} data-erd={r.erd} data-osb={r.osb} data-ol={r.drillingOffsetLeft} data-or={r.drillingOffsetRight} data-wo={r.widthOuter || 22.5} data-wi={r.widthInner || 17.5} data-dep={r.depth || 15.5} data-brand={r.brand} data-name={r.name} data-cat={r.category}>
+            {rims.map((r) => (
+              <option value={r.id} selected={r.id === defaultRim.id} data-profile={r.rimProfile || 'standard'} data-eyelets={String(r.rimEyelets ?? false)} data-valve={r.rimValveDiameter ?? 6.5} data-notes={r.notes || ''} data-erd={r.erd} data-osb={r.osb} data-ol={r.drillingOffsetLeft} data-or={r.drillingOffsetRight} data-wo={r.widthOuter || 22.5} data-wi={r.widthInner || 17.5} data-dep={r.depth || 15.5} data-brand={r.brand} data-name={r.name} data-cat={r.category}>
                 {r.brand} - {r.name} ({r.category})
               </option>
             ))}
           </select>
         </div>
       </div>
+
+      <p id="rim-notes" class="text-xs text-titanium-400 leading-relaxed">{defaultRim.notes}</p>
 
       <!-- Rim Geometry Card -->
       <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl">
@@ -534,21 +557,21 @@ import { hubs } from '../data/hubs';
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1 col-span-2">
             <label class="text-xs font-medium text-titanium-400">ERD - Spoke Bed Diameter (mm)</label>
-            <input type="number" id="input-erd" step="0.1" value="392.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+            <input type="number" id="input-erd" step="0.1" value={defaultRim.erd} class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
           
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-titanium-400">Outer Width (mm)</label>
-            <input type="number" id="input-rim-wo" step="0.1" value="22.5" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+            <input type="number" id="input-rim-wo" step="0.1" value={defaultRim.widthOuter} class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-titanium-400">Inner Well Width (mm)</label>
-            <input type="number" id="input-rim-wi" step="0.1" value="17.5" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+            <input type="number" id="input-rim-wi" step="0.1" value={defaultRim.widthInner} class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
 
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-titanium-400">Profile Depth (mm)</label>
-            <input type="number" id="input-rim-dep" step="0.1" value="15.5" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
+            <input type="number" id="input-rim-dep" step="0.1" value={defaultRim.depth} class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
           <div class="flex flex-col gap-1">
             <label class="text-xs font-medium text-titanium-400">Asymmetric OSB (mm)</label>
@@ -556,11 +579,11 @@ import { hubs } from '../data/hubs';
           </div>
 
           <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-titanium-400">NDS Drilling Offset (oL)</label>
+            <label class="text-xs font-medium text-titanium-400">Left drilling offset (oL)</label>
             <input type="number" id="input-ol" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
           <div class="flex flex-col gap-1">
-            <label class="text-xs font-medium text-titanium-400">DS Drilling Offset (oR)</label>
+            <label class="text-xs font-medium text-titanium-400">Right drilling offset (oR)</label>
             <input type="number" id="input-or" step="0.1" value="0.0" class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
         </div>
@@ -571,11 +594,11 @@ import { hubs } from '../data/hubs';
         <h3 class="text-xs font-bold text-cyan-400 uppercase tracking-wider">Derived Rim Dimensions</h3>
         <div class="flex justify-between items-center text-xs py-1 border-b border-titanium-800/50">
           <span class="text-titanium-400">Effective Spoke Radius (ERD / 2):</span>
-          <span id="rim-radius" class="font-bold text-titanium-100 mono-data">196.0 mm</span>
+          <span id="rim-radius" class="font-bold text-titanium-100 mono-data">{(defaultRim.erd / 2).toFixed(1)} mm</span>
         </div>
         <div class="flex justify-between items-center text-xs py-1 border-b border-titanium-800/50">
           <span class="text-titanium-400">ERD Circumference (π × ERD):</span>
-          <span id="rim-circumference" class="font-bold text-titanium-100 mono-data">1231.5 mm</span>
+          <span id="rim-circumference" class="font-bold text-titanium-100 mono-data">{(Math.PI * defaultRim.erd).toFixed(1)} mm</span>
         </div>
         <div class="flex justify-between items-center text-xs py-1">
           <span class="text-titanium-400">Net Asymmetric Offset Shift:</span>
@@ -625,7 +648,7 @@ import { hubs } from '../data/hubs';
         <div class="grid grid-cols-2 gap-2">
           <div id="badge-group-1" class="bg-titanium-950/80 border border-titanium-800 rounded-xl p-2.5 flex flex-col gap-1 transition-all">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-red-400 uppercase tracking-wider">Group 1 (DS Trailing)</span>
+              <span class="text-[10px] font-bold text-red-400 uppercase tracking-wider">Group 1 (Right trailing)</span>
               <span id="badge-g1-count" class="text-[10px] font-mono text-titanium-400">0/8</span>
             </div>
             <div class="w-full bg-titanium-900 h-1.5 rounded-full overflow-hidden">
@@ -635,7 +658,7 @@ import { hubs } from '../data/hubs';
 
           <div id="badge-group-2" class="bg-titanium-950/80 border border-titanium-800 rounded-xl p-2.5 flex flex-col gap-1 transition-all">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Group 2 (NDS Trailing)</span>
+              <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Group 2 (Left trailing)</span>
               <span id="badge-g2-count" class="text-[10px] font-mono text-titanium-400">0/8</span>
             </div>
             <div class="w-full bg-titanium-900 h-1.5 rounded-full overflow-hidden">
@@ -645,7 +668,7 @@ import { hubs } from '../data/hubs';
 
           <div id="badge-group-3" class="bg-titanium-950/80 border border-titanium-800 rounded-xl p-2.5 flex flex-col gap-1 transition-all">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Group 3 (DS Leading)</span>
+              <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Group 3 (Right leading)</span>
               <span id="badge-g3-count" class="text-[10px] font-mono text-titanium-400">0/8</span>
             </div>
             <div class="w-full bg-titanium-900 h-1.5 rounded-full overflow-hidden">
@@ -655,7 +678,7 @@ import { hubs } from '../data/hubs';
 
           <div id="badge-group-4" class="bg-titanium-950/80 border border-titanium-800 rounded-xl p-2.5 flex flex-col gap-1 transition-all">
             <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">Group 4 (NDS Leading)</span>
+              <span class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">Group 4 (Left leading)</span>
               <span id="badge-g4-count" class="text-[10px] font-mono text-titanium-400">0/8</span>
             </div>
             <div class="w-full bg-titanium-900 h-1.5 rounded-full overflow-hidden">
@@ -773,7 +796,7 @@ import { hubs } from '../data/hubs';
             <span>🧠</span> Wheelbuilder Rule & Hole Counting
           </span>
           <p id="lacing-rule-tip-text" class="text-xs text-titanium-300 leading-relaxed font-sans">
-            Start by locating the Valve Hole on the rim bed (highlighted in yellow). Insert the Key Spoke (first Drive Side trailing spoke) into the hub flange, then seat it in the rim hole directly adjacent to the valve hole.
+            Start by locating the Valve Hole on the rim bed (highlighted in yellow). Insert the Key Spoke (first right-side trailing spoke) into the hub flange, then seat it in the rim hole directly adjacent to the valve hole.
           </p>
         </div>
       </div>
@@ -791,11 +814,25 @@ import { hubs } from '../data/hubs';
 </div>
 
 <script>
+  import { calculateSpokePaths } from '../utils/spokePath';
+  import { defaultHub } from '../data/hubs';
   import { calculateWheelBuild } from '../utils/physicsCalculator';
   import { Viewport3D } from './Viewport3D';
   import { HubCadVisualizer } from './HubCadVisualizer';
   import { RimCadVisualizer } from './RimCadVisualizer';
   import { Chart } from 'chart.js/auto';
+  import { defaultRim, type RimAppearance } from '../data/rims';
+
+  let rimAppearance: RimAppearance = { rimProfile: defaultRim.rimProfile, rimEyelets: defaultRim.rimEyelets, rimValveDiameter: defaultRim.rimValveDiameter };
+
+  function readRimAppearance() {
+    const option = rimPreset.options[rimPreset.selectedIndex];
+    rimAppearance = {
+      rimProfile: option?.dataset.profile === 'shallow-double-wall' ? 'shallow-double-wall' : 'standard',
+      rimEyelets: option?.dataset.eyelets === 'true',
+      rimValveDiameter: Number(option?.dataset.valve) || 6.5,
+    };
+  }
 
   let viewport: Viewport3D | null = null;
   let hubCad: HubCadVisualizer | null = null;
@@ -872,7 +909,35 @@ import { hubs } from '../data/hubs';
   const wlIn = document.getElementById('input-wl') as HTMLInputElement;
   const wrIn = document.getElementById('input-wr') as HTMLInputElement;
   const shIn = document.getElementById('input-sh') as HTMLInputElement;
-  const ftIn = document.getElementById('input-ft') as HTMLInputElement;
+  const odlIn = document.getElementById('input-odl') as HTMLInputElement;
+  const odrIn = document.getElementById('input-odr') as HTMLInputElement;
+  const ftlIn = document.getElementById('input-ftl') as HTMLInputElement;
+  const ftrIn = document.getElementById('input-ftr') as HTMLInputElement;
+  const sdIn = document.getElementById('input-sd') as HTMLInputElement;
+  const extraHope = document.getElementById('extra-hope') as HTMLInputElement;
+  let interlaced = false;
+  let customHubType = 'Rear';
+  let customHubSpacing = '135mm';
+  let geometryProvenance = defaultHub.geometryProvenance ?? 'Manual geometry';
+  const numeric = (field: HTMLInputElement | HTMLSelectElement) => field.value.trim() === '' ? NaN : Number(field.value);
+  function syncHubControls() {
+    const option = hubPreset.selectedOptions[0];
+    const fixedCount = option?.dataset.count;
+    countIn.disabled = Boolean(fixedCount);
+    if (fixedCount) countIn.value = fixedCount;
+    const extraSelected = option?.dataset.extra === 'true';
+    if (extraSelected) extraHope.checked = true;
+    for (const opt of hubPreset.options) opt.hidden = opt.dataset.extra === 'true' && !extraHope.checked;
+    document.getElementById('hub-count-note')!.textContent = fixedCount ? 'This preset uses 32 spokes. Select Custom for other counts.' : 'Custom and other hubs allow adjustable spoke counts.';
+    const sources = document.getElementById('hub-sources')!;
+    sources.replaceChildren();
+    for (const [key, label] of [['source', 'Hope dimension chart'], ['exploded', 'Exploded diagram']]) {
+      const url = option?.dataset[key];
+      if (url) { const link = document.createElement('a'); link.href = url; link.textContent = label; link.target = '_blank'; link.rel = 'noopener noreferrer'; sources.append(link); }
+    }
+    document.getElementById('geometry-provenance')!.textContent = geometryProvenance;
+  }
+  extraHope.addEventListener('change', syncHubControls);
   const hoIn = document.getElementById('input-ho') as HTMLInputElement;
 
   const countIn = document.getElementById('input-count') as HTMLInputElement;
@@ -1001,30 +1066,34 @@ import { hubs } from '../data/hubs';
     const hubOpt = hubPreset.options[hubPreset.selectedIndex];
     const hubBrand = hubOpt?.getAttribute('data-brand') || '';
     const hubName = hubOpt?.getAttribute('data-name') || 'Custom Hub';
-    const hubSpacing = hubOpt?.getAttribute('data-spacing') || '';
+    const hubSpacing = hubOpt?.getAttribute('data-spacing') || customHubSpacing;
     const hubDisc = (hubOpt?.getAttribute('data-disctype') as '6-Bolt' | 'Centerlock' | 'None') || '6-Bolt';
-    const hubTypeAttr = hubOpt?.getAttribute('data-hubtype');
+    const hubTypeAttr = hubOpt?.getAttribute('data-hubtype') ?? customHubType;
     const isRear = hubTypeAttr ? hubTypeAttr === 'Rear' : (hubName.toLowerCase().includes('rear') || hubSpacing.includes('148') || hubSpacing.includes('142') || hubSpacing.includes('135') || hubSpacing.includes('157'));
 
     return {
-      erd: parseFloat(erdIn.value) || 392.0,
-      rimWidthOuter: parseFloat(woIn.value) || 22.5,
-      rimWidthInner: parseFloat(wiIn.value) || 17.5,
-      rimDepth: parseFloat(depIn.value) || 15.5,
+      ...rimAppearance,
+      erd: numeric(erdIn),
+      rimWidthOuter: parseFloat(woIn.value) || defaultRim.widthOuter!,
+      rimWidthInner: parseFloat(wiIn.value) || defaultRim.widthInner!,
+      rimDepth: parseFloat(depIn.value) || defaultRim.depth!,
       osb: parseFloat(osbIn.value) || 0.0,
       drillingOffsetLeft: parseFloat(olIn.value) || 0.0,
       drillingOffsetRight: parseFloat(orIn.value) || 0.0,
-      spokeCount: parseInt(countIn.value) || 32,
-      spokeHoleDiameter: parseFloat(shIn.value) || 2.6,
-      flangeThickness: parseFloat(ftIn.value) || 3.0,
+      spokeCount: numeric(countIn),
+      spokeHoleDiameter: numeric(shIn),
+      flangeThickness: numeric(ftlIn),
+      flangeThicknessLeft: numeric(ftlIn), flangeThicknessRight: numeric(ftrIn),
+      flangeOuterDiameterLeft: numeric(odlIn), flangeOuterDiameterRight: numeric(odrIn),
+      spokeDiameter: numeric(sdIn), interlaced, geometryProvenance,
       hubOffset: parseFloat(hoIn.value) || 0.0,
       rimFlip: rimflipIn.value as 'Auto' | 'Left' | 'Right',
-      flangePcdLeft: parseFloat(pcdlIn.value) || 57.0,
-      centerToLeft: parseFloat(wlIn.value) || 35.0,
-      crossesLeft: parseInt(crosslIn.value) || 3,
-      flangePcdRight: parseFloat(pcdrIn.value) || 59.0,
-      centerToRight: parseFloat(wrIn.value) || 22.6,
-      crossesRight: parseInt(crossrIn.value) || 3,
+      flangePcdLeft: numeric(pcdlIn),
+      centerToLeft: numeric(wlIn),
+      crossesLeft: numeric(crosslIn),
+      flangePcdRight: numeric(pcdrIn),
+      centerToRight: numeric(wrIn),
+      crossesRight: numeric(crossrIn),
       hubName: hubPreset.value === 'custom' ? 'Custom Hub' : `${hubBrand} ${hubName}`,
       spacing: hubSpacing,
       discType: hubDisc,
@@ -1036,6 +1105,7 @@ import { hubs } from '../data/hubs';
   function applyRimPreset() {
     const selectedOpt = rimPreset.options[rimPreset.selectedIndex];
     if (rimPreset.value !== 'custom' && selectedOpt) {
+      readRimAppearance();
       if (selectedOpt.hasAttribute('data-erd')) erdIn.value = selectedOpt.getAttribute('data-erd') || '392.0';
       if (selectedOpt.hasAttribute('data-osb')) osbIn.value = selectedOpt.getAttribute('data-osb') || '0.0';
       if (selectedOpt.hasAttribute('data-ol')) olIn.value = selectedOpt.getAttribute('data-ol') || '0.0';
@@ -1049,17 +1119,24 @@ import { hubs } from '../data/hubs';
   function applyHubPreset() {
     const selectedOpt = hubPreset.options[hubPreset.selectedIndex];
     if (hubPreset.value !== 'custom' && selectedOpt) {
+      customHubType = selectedOpt.dataset.hubtype ?? 'Rear';
+      customHubSpacing = selectedOpt.dataset.spacing ?? '';
       if (selectedOpt.hasAttribute('data-pcdl')) pcdlIn.value = selectedOpt.getAttribute('data-pcdl') || '57.0';
       if (selectedOpt.hasAttribute('data-pcdr')) pcdrIn.value = selectedOpt.getAttribute('data-pcdr') || '59.0';
-      if (selectedOpt.hasAttribute('data-wl')) wlIn.value = selectedOpt.getAttribute('data-wl') || '35.0';
-      if (selectedOpt.hasAttribute('data-wr')) wrIn.value = selectedOpt.getAttribute('data-wr') || '22.6';
+      if (selectedOpt.hasAttribute('data-wl')) wlIn.value = selectedOpt.getAttribute('data-wl') || String(defaultHub.centerToLeft);
+      if (selectedOpt.hasAttribute('data-wr')) wrIn.value = selectedOpt.getAttribute('data-wr') || String(defaultHub.centerToRight);
       if (selectedOpt.hasAttribute('data-sh')) shIn.value = selectedOpt.getAttribute('data-sh') || '2.6';
-      if (selectedOpt.hasAttribute('data-ft')) ftIn.value = selectedOpt.getAttribute('data-ft') || '3.0';
+      odlIn.value = selectedOpt.dataset.odl ?? '';
+      odrIn.value = selectedOpt.dataset.odr ?? '';
+      ftlIn.value = selectedOpt.dataset.ftl ?? '';
+      ftrIn.value = selectedOpt.dataset.ftr ?? '';
+      geometryProvenance = selectedOpt.dataset.provenance ?? 'Outside diameters not measured. Enter dimensions to enable the 3D path estimate; thickness from the catalogue is an assumption.';
     }
   }
 
   // 3. RUN CALCULATIONS & RE-RENDER ALL VISUALIZERS
   function updateAll() {
+    syncHubControls();
     const inputs = getInputs();
 
     // Label spoke count
@@ -1067,18 +1144,48 @@ import { hubs } from '../data/hubs';
 
     // Trigger math engine
     const results = calculateWheelBuild(inputs);
+    const paths = calculateSpokePaths(inputs);
+    const leftLabel = inputs.isRear ? 'Left / non-drive' : 'Left / disc';
+    const rightLabel = inputs.isRear ? 'Right / drive' : 'Right / non-disc';
+    document.querySelector('[data-side-label="left-length"]')!.textContent = `${leftLabel} — traditional`;
+    document.querySelector('[data-side-label="right-length"]')!.textContent = `${rightLabel} — traditional`;
+    toggleLSpokes.textContent = leftLabel;
+    toggleRSpokes.textContent = rightLabel;
+    const rows = document.getElementById('path-results')!;
+    rows.replaceChildren();
+    for (const side of ['Left', 'Right'] as const) for (const headsOut of [true, false]) {
+      const group = paths.spokes.filter(p => p.side === side && p.headsOut === headsOut);
+      const row = document.createElement('tr');
+      const name = `${side === 'Left' ? leftLabel : rightLabel}, heads-${headsOut ? 'out' : 'in'}`;
+      const range = (key: 'pathLength' | 'bendAllowance' | 'estimatedLength') => {
+        if (!group.length || group.some(p => !p.valid)) return 'Unavailable';
+        const values = group.map(p => p[key]), low = Math.min(...values), high = Math.max(...values);
+        return high - low < 0.05 ? low.toFixed(1) : `${low.toFixed(1)}–${high.toFixed(1)}`;
+      };
+      for (const value of [name, range('pathLength'), range('bendAllowance'), range('estimatedLength')]) {
+        const cell = document.createElement('td'); cell.className = 'py-2 pr-3 border-t border-titanium-800'; cell.textContent = value; row.append(cell);
+      }
+      rows.append(row);
+    }
+    document.getElementById('path-errors')!.textContent = paths.errors.length ? paths.errors[0] : '';
 
     // Update Numerical DOM Output
     if (outLenL) outLenL.innerHTML = `${results.left.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
-    if (outLenLRound) outLenLRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.ceil(results.left.calculatedSpokeLength)} mm</span>`;
+    if (outLenLRound) outLenLRound.innerHTML = `Nearest whole millimetre: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.left.calculatedSpokeLength)} mm</span>`;
     if (outLenR) outLenR.innerHTML = `${results.right.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
-    if (outLenRRound) outLenRRound.innerHTML = `Order: <span class="font-bold text-titanium-100 mono-data">${Math.ceil(results.right.calculatedSpokeLength)} mm</span>`;
+    if (outLenRRound) outLenRRound.innerHTML = `Nearest whole millimetre: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.right.calculatedSpokeLength)} mm</span>`;
+
+    for (const [result, length, rounded] of [[results.left, outLenL, outLenLRound], [results.right, outLenR, outLenRRound]] as const) {
+      if (!result.effectiveFlangeDistanceValid || !Number.isFinite(result.calculatedSpokeLength) || inputs.erd <= 0 || inputs.spokeHoleDiameter <= 0) {
+        length.textContent = 'Unavailable'; rounded.textContent = 'Check wheel geometry';
+      }
+    }
 
     // Warn when an effective flange distance is invalid (<= 0)
     if (weffWarning) {
       const sides = [
-        { name: 'NDS (Left)', valid: results.left.effectiveFlangeDistanceValid, w: results.left.effectiveFlangeDistance },
-        { name: 'DS (Right)', valid: results.right.effectiveFlangeDistanceValid, w: results.right.effectiveFlangeDistance },
+        { name: leftLabel, valid: results.left.effectiveFlangeDistanceValid, w: results.left.effectiveFlangeDistance },
+        { name: rightLabel, valid: results.right.effectiveFlangeDistanceValid, w: results.right.effectiveFlangeDistance },
       ].filter(s => !s.valid);
       if (sides.length > 0) {
         const detail = sides.map(s => `${s.name}: ${s.w.toFixed(1)} mm`).join(' · ');
@@ -1138,9 +1245,11 @@ import { hubs } from '../data/hubs';
     const hubOpt = hubPreset.options[hubPreset.selectedIndex];
     const hubBrand = hubOpt?.getAttribute('data-brand') || '';
     const hubName = hubOpt?.getAttribute('data-name') || 'Custom Hub';
-    const hubSpacing = hubOpt?.getAttribute('data-spacing') || '';
+    const hubSpacing = hubOpt?.getAttribute('data-spacing') || customHubSpacing;
 
     const rimOpt = rimPreset.options[rimPreset.selectedIndex];
+    const rimNotes = document.getElementById('rim-notes');
+    if (rimNotes) rimNotes.textContent = rimPreset.value === 'custom' ? 'Custom geometry; rim appearance retained from the selected profile.' : (rimOpt?.dataset.notes || '');
     const rimBrand = rimOpt?.getAttribute('data-brand') || '';
     const rimName = rimOpt?.getAttribute('data-name') || 'Custom Rim';
 
@@ -1164,6 +1273,9 @@ import { hubs } from '../data/hubs';
         centerToRight: inputs.centerToRight,
         spokeHoleDiameter: inputs.spokeHoleDiameter,
         flangeThickness: inputs.flangeThickness,
+        flangeThicknessLeft: inputs.flangeThicknessLeft, flangeThicknessRight: inputs.flangeThicknessRight,
+        flangeOuterDiameterLeft: Number.isFinite(inputs.flangeOuterDiameterLeft) ? inputs.flangeOuterDiameterLeft : undefined,
+        flangeOuterDiameterRight: Number.isFinite(inputs.flangeOuterDiameterRight) ? inputs.flangeOuterDiameterRight : undefined,
         hubOffset: inputs.hubOffset,
         brand: hubBrand,
         name: hubName,
@@ -1181,6 +1293,7 @@ import { hubs } from '../data/hubs';
         rimWidthOuter: inputs.rimWidthOuter,
         rimWidthInner: inputs.rimWidthInner,
         rimDepth: inputs.rimDepth,
+        ...rimAppearance,
         rimFlip: inputs.rimFlip,
         brand: rimBrand,
         name: rimName,
@@ -1189,7 +1302,7 @@ import { hubs } from '../data/hubs';
 
     // 3. Update Three.js 3D Viewport
     if (viewport) {
-      viewport.update(inputs);
+      viewport.update(inputs, paths);
     }
 
     // 4. Update Chart
@@ -1211,7 +1324,7 @@ import { hubs } from '../data/hubs';
       chartInstance = new Chart(ctx, {
         type: 'bar',
         data: {
-          labels: ['NDS Bracing', 'DS Bracing'],
+          labels: ['Left bracing', 'Right bracing'],
           datasets: [{
             label: 'Bracing Angle (deg)',
             data: [bracingL, bracingR],
@@ -1257,18 +1370,20 @@ import { hubs } from '../data/hubs';
   });
 
   // Decouple presets on manual inputs
-  const manualInputs = [erdIn, woIn, wiIn, depIn, osbIn, olIn, orIn, pcdlIn, pcdrIn, wlIn, wrIn, shIn, ftIn, hoIn];
+  const manualInputs = [erdIn, woIn, wiIn, depIn, osbIn, olIn, orIn, pcdlIn, pcdrIn, wlIn, wrIn, shIn, ftlIn, ftrIn, odlIn, odrIn, hoIn];
   manualInputs.forEach(elem => {
     elem.addEventListener('input', () => {
       if (elem === erdIn || elem === woIn || elem === wiIn || elem === depIn || elem === osbIn || elem === olIn || elem === orIn) {
         rimPreset.value = 'custom';
       } else {
         hubPreset.value = 'custom';
+        geometryProvenance = 'User-entered geometry; approximate measurements.';
       }
       updateAll();
     });
   });
 
+  sdIn.addEventListener('input', updateAll);
   countIn.addEventListener('input', updateAll);
   crosslIn.addEventListener('change', updateAll);
   crossrIn.addEventListener('change', updateAll);
@@ -1316,16 +1431,22 @@ import { hubs } from '../data/hubs';
     });
   }
 
+  function syncInterlaceControl() {
+    toggleInterlace.classList.toggle('bg-cyan-950/30', interlaced);
+    toggleInterlace.classList.toggle('text-cyan-400', interlaced);
+    toggleInterlace.classList.toggle('bg-titanium-950', !interlaced);
+    toggleInterlace.classList.toggle('text-titanium-500', !interlaced);
+    toggleInterlace.textContent = interlaced ? 'Interlaced' : 'Non-interlaced';
+    toggleInterlace.setAttribute('aria-pressed', String(interlaced));
+  }
+
   if (toggleInterlace) {
     toggleInterlace.addEventListener('click', () => {
       if (!viewport) return;
-      viewport.enableInterlacing = !viewport.enableInterlacing;
-      toggleInterlace.classList.toggle('bg-cyan-950/30', viewport.enableInterlacing);
-      toggleInterlace.classList.toggle('text-cyan-400', viewport.enableInterlacing);
-      toggleInterlace.classList.toggle('bg-titanium-950', !viewport.enableInterlacing);
-      toggleInterlace.classList.toggle('text-titanium-500', !viewport.enableInterlacing);
-      toggleInterlace.textContent = viewport.enableInterlacing ? 'Interlaced' : 'Straight';
-      viewport.update(getInputs());
+      interlaced = !interlaced;
+      viewport.enableInterlacing = interlaced;
+      syncInterlaceControl();
+      updateAll();
     });
   }
 
@@ -1562,13 +1683,13 @@ import { hubs } from '../data/hubs';
       // Rule Tips per Group
       if (lacingRuleTipText) {
         if (activeSpoke.group === 1) {
-          lacingRuleTipText.textContent = `Group 1: Drive Side Trailing Spokes (Heads-Out). Hub Logo Alignment: Position the Hub Brand Logo facing the Valve Hole before placing Spoke #1 (Key Spoke). Place remaining spokes in every 2nd flange hole into every 4th rim hole. When complete, the spokes frame the Hub Logo directly beneath the Valve Hole!`;
+          lacingRuleTipText.textContent = `Group 1: Right-side trailing Spokes (Heads-Out). Hub Logo Alignment: Position the Hub Brand Logo facing the Valve Hole before placing Spoke #1 (Key Spoke). Place remaining spokes in every 2nd flange hole into every 4th rim hole. When complete, the spokes frame the Hub Logo directly beneath the Valve Hole!`;
         } else if (activeSpoke.group === 2) {
-          lacingRuleTipText.textContent = `Group 2: Non-Drive Side Trailing Spokes (Heads-Out). Look down the axle to align left flange holes relative to the right flange. Insert trailing spokes in the left flange and seat them in the corresponding left-drilled rim holes.`;
+          lacingRuleTipText.textContent = `Group 2: Left-side trailing Spokes (Heads-Out). Look down the axle to align left flange holes relative to the right flange. Insert trailing spokes in the left flange and seat them in the corresponding rim holes assigned to the left flange.`;
         } else if (activeSpoke.group === 3) {
-          lacingRuleTipText.textContent = `Group 3: Drive Side Leading Spokes (Heads-In). Twist the hub relative to the rim to set bracing. Insert leading spokes from inside the right flange, crossing over/under the Group 1 spokes into the remaining right-side rim holes.`;
+          lacingRuleTipText.textContent = `Group 3: Right-side leading Spokes (Heads-In). Twist the hub relative to the rim to set bracing. Insert leading spokes from inside the right flange, crossing over/under the Group 1 spokes into the remaining rim holes assigned to the right flange.`;
         } else {
-          lacingRuleTipText.textContent = `Group 4: Non-Drive Side Leading Spokes (Heads-In). Insert remaining leading spokes from inside the left flange, weaving over/under Group 2 spokes into the remaining left-drilled rim holes to complete the wheel assembly!`;
+          lacingRuleTipText.textContent = `Group 4: Left-side leading Spokes (Heads-In). Insert remaining leading spokes from inside the left flange, weaving over/under Group 2 spokes into the remaining rim holes assigned to the left flange to complete the wheel assembly!`;
         }
       }
     } else {
@@ -1592,7 +1713,7 @@ import { hubs } from '../data/hubs';
   function updateHash(inputs: ReturnType<typeof getInputs>) {
     const params = new URLSearchParams();
     for (const [key, val] of Object.entries(inputs)) {
-      params.set(key, val.toString());
+      if (typeof val !== 'number' || Number.isFinite(val)) params.set(key, val.toString());
     }
     params.set('rp', rimPreset.value);
     params.set('hp', hubPreset.value);
@@ -1608,8 +1729,23 @@ import { hubs } from '../data/hubs';
       const params = new URLSearchParams(hash.substring(1));
       const rpVal = params.get('rp');
       const hpVal = params.get('hp');
-      if (rpVal && rimPreset) rimPreset.value = rpVal;
-      if (hpVal && hubPreset) hubPreset.value = hpVal;
+      if (rpVal && Array.from(rimPreset.options).some(option => option.value === rpVal)) rimPreset.value = rpVal;
+      if (rpVal && rpVal !== 'custom') applyRimPreset();
+      // Legacy custom links have no appearance metadata: retain the old renderer.
+      if (!rpVal || rpVal === 'custom') rimAppearance = { rimProfile: 'standard', rimEyelets: false, rimValveDiameter: 6.5 };
+      else readRimAppearance();
+      if (params.has('rimProfile')) rimAppearance.rimProfile = params.get('rimProfile') === 'shallow-double-wall' ? 'shallow-double-wall' : 'standard';
+      if (params.has('rimEyelets')) rimAppearance.rimEyelets = params.get('rimEyelets') === 'true';
+      const valveDiameter = Number(params.get('rimValveDiameter'));
+      if (valveDiameter > 0 && Number.isFinite(valveDiameter)) rimAppearance.rimValveDiameter = valveDiameter;
+      if (hpVal) hubPreset.value = Array.from(hubPreset.options).some(o => o.value === hpVal) ? hpVal : 'custom';
+      applyHubPreset();
+      if (params.has('isRear')) customHubType = params.get('isRear') === 'true' ? 'Rear' : 'Front';
+      if (params.has('spacing')) customHubSpacing = params.get('spacing')!;
+      const restoredOption = hubPreset.selectedOptions[0];
+      if (hubPreset.value === 'custom') { odlIn.value = ''; odrIn.value = ''; }
+      if (params.has('interlaced')) interlaced = params.get('interlaced') !== 'false';
+      if (params.has('geometryProvenance')) geometryProvenance = params.get('geometryProvenance')!;
 
       const mapField = (id: string, paramName: string) => {
         const input = document.getElementById(id) as HTMLInputElement;
@@ -1624,18 +1760,31 @@ import { hubs } from '../data/hubs';
       mapField('input-osb', 'osb');
       mapField('input-ol', 'ol');
       mapField('input-or', 'or');
+      mapField('input-ol', 'drillingOffsetLeft');
+      mapField('input-or', 'drillingOffsetRight');
       mapField('input-pcdl', 'flangePcdLeft');
       mapField('input-pcdr', 'flangePcdRight');
       mapField('input-wl', 'centerToLeft');
       mapField('input-wr', 'centerToRight');
       mapField('input-sh', 'spokeHoleDiameter');
-      mapField('input-ft', 'flangeThickness');
+      mapField('input-ftl', 'flangeThickness');
+      mapField('input-ftr', 'flangeThickness');
+      mapField('input-ftl', 'flangeThicknessLeft');
+      mapField('input-ftr', 'flangeThicknessRight');
+      mapField('input-odl', 'flangeOuterDiameterLeft');
+      mapField('input-odr', 'flangeOuterDiameterRight');
+      mapField('input-sd', 'spokeDiameter');
       mapField('input-ho', 'hubOffset');
       mapField('input-count', 'spokeCount');
       mapField('input-crossl', 'crossesLeft');
       mapField('input-crossr', 'crossesRight');
       mapField('input-rimflip', 'rimFlip');
-
+      if (rimPreset.value === defaultRim.id && [osbIn, olIn, orIn].some(field => numeric(field) !== 0)) rimPreset.value = 'custom';
+      const checks: [HTMLInputElement, string][] = [[pcdlIn,'pcdl'],[pcdrIn,'pcdr'],[wlIn,'wl'],[wrIn,'wr'],[shIn,'sh'],[ftlIn,'ftl'],[ftrIn,'ftr'],[odlIn,'odl'],[odrIn,'odr']];
+      if (restoredOption?.value !== 'custom' && (checks.some(([field,key]) => restoredOption?.dataset[key] !== undefined && numeric(field) !== Number(restoredOption.dataset[key])) || (restoredOption?.dataset.count && numeric(countIn) !== Number(restoredOption.dataset.count)))) {
+        hubPreset.value = 'custom'; geometryProvenance = 'Custom geometry restored from shared link.';
+      }
+      syncHubControls();
       return true;
     } catch (e) {
       console.warn('Failed parsing share link parameters:', e);
@@ -1679,6 +1828,8 @@ import { hubs } from '../data/hubs';
     const canvasContainer = document.getElementById('canvas-container');
     if (canvasContainer) {
       viewport = new Viewport3D(canvasContainer);
+      viewport.enableInterlacing = interlaced;
+      syncInterlaceControl();
       viewport.setCameraPreset('isometric');
     }
 
@@ -1693,6 +1844,9 @@ import { hubs } from '../data/hubs';
         centerToRight: initialInputs.centerToRight,
         spokeHoleDiameter: initialInputs.spokeHoleDiameter,
         flangeThickness: initialInputs.flangeThickness,
+        flangeThicknessLeft: initialInputs.flangeThicknessLeft, flangeThicknessRight: initialInputs.flangeThicknessRight,
+        flangeOuterDiameterLeft: Number.isFinite(initialInputs.flangeOuterDiameterLeft) ? initialInputs.flangeOuterDiameterLeft : undefined,
+        flangeOuterDiameterRight: Number.isFinite(initialInputs.flangeOuterDiameterRight) ? initialInputs.flangeOuterDiameterRight : undefined,
         hubOffset: initialInputs.hubOffset,
         brand: hubOpt?.getAttribute('data-brand') || '',
         name: hubOpt?.getAttribute('data-name') || '',
@@ -1712,6 +1866,7 @@ import { hubs } from '../data/hubs';
         rimWidthOuter: initialInputs.rimWidthOuter,
         rimWidthInner: initialInputs.rimWidthInner,
         rimDepth: initialInputs.rimDepth,
+        ...rimAppearance,
         rimFlip: initialInputs.rimFlip,
         brand: rimOpt?.getAttribute('data-brand') || '',
         name: rimOpt?.getAttribute('data-name') || '',

@@ -1,4 +1,6 @@
-export interface WheelBuildInputs {
+import type { RimAppearance } from '../data/rims';
+
+export interface WheelBuildInputs extends RimAppearance {
   erd: number;                  // ERD in mm
   osb: number;                  // Offset Spoke Bed (asymmetrical rim offset) in mm
   drillingOffsetLeft: number;   // Left drilling offset in mm
@@ -6,6 +8,13 @@ export interface WheelBuildInputs {
   spokeCount: number;           // Total spoke count (e.g., 32, 28, 24)
   spokeHoleDiameter: number;    // Hub flange spoke hole diameter in mm (e.g., 2.6)
   flangeThickness?: number;     // Hub flange thickness in mm (optional, e.g. 3.0)
+  flangeThicknessLeft?: number;
+  flangeThicknessRight?: number;
+  flangeOuterDiameterLeft?: number;
+  flangeOuterDiameterRight?: number;
+  spokeDiameter?: number;
+  interlaced?: boolean;
+  geometryProvenance?: string;
   hubOffset: number;            // Frame offset in mm (e.g., 0)
   rimFlip: 'Auto' | 'Left' | 'Right'; // Orientation of asymmetric rim spoke bed
   

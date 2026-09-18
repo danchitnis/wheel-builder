@@ -1,4 +1,13 @@
 export interface Hub {
+  spokeCount?: number;
+  extraOption?: boolean;
+  flangeOuterDiameterLeft?: number;
+  flangeOuterDiameterRight?: number;
+  flangeThicknessLeft?: number;
+  flangeThicknessRight?: number;
+  geometryProvenance?: string;
+  sourceUrl?: string;
+  explodedUrl?: string;
   id: string;
   brand: string;
   name: string;
@@ -36,7 +45,13 @@ export const hubs: Hub[] = [
   {
     id: 'hope-pro5-rear-135-6b',
     brand: 'Hope',
-    name: 'Pro 5 Rear 135/142 6-Bolt',
+    name: 'Pro 5 Rear 135 mm — 32 holes — 6-Bolt',
+    spokeCount: 32,
+    flangeOuterDiameterLeft: 67, flangeOuterDiameterRight: 67,
+    flangeThicknessLeft: 4, flangeThicknessRight: 4,
+    geometryProvenance: 'User measured: outside diameter 67 mm, flange thickness approximately 4 mm; both sides assumed equal.',
+    sourceUrl: 'https://www.hopetech.com/_repository/1/documents/Pro5_PCD_J_Bend_2025.pdf',
+    explodedUrl: 'https://www.hopetech.com/_repository/1/documents/PRO5_135_Assembly.pdf',
     flangePcdLeft: 57.0,
     flangePcdRight: 59.0,
     centerToLeft: 32.0,
@@ -44,7 +59,7 @@ export const hubs: Hub[] = [
     spokeHoleDiameter: 2.6,
     flangeThickness: 3.0,
     category: 'MTB',
-    spacing: '12x142mm / 135mm',
+    spacing: '135mm',
     weight: 295,
     discType: '6-Bolt',
     notes: 'Official Hope Pro 5 Rear 135/142 6-Bolt specifications.'
@@ -134,7 +149,13 @@ export const hubs: Hub[] = [
   {
     id: 'hope-pro5-front-100-6b',
     brand: 'Hope',
-    name: 'Pro 5 Front 100 6-Bolt',
+    name: 'Pro 5 Front 100 mm — 32 holes — 6-Bolt',
+    spokeCount: 32,
+    flangeOuterDiameterLeft: 62, flangeOuterDiameterRight: 62,
+    flangeThicknessLeft: 4, flangeThicknessRight: 4,
+    geometryProvenance: 'User measured: outside diameter 62 mm, flange thickness approximately 4 mm; both sides assumed equal.',
+    sourceUrl: 'https://www.hopetech.com/_repository/1/documents/Pro5_PCD_J_Bend_2025.pdf',
+    explodedUrl: 'https://www.hopetech.com/_repository/1/documents/PRO5_Front_Standard.pdf',
     flangePcdLeft: 58.0,
     flangePcdRight: 52.0,
     centerToLeft: 20.0,
@@ -142,7 +163,7 @@ export const hubs: Hub[] = [
     spokeHoleDiameter: 2.6,
     flangeThickness: 3.0,
     category: 'MTB',
-    spacing: '15x100mm / 100mm',
+    spacing: '100mm',
     weight: 175,
     discType: '6-Bolt',
     notes: 'Official Hope Pro 5 Front 100 6-Bolt specifications.'
@@ -278,3 +299,15 @@ export const hubs: Hub[] = [
     notes: 'Beautifully machined US-made gravel hub with an incredibly durable titanium freehub body.'
   }
 ];
+
+export const DEFAULT_HUB_ID = 'hope-pro5-rear-135-6b';
+const primaryIds = [DEFAULT_HUB_ID, 'hope-pro5-front-100-6b'];
+for (const hub of hubs) {
+  hub.extraOption = hub.brand === 'Hope' && !primaryIds.includes(hub.id);
+  if (primaryIds.includes(hub.id)) hub.flangeThickness = 4;
+}
+hubs.sort((a, b) => {
+  const rank = (h: Hub) => primaryIds.includes(h.id) ? primaryIds.indexOf(h.id) : 2;
+  return rank(a) - rank(b);
+});
+export const defaultHub = hubs.find(h => h.id === DEFAULT_HUB_ID)!;

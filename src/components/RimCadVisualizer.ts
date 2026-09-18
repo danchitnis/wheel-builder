@@ -1,3 +1,5 @@
+import type { RimAppearance } from '../data/rims';
+import { shallowRimSection } from '../utils/rimProfile';
 import {
   drawCadGrid,
   drawCadDimensionLine,
@@ -6,7 +8,7 @@ import {
   defaultCadTheme,
 } from '../utils/cadRenderer';
 
-export interface RimCadData {
+export interface RimCadData extends RimAppearance {
   erd: number;                  // ERD in mm
   osb: number;                  // Offset Spoke Bed in mm
   drillingOffsetLeft: number;   // Left drilling offset in mm
@@ -182,9 +184,11 @@ export class RimCadVisualizer {
 
     // 2. Draw Rim Profile Section (Double-Walled Extrusion Profile)
     const yNippleSeat = 0;
-    const yAeroTip = -rimDepth;
-    const yTireBed = 7.0;
-    const yBeadTop = 13.0;
+    const shallow = this.data.rimProfile === 'shallow-double-wall';
+    const section = shallowRimSection(rimWidthOuter, rimWidthInner, rimDepth);
+    const yAeroTip = shallow ? 0 : -rimDepth;
+    const yTireBed = shallow ? section.bed : 7.0;
+    const yBeadTop = shallow ? rimDepth : 13.0;
 
     // Gradient fill for Carbon/Alloy Rim extrusion
     const rimGrad = this.ctx.createLinearGradient(0, toScreenY(yBeadTop), 0, toScreenY(yAeroTip));
@@ -197,6 +201,23 @@ export class RimCadVisualizer {
     this.ctx.strokeStyle = '#38bdf8';
     this.ctx.lineWidth = 1.8;
 
+    if (shallow) {
+      this.ctx.fillStyle = '#17191c';
+      this.ctx.beginPath();
+      for (const contour of [section.outline, section.cavity]) {
+        contour.forEach(([x, y], i) => i === 0 ? this.ctx.moveTo(toScreenX(x), toScreenY(y)) : this.ctx.lineTo(toScreenX(x), toScreenY(y)));
+        this.ctx.closePath();
+      }
+      this.ctx.fill('evenodd');
+      this.ctx.stroke();
+      if (this.data.rimEyelets) {
+        this.ctx.fillStyle = '#c9cdd2';
+        for (const x of new Set([xHoleLeft_mm, xHoleRight_mm])) {
+          this.ctx.fillRect(toScreenX(x - 3.5), toScreenY(0.5), 1.4 * scale, 1.5 * scale);
+          this.ctx.fillRect(toScreenX(x + 2.1), toScreenY(0.5), 1.4 * scale, 1.5 * scale);
+        }
+      }
+    } else {
     // Outer Boundary Path
     this.ctx.beginPath();
     this.ctx.moveTo(toScreenX(xOuterLeft), toScreenY(yBeadTop));
@@ -243,6 +264,8 @@ export class RimCadVisualizer {
     this.ctx.closePath();
     this.ctx.fill();
     this.ctx.stroke();
+
+    }
 
     // 3. Draw Asymmetric Spoke Bed Center Line & Drilling Holes
     this.ctx.strokeStyle = '#f59e0b';
@@ -392,7 +415,7 @@ export class RimCadVisualizer {
       { x: toScreenX(xOuterLeft), y: toScreenY(yAeroTip) },
       `Depth: ${rimDepth.toFixed(1)} mm`,
       {
-        offset: -25 * scale,
+        offset: (shallow ? 25 : -25) * scale,
         color: '#38bdf8',
         extLineStart1: { x: toScreenX(xOuterLeft), y: toScreenY(yBeadTop) },
         extLineStart2: { x: toScreenX(xOuterLeft), y: toScreenY(yAeroTip) },
@@ -411,8 +434,27 @@ export class RimCadVisualizer {
     this.ctx.fillStyle = '#94a3b8';
     this.ctx.fillText(`ERD: ${erd.toFixed(1)}mm • Profile: ${rimWidthOuter.toFixed(1)}×${rimDepth.toFixed(1)}mm (Inner: ${rimWidthInner.toFixed(1)}mm) • OSB: ${osb.toFixed(1)}mm`, 16, 40);
 
+    if (shallow) {
+      this.ctx.fillStyle = '#94a3b8';
+      this.ctx.fillText(`Eyelets: ${this.data.rimEyelets ? 'silver' : 'none'} • Presta Ø${(this.data.rimValveDiameter ?? 6.5).toFixed(1)} mm • Internal section approximate`, 16, 56);
+      // Separate valve drilling detail: it lies between spoke holes, not in this section.
+      const cx = cssW - 70, cy = 105;
+      const radius = (this.data.rimValveDiameter ?? 6.5) * 2;
+      this.ctx.fillStyle = '#17191c';
+      this.ctx.fillRect(cx - 25, cy - 23, 50, 46);
+      this.ctx.beginPath();
+      this.ctx.arc(cx, cy, radius, 0, Math.PI * 2);
+      this.ctx.fillStyle = '#050508';
+      this.ctx.fill();
+      this.ctx.strokeStyle = '#94a3b8';
+      this.ctx.stroke();
+      this.ctx.textAlign = 'center';
+      this.ctx.fillStyle = '#94a3b8';
+      this.ctx.fillText('Valve detail', cx, cy + 38);
+      this.ctx.textAlign = 'left';
+    }
     this.ctx.fillStyle = '#38bdf8';
-    this.ctx.fillText('◀ NDS (LEFT)', 16, cssH - 16);
+    this.ctx.fillText('◀ NDS (LEFT)' , 16, cssH - 16);
 
     this.ctx.fillStyle = '#f43f5e';
     this.ctx.textAlign = 'right';

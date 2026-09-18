@@ -1,13 +1,31 @@
+import { calculateSpokePaths, type SpokePath, type SpokePaths, type Point3 } from '../utils/spokePath';
+import { shallowRimSection } from '../utils/rimProfile';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { WheelBuildInputs } from '../utils/physicsCalculator';
+
+/** Parameterise by sample index so TubeGeometry includes every contact point.
+ * Uniform arc-length mesh sampling can skip a sub-millimetre flange bend. */
+class SpokeDisplayCurve extends THREE.Curve<THREE.Vector3> {
+  private points: THREE.Vector3[];
+  constructor(points: THREE.Vector3[]) { super(); this.points = points; }
+  getPoint(t: number, target = new THREE.Vector3()) {
+    const position = Math.max(0, Math.min(1, t)) * (this.points.length - 1);
+    const index = Math.min(this.points.length - 2, Math.floor(position));
+    return target.copy(this.points[index]).lerp(this.points[index + 1], position - index);
+  }
+  getPointAt(t: number, target = new THREE.Vector3()) { return this.getPoint(t, target); }
+  getTangentAt(t: number, target = new THREE.Vector3()) {
+    return target.copy(this.getPoint(Math.min(1, t + 1e-5))).sub(this.getPoint(Math.max(0, t - 1e-5))).normalize();
+  }
+}
 
 export class Viewport3D {
   private container: HTMLElement;
   private scene!: THREE.Scene;
   private camera!: THREE.PerspectiveCamera;
   private renderer!: THREE.WebGLRenderer;
-  private controls!: THREE.OrbitControls;
+  private controls!: OrbitControls;
   private spokeMeshes: THREE.Mesh[] = [];
   private currentInputs?: WheelBuildInputs;
 
@@ -15,12 +33,12 @@ export class Viewport3D {
   public explodedValue: number = 0; // 0 to 1
   public showLeftSpokes: boolean = true;
   public showRightSpokes: boolean = true;
-  public enableInterlacing: boolean = true; // Toggle 3D spoke interlacing/weaving
+  public enableInterlacing: boolean = false; // Toggle 3D spoke interlacing/weaving
   public showRuler: boolean = true; // Toggle 3D straight ruler vector
   public showMeasurement: boolean = true; // Global measurement toggle
   public isSpokeDeltaMode: boolean = false; // Focused single spoke path analysis mode
   public colorMode: 'classic' | 'side' | 'tension' = 'classic';
-  public spokeThickness: number = 1.0; // Aero vs Heavy duty
+  public spokeThickness: number = 1.0; // Visual diameter multiplier; never used in calculations
 
   // Interactive Lacing Mode
   public lacingMode: boolean = false;
@@ -34,6 +52,9 @@ export class Viewport3D {
 
   // Ruler visualization
   private rulerGroup: THREE.Group = new THREE.Group();
+  private activeRulerMidpoint: THREE.Vector3 | null = null;
+  private activeRulerDirectLength = 0;
+  private activeRulerActualLength = 0;
 
   // Interaction
   private raycaster = new THREE.Raycaster();
@@ -303,7 +324,7 @@ export class Viewport3D {
     this.setLacingPlacedCount(targetCount);
   }
 
-  public update(inputs: WheelBuildInputs) {
+  public update(inputs: WheelBuildInputs, sharedPaths?: SpokePaths) {
     this.currentInputs = inputs;
     this.clearScene();
     this.spokeMeshes = [];
@@ -336,9 +357,14 @@ export class Viewport3D {
       crossesRight,
     } = inputs;
 
+    if (![erd, flangePcdLeft, flangePcdRight, centerToLeft, centerToRight, spokeCount].every(Number.isFinite) || erd <= 0 || flangePcdLeft <= 0 || flangePcdRight <= 0 || spokeCount < 8 || spokeCount > 64) {
+      this.activeRulerMidpoint = null;
+      return;
+    }
+
     // --- MATERIALS ---
     const rimMat = new THREE.MeshStandardMaterial({
-      color: 0x5a606d, // Brighter Metallic Alloy/Titanium Gray for high contrast on dark background
+      color: inputs.rimProfile === 'shallow-double-wall' ? 0x17191c : 0x5a606d, // Brighter Metallic Alloy/Titanium Gray for high contrast on dark background
       roughness: 0.35,
       metalness: 0.75,
       side: THREE.DoubleSide,
@@ -365,12 +391,12 @@ export class Viewport3D {
     // --- 1. GENERATE RIM (Lathe Profile for ultra-realism) ---
     // A modern aero, double-walled rim profile centered around ERD spoke bed (R_bed)
     const R_bed = erd / 2; // Exact Spoke Bed radius (where nipples seat)
-    const rimDepth = 22;   // Outer rim depth
+    const rimDepth = inputs.rimDepth ?? 22;   // Outer rim depth
     const R_outer = R_bed + rimDepth; // Outer tire hook bead radius
-    const rimWidth = 13;   // Rim half-width
+    const rimWidth = (inputs.rimWidthOuter ?? 26) / 2;   // Rim half-width
 
     // Define profile coordinates relative to inner spoke bed (R_bed, 0)
-    const points: THREE.Vector2[] = [];
+    let points: THREE.Vector2[] = [];
     points.push(new THREE.Vector2(R_bed, 0)); // Inner spoke bed center channel
     points.push(new THREE.Vector2(R_bed + 2, rimWidth - 3)); // Sloping inner wall
     points.push(new THREE.Vector2(R_outer - 3, rimWidth)); // Outer sidewall
@@ -383,6 +409,10 @@ export class Viewport3D {
     points.push(new THREE.Vector2(R_outer - 3, -rimWidth));
     points.push(new THREE.Vector2(R_bed + 2, -(rimWidth - 3)));
     points.push(new THREE.Vector2(R_bed, 0));
+
+    const shallow = inputs.rimProfile === 'shallow-double-wall';
+    const section = shallowRimSection(rimWidth * 2, inputs.rimWidthInner ?? 22, rimDepth);
+    if (shallow) points = section.outline.map(([axial, radial]) => new THREE.Vector2(R_bed + radial, axial));
 
     // Lathe profile around Y axis, then rotate to face along Z
     const rimGeom = new THREE.LatheGeometry(points, 96);
@@ -399,6 +429,12 @@ export class Viewport3D {
     }
     rimMesh.position.z = -rimShift;
     this.scene.add(rimMesh);
+    if (shallow) {
+      const cavity = new THREE.Mesh(new THREE.LatheGeometry(section.cavity.map(([axial, radial]) => new THREE.Vector2(R_bed + radial, axial)), 96), rimMat);
+      cavity.rotation.x = Math.PI / 2;
+      cavity.position.z = -rimShift;
+      this.scene.add(cavity);
+    }
 
     // --- 2. PRECOMPUTE VALVE ANGLE (Midpoint of widest angular gap on rim) ---
     const Ns = spokeCount / 2;
@@ -455,9 +491,7 @@ export class Viewport3D {
     // Outer flange margin extending past pitch circle radius
     const flangeOuterMargin = Math.max(3.2, spokeHoleDiameter * 1.25);
     // Spoke wire radius
-    const spokeRad = 0.5 * this.spokeThickness;
-    // Dynamic axial displacement for J-bend elbow to guarantee clear physical air gap over flange face
-    const offsetDist = (flangeThickness / 2) + spokeRad + 0.3;
+    const spokeRad = (inputs.spokeDiameter ?? 2) / 2 * this.spokeThickness;
 
     // Flange geometries with real drilled spoke holes
     const flangeLGeom = this.createFlangeGeometry(
@@ -465,8 +499,8 @@ export class Viewport3D {
       Ns,
       spokeHoleDiameter,
       0, // Left holes alignment
-      flangeThickness,
-      flangeOuterMargin
+      inputs.flangeThicknessLeft ?? flangeThickness,
+      (Number.isFinite(inputs.flangeOuterDiameterLeft) && inputs.flangeOuterDiameterLeft! > flangePcdLeft ? inputs.flangeOuterDiameterLeft! : (flangePcdLeft + 2 * flangeOuterMargin)) / 2 - flangePcdLeft / 2
     );
     const flangeL = new THREE.Mesh(flangeLGeom, hubMat);
     flangeL.position.z = zL;
@@ -477,8 +511,8 @@ export class Viewport3D {
       Ns,
       spokeHoleDiameter,
       Math.PI / Ns, // Right holes staggered by half-hole
-      flangeThickness,
-      flangeOuterMargin
+      inputs.flangeThicknessRight ?? flangeThickness,
+      (Number.isFinite(inputs.flangeOuterDiameterRight) && inputs.flangeOuterDiameterRight! > flangePcdRight ? inputs.flangeOuterDiameterRight! : (flangePcdRight + 2 * flangeOuterMargin)) / 2 - flangePcdRight / 2
     );
     const flangeR = new THREE.Mesh(flangeRGeom, hubMat);
     flangeR.position.z = zR;
@@ -660,27 +694,6 @@ export class Viewport3D {
       }
     ];
 
-    // Helper function for 2D segment intersection
-    const intersect2D = (
-      p1: THREE.Vector2,
-      p2: THREE.Vector2,
-      p3: THREE.Vector2,
-      p4: THREE.Vector2
-    ) => {
-      const denom = (p4.y - p3.y) * (p2.x - p1.x) - (p4.x - p3.x) * (p2.y - p1.y);
-      if (Math.abs(denom) < 1e-6) return null;
-      const ua = ((p4.x - p3.x) * (p1.y - p3.y) - (p4.y - p3.y) * (p1.x - p3.x)) / denom;
-      const ub = ((p2.x - p1.x) * (p1.y - p3.y) - (p2.y - p1.y) * (p1.x - p3.x)) / denom;
-      if (ua >= 0.05 && ua <= 0.95 && ub >= 0.05 && ub <= 0.95) {
-        return {
-          point: new THREE.Vector2(p1.x + ua * (p2.x - p1.x), p1.y + ua * (p2.y - p1.y)),
-          t1: ua,
-          t2: ub,
-        };
-      }
-      return null;
-    };
-
     // --- 4. GENERATE TUBE PUMP VALVE HOLE & PRESTA VALVE STEM ---
     const inwardRadDir = new THREE.Vector3(-Math.cos(valveAngle), -Math.sin(valveAngle), 0).normalize();
     const P_valveBed = new THREE.Vector3(
@@ -710,12 +723,12 @@ export class Viewport3D {
     });
 
     // A. Drilled Rim Valve Hole (6.5mm Presta hole drilled through double-wall rim)
-    const vHoleRimGeom = new THREE.CylinderGeometry(4.0, 4.0, rimDepth + 1.0, 24);
+    const vHoleRimGeom = new THREE.CylinderGeometry((inputs.rimValveDiameter ?? 6.5) / 2 + 0.6, (inputs.rimValveDiameter ?? 6.5) / 2 + 0.6, rimDepth + 1.0, 24);
     const vHoleRimMesh = new THREE.Mesh(vHoleRimGeom, valveRimMat);
     vHoleRimMesh.position.y = -rimDepth / 2;
     valveGroup.add(vHoleRimMesh);
 
-    const vHoleCoreGeom = new THREE.CylinderGeometry(3.2, 3.2, rimDepth + 1.6, 24);
+    const vHoleCoreGeom = new THREE.CylinderGeometry((inputs.rimValveDiameter ?? 6.5) / 2, (inputs.rimValveDiameter ?? 6.5) / 2, rimDepth + 1.6, 24);
     const vHoleCoreMesh = new THREE.Mesh(vHoleCoreGeom, valveHoleCoreMat);
     vHoleCoreMesh.position.y = -rimDepth / 2;
     valveGroup.add(vHoleCoreMesh);
@@ -758,12 +771,15 @@ export class Viewport3D {
     // 4. Collect spoke geometries across both sides and organize into 4 Lacing Groups
     interface SpokeEntry {
       side: 'Left' | 'Right';
+      visible: boolean;
       j: number;
       isLeading: boolean;
       isHeadsOut: boolean;
       group: 1 | 2 | 3 | 4;
       groupName: string;
-      sp: typeof spokeData[0];
+      sp: { model: SpokePath; P_head: THREE.Vector3; P_holeExit: THREE.Vector3;
+        P_pureHole: THREE.Vector3; P_rimBase: THREE.Vector3; P_rim: THREE.Vector3;
+        direct3DLength: number; rimHoleAngle: number; isLeading: boolean; isHeadsOut: boolean };
       crossInfo?: { point: THREE.Vector3; t: number };
       wEff: number;
       colorHex: number;
@@ -775,184 +791,37 @@ export class Viewport3D {
 
     const rawSpokeEntries: SpokeEntry[] = [];
 
+    const pathModel = sharedPaths ?? calculateSpokePaths(inputs);
     sides.forEach((s) => {
-      if (!s.show) return;
-
-      const fHolesCount = Ns;
-
-      // 1. Precompute spoke base trajectories
-      const spokeData: Array<{
-        j: number;
-        isLeading: boolean;
-        flangeAngle: number;
-        rimHoleAngle: number;
-        P_head: THREE.Vector3;
-        P_holeCenter: THREE.Vector3;
-        P_holeExit: THREE.Vector3;
-        P_pureHole: THREE.Vector3;
-        P_innerKnee: THREE.Vector3;
-        P_flangeRim: THREE.Vector3;
-        P_shaftStart: THREE.Vector3;
-        P_rimBase: THREE.Vector3;
-        P_rim: THREE.Vector3;
-        direct3DLength: number;
-        zHead: number;
-        zElbow: number;
-        isHeadsOut: boolean;
-      }> = [];
-
-      for (let j = 0; j < fHolesCount; j++) {
-        const flangeAngle = j * (2 * Math.PI / fHolesCount) + s.flangeOffsetAngle;
-        const xF = s.fRadius * Math.cos(flangeAngle);
-        const yF = s.fRadius * Math.sin(flangeAngle);
-        const zF = s.zFlange;
-
-        const isLeading = j % 2 === 0;
-        const directionSign = isLeading ? 1.0 : -1.0;
-
-        const thetaAngle = (720.0 * s.crosses) / N;
-        const thetaRad = thetaAngle * (Math.PI / 180.0);
-        const rimHoleAngle = flangeAngle + directionSign * thetaRad;
-
-        const xR_rim = R_bed * Math.cos(rimHoleAngle);
-        const yR_rim = R_bed * Math.sin(rimHoleAngle);
-        const zR_rim_base = s.rimZ_base;
-        const zR_rim = s.rimZ;
-
-        const sideDir = s.sideName === 'Right' ? 1.0 : -1.0;
-        const isHeadsOut = j % 2 === 0;
-        const zHead = isHeadsOut ? zF + sideDir * offsetDist : zF - sideDir * offsetDist;
-        const zElbow = isHeadsOut ? zF - sideDir * offsetDist : zF + sideDir * offsetDist;
-
-        // 2D vector in direction of spoke pull towards rim
-        const dir2D = new THREE.Vector2(xR_rim - xF, yR_rim - yF).normalize();
-
-        // Hole clearance pivot shift inside the flange hole (d_h vs d_spoke)
-        const holeRadius = spokeHoleDiameter / 2;
-        const deltaClearance = Math.min(0.4, Math.max(0.1, holeRadius - spokeRad));
-
-        // Pivoted J-bend positions: head seats at rear rim edge, elbow pivots toward pull direction
-        const P_head = new THREE.Vector3(
-          xF - dir2D.x * deltaClearance,
-          yF - dir2D.y * deltaClearance,
-          zHead
-        );
-        const P_holeExit = new THREE.Vector3(
-          xF + dir2D.x * deltaClearance,
-          yF + dir2D.y * deltaClearance,
-          zElbow
-        );
-        const P_holeCenter = new THREE.Vector3().addVectors(P_head, P_holeExit).multiplyScalar(0.5);
-
-        // For heads-in spokes (elbow on outer face), clear the outer flange edge dynamically
-        const clearanceMargin = flangeOuterMargin + spokeRad + 0.5;
-        const P_flangeRim = new THREE.Vector3(
-          xF + dir2D.x * clearanceMargin,
-          yF + dir2D.y * clearanceMargin,
-          zElbow
-        );
-
-        const P_pureHole = new THREE.Vector3(xF, yF, zF);
-        const P_rimBase = new THREE.Vector3(xR_rim, yR_rim, zR_rim_base);
-        const P_rim = new THREE.Vector3(xR_rim, yR_rim, zR_rim);
-
-        // Vector direction from flange hole center to rim spoke bed
-        const dirToRim = new THREE.Vector3().subVectors(P_rim, P_pureHole).normalize();
-
-        // Inner knee point: contact point at inner edge of flange hole where J-bend rests
-        const P_innerKnee = new THREE.Vector3().addVectors(
-          P_pureHole,
-          dirToRim.clone().multiplyScalar(spokeHoleDiameter / 2)
-        );
-
-        // Straight 3D length from inner knee of J-bend to point inside nipple at rim (matches calculatedSpokeLength)
-        const direct3DLength = P_innerKnee.distanceTo(P_rim);
-        const P_shaftStart = isHeadsOut ? P_holeExit : P_flangeRim;
-
-        spokeData.push({
-          j,
-          isLeading,
-          flangeAngle,
-          rimHoleAngle,
-          P_head,
-          P_holeCenter,
-          P_holeExit,
-          P_pureHole,
-          P_innerKnee,
-          P_flangeRim,
-          P_shaftStart,
-          P_rimBase,
-          P_rim,
-          direct3DLength,
-          zHead,
-          zElbow,
-          isHeadsOut,
-        });
-      }
-
-      // 2. Compute 3D interlacing crossing points
-      const crossingMap = new Map<number, { point: THREE.Vector3; t: number }>();
-
-      if (s.crosses >= 1 && this.enableInterlacing) {
-        for (let a = 0; a < fHolesCount; a++) {
-          const spA = spokeData[a];
-          if (!spA.isLeading) continue; // Leading vs Trailing
-
-          for (let b = 0; b < fHolesCount; b++) {
-            const spB = spokeData[b];
-            if (spB.isLeading) continue;
-
-            const segA_p1 = new THREE.Vector2(spA.P_shaftStart.x, spA.P_shaftStart.y);
-            const segA_p2 = new THREE.Vector2(spA.P_rim.x, spA.P_rim.y);
-            const segB_p1 = new THREE.Vector2(spB.P_shaftStart.x, spB.P_shaftStart.y);
-            const segB_p2 = new THREE.Vector2(spB.P_rim.x, spB.P_rim.y);
-
-            const res = intersect2D(segA_p1, segA_p2, segB_p1, segB_p2);
-            if (res) {
-              const curA = crossingMap.get(a);
-              if (!curA || res.t1 > curA.t) {
-                const zA_raw = spA.P_shaftStart.z + res.t1 * (spA.P_rim.z - spA.P_shaftStart.z);
-                const zB_raw = spB.P_shaftStart.z + res.t2 * (spB.P_rim.z - spB.P_shaftStart.z);
-
-                const zMid = (zA_raw + zB_raw) / 2;
-                const sideDir = s.sideName === 'Right' ? 1.0 : -1.0;
-                
-                // Interlacing over/under weave displacement proportional to spoke thickness
-                const weaveOffsetVal = Math.max(0.8, spokeRad * 1.5);
-                const weaveOffsetA = (spA.j % 2 === 0) ? sideDir * weaveOffsetVal : -sideDir * weaveOffsetVal;
-                const weaveOffsetB = (spB.j % 2 === 0) ? sideDir * weaveOffsetVal : -sideDir * weaveOffsetVal;
-
-                const ptA = new THREE.Vector3(res.point.x, res.point.y, zMid + weaveOffsetA);
-                const ptB = new THREE.Vector3(res.point.x, res.point.y, zMid + weaveOffsetB);
-
-                crossingMap.set(a, { point: ptA, t: res.t1 });
-                crossingMap.set(b, { point: ptB, t: res.t2 });
-              }
-            }
-          }
-        }
-      }
-
-      for (let j = 0; j < fHolesCount; j++) {
-        const sp = spokeData[j];
+      const sideDir = s.sideName === 'Right' ? 1 : -1;
+      const displayPoint = (p: Point3) => new THREE.Vector3(p.x, p.y, p.z + sideDir * expOffset);
+      for (const model of pathModel.spokes.filter(p => p.side === s.sideName && p.valid)) {
+        const j = model.index;
+        const head = displayPoint(model.hole);
+        const thickness = (s.sideName === 'Left' ? inputs.flangeThicknessLeft : inputs.flangeThicknessRight) ?? flangeThickness;
+        head.z += sideDir * (model.headsOut ? 1 : -1) * (thickness / 2 + spokeRad);
+        const sp = { model, P_head: head, P_holeExit: displayPoint(model.start),
+          P_pureHole: displayPoint(model.hole), P_rimBase: new THREE.Vector3(model.end.x, model.end.y, model.end.z),
+          P_rim: displayPoint(model.end), direct3DLength: model.chordLength,
+          rimHoleAngle: Math.atan2(model.end.y, model.end.x), isLeading: !model.headsOut, isHeadsOut: model.headsOut };
         let groupNum: 1 | 2 | 3 | 4 = 1;
-        let groupNameStr = 'Group 1: Drive Side Trailing (Key Spokes)';
+        let groupNameStr = 'Group 1: Right trailing (key spokes)';
 
         if (s.sideName === 'Right') {
           if (!sp.isLeading) {
             groupNum = 1;
-            groupNameStr = 'Group 1: Drive Side Trailing (Key Spokes)';
+            groupNameStr = 'Group 1: Right trailing (key spokes)';
           } else {
             groupNum = 3;
-            groupNameStr = 'Group 3: Drive Side Leading (Cross Weave)';
+            groupNameStr = 'Group 3: Right leading (cross weave)';
           }
         } else {
           if (!sp.isLeading) {
             groupNum = 2;
-            groupNameStr = 'Group 2: Non-Drive Side Trailing';
+            groupNameStr = 'Group 2: Left trailing';
           } else {
             groupNum = 4;
-            groupNameStr = 'Group 4: Non-Drive Side Leading (Final Weave)';
+            groupNameStr = 'Group 4: Left leading (final weave)';
           }
         }
 
@@ -960,17 +829,18 @@ export class Viewport3D {
 
         rawSpokeEntries.push({
           side: s.sideName,
+          visible: s.show,
           j,
           isLeading: sp.isLeading,
           isHeadsOut: sp.isHeadsOut,
           group: groupNum,
           groupName: groupNameStr,
           sp,
-          crossInfo: crossingMap.get(j),
+          crossInfo: model.crossingContact ? { point: displayPoint(model.crossingContact), t: 0 } : undefined,
           wEff: s.wEff,
           colorHex: s.colorHex,
           flangeHoleIndex: j,
-          rimHoleIndex: s.rimHoleIndices(j),
+          rimHoleIndex: (((j + (model.headsOut ? 1 : -1) * s.crosses) % Ns + Ns) % Ns) * 2 + (s.sideName === 'Right' ? 1 : 0),
           sequenceIndex: 0,
           angularDist: angDist,
         });
@@ -1004,13 +874,22 @@ export class Viewport3D {
       const innerCoreMesh = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 2.1, 2.4, 16), holeDarkMat);
       spokeHoleGroup.add(innerRimMesh);
       spokeHoleGroup.add(innerCoreMesh);
+      if (inputs.rimEyelets) {
+        const eyelet = new THREE.Mesh(
+          new THREE.TorusGeometry(2.8, 0.65, 8, 24),
+          new THREE.MeshStandardMaterial({ color: 0xc9cdd2, metalness: 0.9, roughness: 0.24 }),
+        );
+        eyelet.rotation.x = Math.PI / 2;
+        eyelet.position.y = -0.35;
+        spokeHoleGroup.add(eyelet);
+      }
 
       const outerHoleGroup = new THREE.Group();
       const outerRimMesh = new THREE.Mesh(new THREE.CylinderGeometry(4.2, 4.2, 2.2, 16), holeRimMat);
       const outerCoreMesh = new THREE.Mesh(new THREE.CylinderGeometry(3.6, 3.6, 2.4, 16), holeDarkMat);
       outerHoleGroup.add(outerRimMesh);
       outerHoleGroup.add(outerCoreMesh);
-      outerHoleGroup.position.y = 5.0;
+      outerHoleGroup.position.y = shallow ? section.bed : 5.0;
       spokeHoleGroup.add(outerHoleGroup);
 
       const radDir = new THREE.Vector3(Math.cos(sp.rimHoleAngle), Math.sin(sp.rimHoleAngle), 0).normalize();
@@ -1020,7 +899,7 @@ export class Viewport3D {
 
       // Evaluate whether this spoke should be rendered
       const isPlaced = !this.lacingMode || (m < this.lacingPlacedCount);
-      if (!isPlaced) return; // Unplaced spokes are COMPLETELY hidden (not rendered)
+      if (!isPlaced || !entry.visible) return; // Unplaced spokes are COMPLETELY hidden (not rendered)
 
       const isActiveSpoke = this.lacingMode && (m === this.lacingPlacedCount - 1);
 
@@ -1065,61 +944,30 @@ export class Viewport3D {
       headMesh.position.copy(sp.P_head);
       this.scene.add(headMesh);
 
-      // 2. Continuous 3D Spoke Wire Tube
-      const neckDir = new THREE.Vector3().subVectors(sp.P_holeExit, sp.P_head).normalize();
-      const targetPoint = !sp.isHeadsOut ? sp.P_flangeRim : (crossInfo ? crossInfo.point : sp.P_rim);
-      const shaftDir = new THREE.Vector3().subVectors(targetPoint, sp.P_holeExit).normalize();
-
-      const Rbend = Math.max(2.2, spokeRad * 2.6);
-      const P_arcStart = new THREE.Vector3().subVectors(sp.P_holeExit, neckDir.clone().multiplyScalar(Rbend * 0.8));
-      const P_arcEnd = new THREE.Vector3().addVectors(sp.P_holeExit, shaftDir.clone().multiplyScalar(Rbend * 0.8));
-
-      const bisector = new THREE.Vector3().subVectors(shaftDir, neckDir).normalize();
-      const P_arcMid = new THREE.Vector3().addVectors(sp.P_holeExit, bisector.multiplyScalar(Rbend * 0.7));
-
-      const spokeCurvePoints: THREE.Vector3[] = [
-        sp.P_head,
-        P_arcStart,
-        P_arcMid,
-        P_arcEnd,
-      ];
-      if (!sp.isHeadsOut) spokeCurvePoints.push(sp.P_flangeRim);
-      if (crossInfo) spokeCurvePoints.push(crossInfo.point);
-      spokeCurvePoints.push(sp.P_rim);
-
-      const spokeCurve = new THREE.CatmullRomCurve3(spokeCurvePoints, false, 'centripetal');
-      const spokeTubeGeom = new THREE.TubeGeometry(spokeCurve, 56, spokeRad, 8, false);
+      // Measured shaft: exactly the shared path, translated only for exploded view.
+      const displayShift = (entry.side === 'Left' ? -1 : 1) * expOffset;
+      const displayPoint = (p: Point3) => new THREE.Vector3(p.x, p.y, p.z + displayShift);
+      const shaftPoints = sp.model.points.map(displayPoint);
+      const shaftCurve = new SpokeDisplayCurve(shaftPoints);
+      const spokeTubeGeom = new THREE.TubeGeometry(shaftCurve, (shaftPoints.length - 1) * 4, spokeRad, 8, false);
       const spokeMesh = new THREE.Mesh(spokeTubeGeom, spokeMaterial);
-
-      const dirToRim = new THREE.Vector3().subVectors(sp.P_rim, sp.P_holeExit).normalize();
-      const totalSpokeLength = sp.direct3DLength;
-      const exitBendAngleDeg = Math.acos(Math.abs(dirToRim.z)) * (180.0 / Math.PI);
-
-      const shaftCurvePoints: THREE.Vector3[] = [P_arcMid, P_arcEnd];
-      if (!sp.isHeadsOut) shaftCurvePoints.push(sp.P_flangeRim);
-      if (crossInfo) shaftCurvePoints.push(crossInfo.point);
-      shaftCurvePoints.push(sp.P_rim);
-
-      const shaftCurve = new THREE.CatmullRomCurve3(shaftCurvePoints, false, 'centripetal');
-      const actualCurveLength = shaftCurve.getLength();
-
+      // Decorative manufactured elbow is separate and excluded from shaft length.
+      const neck = new THREE.QuadraticBezierCurve3(sp.P_head, new THREE.Vector3(sp.P_head.x, sp.P_head.y, sp.P_holeExit.z), sp.P_holeExit);
+      this.scene.add(new THREE.Mesh(new THREE.TubeGeometry(neck, 12, spokeRad, 8, false), spokeMaterial));
+      const finalSpan = new THREE.Vector3().subVectors(shaftPoints[shaftPoints.length-1], shaftPoints[shaftPoints.length-2]).normalize();
+      const exitBendAngleDeg = Math.acos(Math.min(1, Math.abs(finalSpan.z))) * 180 / Math.PI;
+      for (const point of [...sp.model.flangeContacts, ...(sp.model.crossingContact ? [sp.model.crossingContact] : [])]) {
+        const marker = new THREE.Mesh(new THREE.SphereGeometry(spokeRad * 1.12, 8, 6), new THREE.MeshBasicMaterial({color: 0xfbbf24}));
+        marker.position.copy(displayPoint(point)); this.scene.add(marker);
+      }
       spokeMesh.userData = {
-        side: entry.side,
-        index: j,
-        sequenceIndex: m,
-        group: entry.group,
-        groupName: entry.groupName,
-        isLeading: sp.isLeading,
-        length: totalSpokeLength,
-        direct3DLength: sp.direct3DLength,
-        actualCurveLength,
-        holeCenter: sp.P_pureHole,
-        innerKnee: sp.P_innerKnee,
-        rimCenter: sp.P_rim,
+        side: entry.side, index: j, sequenceIndex: m, group: entry.group, groupName: entry.groupName,
+        isLeading: sp.isLeading, length: sp.model.traditionalLength,
+        direct3DLength: sp.model.chordLength, actualCurveLength: sp.model.pathLength,
+        bendAllowance: sp.model.bendAllowance, estimatedLength: sp.model.estimatedLength,
+        holeCenter: sp.P_pureHole, innerKnee: sp.P_holeExit, rimCenter: sp.P_rim,
         bracingAngle: Math.asin(Math.min(1.0, entry.wEff / sp.P_pureHole.distanceTo(sp.P_rim))) * (180.0 / Math.PI),
-        flangeExitBendAngle: exitBendAngleDeg,
-        start: sp.P_holeExit,
-        end: sp.P_rim,
+        flangeExitBendAngle: exitBendAngleDeg, start: sp.P_holeExit, end: sp.P_rim,
       };
 
       this.scene.add(spokeMesh);
@@ -1144,10 +992,7 @@ export class Viewport3D {
       nippleGroup.add(nCollar);
 
       const upVec = new THREE.Vector3(0, 1, 0);
-      const inwardVector = new THREE.Vector3().subVectors(
-        sp.P_rim,
-        crossInfo ? crossInfo.point : sp.P_holeExit
-      ).negate().normalize();
+      const inwardVector = finalSpan.clone().negate();
 
       nippleGroup.quaternion.setFromUnitVectors(upVec, inwardVector);
       nippleGroup.position.copy(sp.P_rim);
@@ -1252,20 +1097,11 @@ export class Viewport3D {
             rimHoleIndex: activeEntry.rimHoleIndex + 1,
             isLeading: activeEntry.isLeading,
             headsDir: activeEntry.isHeadsOut ? 'Heads Out (Elbows In)' : 'Heads In (Elbows Out)',
-            length: activeEntry.sp.direct3DLength,
+            length: activeEntry.sp.model.traditionalLength,
           } : null,
         },
       });
       window.dispatchEvent(event);
-    }
-
-    // Draw initial 3D measurement ruler on primary spoke
-    if (this.showMeasurement && this.showRuler && this.spokeMeshes.length > 0) {
-      this.drawRulerForSpoke(this.spokeMeshes[0]);
-    } else if (this.rulerGroup) {
-      this.scene.remove(this.rulerGroup);
-      this.rulerGroup.clear();
-      this.activeRulerMidpoint = null;
     }
 
     // Draw initial 3D measurement ruler on primary spoke
@@ -1411,7 +1247,7 @@ export class Viewport3D {
     const bevelSize = Math.min(0.3, thickness * 0.1);
     const extrudeSettings = {
       depth: thickness,
-      bevelEnabled: true,
+      bevelEnabled: false,
       bevelThickness: bevelSize,
       bevelSize: bevelSize,
       bevelSegments: 3,
@@ -1429,7 +1265,6 @@ export class Viewport3D {
     this.scene.traverse((obj) => {
       if (
         (obj instanceof THREE.Mesh || obj instanceof THREE.Group) &&
-        obj !== this.camera &&
         obj.parent !== this.camera &&
         obj !== this.studioLightGroup &&
         obj.parent !== this.studioLightGroup &&
