@@ -1,4 +1,5 @@
 import { calculateSpokePaths, type SpokePath, type SpokePaths, type Point3 } from '../utils/spokePath';
+import { createLacingGuide, guideKey, guideSnapshot, initialGuideState, reconcileGuide, transitionGuide, type GuideAction, type LacingGuide, type LacingTarget } from '../utils/lacingGuide';
 import { shallowRimSection } from '../utils/rimProfile';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -42,8 +43,16 @@ export class Viewport3D {
 
   // Interactive Lacing Mode
   public lacingMode: boolean = false;
-  public lacingPlacedCount: number = 0; // 0 to N
-  public lacingCameraTracking: boolean = true; // true = auto-track active spoke, false = fixed
+  private guideState = initialGuideState();
+  private guide?: LacingGuide;
+  private cachedPaths?: SpokePaths;
+  private lastTrackedStep = '';
+  private hasOpenedLacing = false;
+  private lacingTargets: Partial<Record<LacingTarget, { point: THREE.Vector3; label: string }>> = {};
+  private highlightedLacingTarget: LacingTarget | null = null;
+  private lacingTargetMarker!: HTMLDivElement;
+  public get lacingPlacedCount() { return this.guideState.step; }
+  public get lacingCameraTracking() { return this.guideState.cameraTracking; }
   private lacingIndicatorGroup: THREE.Group = new THREE.Group();
 
   // Lights Groups
@@ -95,6 +104,15 @@ export class Viewport3D {
     this.renderer.domElement.style.maxHeight = '100%';
     this.renderer.domElement.style.display = 'block';
     this.container.appendChild(this.renderer.domElement);
+    this.container.style.position = 'relative';
+    this.lacingTargetMarker = document.createElement('div');
+    this.lacingTargetMarker.className = 'lacing-target-marker';
+    this.lacingTargetMarker.hidden = true;
+    this.lacingTargetMarker.setAttribute('aria-hidden', 'true');
+    const halo = document.createElement('span'); halo.className = 'lacing-target-halo';
+    const label = document.createElement('span'); label.className = 'lacing-target-label';
+    this.lacingTargetMarker.append(halo, label);
+    this.container.append(this.lacingTargetMarker);
 
     // 4. Controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement);
@@ -132,6 +150,7 @@ export class Viewport3D {
     torchDir.position.set(20, 40, 30);
     this.headTorchGroup.add(torchDir);
 
+    this.headTorchGroup.add(new THREE.AmbientLight(0xffffff, 0.9));
     this.headTorchGroup.visible = false; // Initially OFF for main tab
     this.camera.add(this.headTorchGroup);
 
@@ -139,6 +158,7 @@ export class Viewport3D {
 
     // 6. Handle resizing
     window.addEventListener('resize', this.onWindowResize.bind(this));
+    new ResizeObserver(() => this.onWindowResize()).observe(this.container);
 
     // 7. Raycasting events
     this.renderer.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
@@ -146,9 +166,11 @@ export class Viewport3D {
   }
 
   private onWindowResize() {
-    this.camera.aspect = this.container.clientWidth / this.container.clientHeight;
+    const width = this.container.clientWidth, height = this.container.clientHeight;
+    if (width <= 0 || height <= 0) return;
+    this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
-    this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
+    this.renderer.setSize(width, height);
   }
 
   private onMouseMove(event: MouseEvent) {
@@ -210,6 +232,7 @@ export class Viewport3D {
   }
 
   public setCameraPreset(preset: 'isometric' | 'lateral' | 'dish' | 'hub' | 'spoke-delta') {
+    if (this.lacingMode) this.setLacingCameraTracking(false);
     const wasDeltaMode = this.isSpokeDeltaMode;
     if (preset === 'spoke-delta') {
       this.isSpokeDeltaMode = true;
@@ -225,7 +248,7 @@ export class Viewport3D {
         this.controls.target.set(0, 0, 0);
         break;
       case 'lateral':
-        this.camera.position.set(0, 0, 420);
+        this.camera.position.set(0, 0, Math.max(420, (this.currentInputs?.erd ?? 280) * 1.5));
         this.controls.target.set(0, 0, 0);
         break;
       case 'dish':
@@ -274,58 +297,84 @@ export class Viewport3D {
 
   public setLacingMode(enabled: boolean) {
     this.lacingMode = enabled;
-    if (this.currentInputs) {
-      if (this.lacingMode && this.lacingPlacedCount === 0) {
-        this.lacingPlacedCount = 1;
-      }
-      this.update(this.currentInputs);
+    if (enabled && !this.hasOpenedLacing && this.currentInputs) {
+      this.hasOpenedLacing = true;
+      this.camera.position.set(0, 0, Math.max(420, this.currentInputs.erd * 1.5));
+      this.controls.target.set(0, 0, 0);
+      this.controls.update();
     }
+    if (this.currentInputs) this.update(this.currentInputs);
   }
 
-  public setLacingPlacedCount(count: number) {
-    if (!this.currentInputs) return;
-    const total = this.currentInputs.spokeCount;
-    this.lacingPlacedCount = Math.max(0, Math.min(total, count));
+  /** Link hover/focus highlights without changing the step or camera. A click
+   * can bring an off-screen target into view while preserving the viewing angle. */
+  public emphasizeLacingTarget(target: LacingTarget | null, locate = false) {
+    const entry = target ? this.lacingTargets[target] : undefined;
+    this.highlightedLacingTarget = this.lacingMode && entry ? target : null;
+    if (entry && this.highlightedLacingTarget && locate) {
+      const projected = entry.point.clone().project(this.camera);
+      if (Math.abs(projected.x) > .85 || Math.abs(projected.y) > .8 || projected.z > 1 || projected.z < -1) {
+        const offset = this.camera.position.clone().sub(this.controls.target);
+        this.controls.target.copy(entry.point);
+        this.camera.position.copy(entry.point).add(offset);
+        this.controls.update();
+      }
+    }
+    this.updateLacingTargetMarker();
+  }
+
+  private updateLacingTargetMarker() {
+    const target = this.highlightedLacingTarget;
+    const entry = target ? this.lacingTargets[target] : undefined;
+    this.lacingTargetMarker.hidden = !this.lacingMode || !entry;
+    if (!entry || !target || !this.lacingMode) return;
+    const position = entry.point.clone().project(this.camera);
+    const width = this.container.clientWidth, height = this.container.clientHeight;
+    const outside = Math.abs(position.x) > 1 || Math.abs(position.y) > 1 || position.z > 1 || position.z < -1;
+    const screenX = (position.x + 1) * width / 2, screenY = (1 - position.y) * height / 2;
+    // Never shift an on-screen halo away from the actual hole. Only clamp the
+    // off-screen prompt; its dashed outline asks the user to locate the hole.
+    const x = outside ? Math.max(22, Math.min(width - 22, screenX)) : screenX;
+    const y = outside ? Math.max(22, Math.min(height - 22, screenY)) : screenY;
+    this.lacingTargetMarker.style.left = `${x}px`;
+    this.lacingTargetMarker.style.top = `${y}px`;
+    this.lacingTargetMarker.dataset.target = target;
+    this.lacingTargetMarker.dataset.offscreen = String(outside);
+    this.lacingTargetMarker.style.setProperty('--target-color', target === 'setup-reference' || target === 'reference-flange' || target === 'logo' ? '#fbbf24' :
+      target === 'valve' || target === 'alignment' ? '#fde047' : target.includes('flange') ? '#67e8f9' : '#6ee7b7');
+    const label = this.lacingTargetMarker.querySelector<HTMLElement>('.lacing-target-label')!;
+    label.textContent = outside ? `${entry.label} — click the link to locate` : entry.label;
+    label.style.left = `${Math.max(85 - x, Math.min(0, width - 85 - x))}px`;
+    label.style.top = y < 60 ? '25px' : '';
+    label.style.bottom = y < 60 ? 'auto' : '';
+  }
+
+  public navigateLacing(action: GuideAction) {
+    if (!this.guide || !this.currentInputs) return;
+    this.guideState = transitionGuide(this.guideState, this.guide, action);
+    if (action === 'track') this.lastTrackedStep = '';
     this.update(this.currentInputs);
   }
 
-  public setLacingCameraTracking(tracking: boolean) {
-    this.lacingCameraTracking = tracking;
-    if (this.lacingMode && this.currentInputs) {
-      this.update(this.currentInputs);
-    }
-  }
-
-  public nextLacingSpoke() {
-    if (!this.currentInputs) return;
-    this.setLacingPlacedCount(this.lacingPlacedCount + 1);
-  }
-
-  public prevLacingSpoke() {
-    if (!this.currentInputs) return;
-    this.setLacingPlacedCount(this.lacingPlacedCount - 1);
-  }
-
-  public nextLacingGroup() {
-    if (!this.currentInputs) return;
-    const total = this.currentInputs.spokeCount;
-    const gSize = total / 4;
-    const currentG = Math.floor(this.lacingPlacedCount / gSize);
-    const targetCount = Math.min(total, (currentG + 1) * gSize);
-    this.setLacingPlacedCount(targetCount);
-  }
-
-  public prevLacingGroup() {
-    if (!this.currentInputs) return;
-    const total = this.currentInputs.spokeCount;
-    const gSize = total / 4;
-    const currentG = Math.ceil(this.lacingPlacedCount / gSize);
-    const targetCount = Math.max(0, (currentG - 1) * gSize);
-    this.setLacingPlacedCount(targetCount);
-  }
+  public setLacingCameraTracking(tracking: boolean) { this.navigateLacing(tracking ? 'track' : 'fixed'); }
+  public nextLacingSpoke() { this.navigateLacing('next'); }
+  public prevLacingSpoke() { this.navigateLacing('previous'); }
+  public nextLacingGroup() { this.navigateLacing('next-group'); }
+  public prevLacingGroup() { this.navigateLacing('previous-group'); }
 
   public update(inputs: WheelBuildInputs, sharedPaths?: SpokePaths) {
+    this.emphasizeLacingTarget(null);
+    this.lacingTargets = {};
+    const changed = this.guide?.key !== guideKey(inputs);
+    const pathModel = sharedPaths ?? (changed ? undefined : this.cachedPaths) ?? calculateSpokePaths(inputs);
+    this.cachedPaths = pathModel;
+    this.guide = createLacingGuide(inputs, pathModel);
+    this.guideState = reconcileGuide(this.guideState, this.guide);
+    if (changed) this.lastTrackedStep = '';
     this.currentInputs = inputs;
+    if (this.lacingMode) window.dispatchEvent(new CustomEvent('lacing-update', { detail: guideSnapshot(this.guideState, this.guide) }));
+    this.resetHoveredSpoke();
+    window.dispatchEvent(new CustomEvent('spoke-unhover'));
     this.clearScene();
     this.spokeMeshes = [];
 
@@ -436,46 +485,9 @@ export class Viewport3D {
       this.scene.add(cavity);
     }
 
-    // --- 2. PRECOMPUTE VALVE ANGLE (Midpoint of widest angular gap on rim) ---
+    // Use the same landmark as the guide's ordering and instructions.
     const Ns = spokeCount / 2;
-    const sidesForAngles = [
-      { crosses: crossesLeft, flangeOffsetAngle: 0 },
-      { crosses: crossesRight, flangeOffsetAngle: Math.PI / Ns },
-    ];
-
-    const allRimAngles: number[] = [];
-    sidesForAngles.forEach((s) => {
-      for (let j = 0; j < Ns; j++) {
-        const flangeAngle = j * (2 * Math.PI / Ns) + s.flangeOffsetAngle;
-        const isLeading = j % 2 === 0;
-        const directionSign = isLeading ? 1.0 : -1.0;
-        const thetaAngle = (720.0 * s.crosses) / spokeCount;
-        const thetaRad = thetaAngle * (Math.PI / 180.0);
-        let rimAngle = flangeAngle + directionSign * thetaRad;
-        rimAngle = ((rimAngle % (2 * Math.PI)) + 2 * Math.PI) % (2 * Math.PI);
-        allRimAngles.push(rimAngle);
-      }
-    });
-
-    allRimAngles.sort((a, b) => a - b);
-
-    let maxGap = 0;
-    let valveAngle = Math.PI / Ns;
-
-    if (allRimAngles.length > 0) {
-      for (let k = 0; k < allRimAngles.length; k++) {
-        const nextAngle = (k === allRimAngles.length - 1)
-          ? allRimAngles[0] + 2 * Math.PI
-          : allRimAngles[k + 1];
-        const gap = nextAngle - allRimAngles[k];
-        if (gap > maxGap) {
-          maxGap = gap;
-          let mid = allRimAngles[k] + gap / 2;
-          if (mid >= 2 * Math.PI) mid -= 2 * Math.PI;
-          valveAngle = mid;
-        }
-      }
-    }
+    const valveAngle = this.guide.valveAngle;
 
     // --- 3. GENERATE HUB (CNC Lathe Profile) ---
     // Solid physical hub flange positions (hub geometry remains rigid and un-stretched)
@@ -662,7 +674,7 @@ export class Viewport3D {
     const N = spokeCount;
 
     // Exploded view separation shifts left & right spoke webs (+ nipples) apart laterally
-    const expOffset = this.explodedValue * 60.0;
+    const expOffset = this.lacingMode ? 0 : this.explodedValue * 60.0;
 
     // Loop through sides
     const sides = [
@@ -775,7 +787,7 @@ export class Viewport3D {
       j: number;
       isLeading: boolean;
       isHeadsOut: boolean;
-      group: 1 | 2 | 3 | 4;
+      group: number;
       groupName: string;
       sp: { model: SpokePath; P_head: THREE.Vector3; P_holeExit: THREE.Vector3;
         P_pureHole: THREE.Vector3; P_rimBase: THREE.Vector3; P_rim: THREE.Vector3;
@@ -783,15 +795,11 @@ export class Viewport3D {
       crossInfo?: { point: THREE.Vector3; t: number };
       wEff: number;
       colorHex: number;
-      flangeHoleIndex: number;
-      rimHoleIndex: number;
       sequenceIndex: number;
-      angularDist: number;
     }
 
     const rawSpokeEntries: SpokeEntry[] = [];
 
-    const pathModel = sharedPaths ?? calculateSpokePaths(inputs);
     sides.forEach((s) => {
       const sideDir = s.sideName === 'Right' ? 1 : -1;
       const displayPoint = (p: Point3) => new THREE.Vector3(p.x, p.y, p.z + sideDir * expOffset);
@@ -804,29 +812,7 @@ export class Viewport3D {
           P_pureHole: displayPoint(model.hole), P_rimBase: new THREE.Vector3(model.end.x, model.end.y, model.end.z),
           P_rim: displayPoint(model.end), direct3DLength: model.chordLength,
           rimHoleAngle: Math.atan2(model.end.y, model.end.x), isLeading: !model.headsOut, isHeadsOut: model.headsOut };
-        let groupNum: 1 | 2 | 3 | 4 = 1;
-        let groupNameStr = 'Group 1: Right trailing (key spokes)';
-
-        if (s.sideName === 'Right') {
-          if (!sp.isLeading) {
-            groupNum = 1;
-            groupNameStr = 'Group 1: Right trailing (key spokes)';
-          } else {
-            groupNum = 3;
-            groupNameStr = 'Group 3: Right leading (cross weave)';
-          }
-        } else {
-          if (!sp.isLeading) {
-            groupNum = 2;
-            groupNameStr = 'Group 2: Left trailing';
-          } else {
-            groupNum = 4;
-            groupNameStr = 'Group 4: Left leading (final weave)';
-          }
-        }
-
-        const angDist = ((sp.rimHoleAngle - valveAngle + 4 * Math.PI) % (2 * Math.PI));
-
+        const groupNum = (model.headsOut ? 0 : 2) + (s.sideName === 'Right' ? 1 : 2);
         rawSpokeEntries.push({
           side: s.sideName,
           visible: s.show,
@@ -834,29 +820,21 @@ export class Viewport3D {
           isLeading: sp.isLeading,
           isHeadsOut: sp.isHeadsOut,
           group: groupNum,
-          groupName: groupNameStr,
+          groupName: this.guide!.groupNames[groupNum - 1],
           sp,
           crossInfo: model.crossingContact ? { point: displayPoint(model.crossingContact), t: 0 } : undefined,
           wEff: s.wEff,
           colorHex: s.colorHex,
-          flangeHoleIndex: j,
-          rimHoleIndex: (((j + (model.headsOut ? 1 : -1) * s.crosses) % Ns + Ns) % Ns) * 2 + (s.sideName === 'Right' ? 1 : 0),
           sequenceIndex: 0,
-          angularDist: angDist,
         });
       }
     });
 
-    // Group entries into 4 distinct groups
-    const g1 = rawSpokeEntries.filter((e) => e.group === 1).sort((a, b) => a.angularDist - b.angularDist);
-    const g2 = rawSpokeEntries.filter((e) => e.group === 2).sort((a, b) => a.angularDist - b.angularDist);
-    const g3 = rawSpokeEntries.filter((e) => e.group === 3).sort((a, b) => a.angularDist - b.angularDist);
-    const g4 = rawSpokeEntries.filter((e) => e.group === 4).sort((a, b) => a.angularDist - b.angularDist);
-
-    const lacingOrderedSpokes = [...g1, ...g2, ...g3, ...g4];
-    lacingOrderedSpokes.forEach((e, idx) => {
-      e.sequenceIndex = idx;
-    });
+    const entriesByHole = new Map(rawSpokeEntries.map(entry => [`${entry.side}:${entry.j}`, entry]));
+    const lacingOrderedSpokes = this.lacingMode
+      ? this.guide.spokes.map(spoke => entriesByHole.get(`${spoke.side}:${spoke.path.index}`)!)
+      : rawSpokeEntries;
+    lacingOrderedSpokes.forEach((entry, index) => { entry.sequenceIndex = index; });
 
     // Build 3D Meshes for ordered spokes based on Lacing Mode / Standard Mode
     lacingOrderedSpokes.forEach((entry) => {
@@ -898,10 +876,10 @@ export class Viewport3D {
       this.scene.add(spokeHoleGroup);
 
       // Evaluate whether this spoke should be rendered
-      const isPlaced = !this.lacingMode || (m < this.lacingPlacedCount);
-      if (!isPlaced || !entry.visible) return; // Unplaced spokes are COMPLETELY hidden (not rendered)
+      const isPlaced = !this.lacingMode || this.guideState.preview || (m < this.lacingPlacedCount);
+      if (!isPlaced || (!this.lacingMode && !entry.visible)) return; // Unplaced spokes are COMPLETELY hidden (not rendered)
 
-      const isActiveSpoke = this.lacingMode && (m === this.lacingPlacedCount - 1);
+      const isActiveSpoke = this.lacingMode && !this.guideState.preview && (m === this.lacingPlacedCount - 1);
 
       let spokeMaterial: THREE.MeshStandardMaterial;
 
@@ -914,7 +892,7 @@ export class Viewport3D {
           emissive: 0xff8800,
           emissiveIntensity: 0.5,
         });
-      } else if (this.isSpokeDeltaMode) {
+      } else if (this.isSpokeDeltaMode && !this.lacingMode) {
         const isFocusSpoke = entry.side === 'Left' && j === 0;
         spokeMaterial = new THREE.MeshStandardMaterial({
           color: isFocusSpoke ? 0xffd700 : 0x444450,
@@ -1004,9 +982,57 @@ export class Viewport3D {
     this.lacingIndicatorGroup.clear();
 
     if (this.lacingMode) {
-      if (this.lacingPlacedCount > 0 && lacingOrderedSpokes.length > 0) {
-        const activeIdx = Math.min(lacingOrderedSpokes.length - 1, this.lacingPlacedCount - 1);
+      if (!this.guideState.preview && lacingOrderedSpokes.length > 0) {
+        const activeIdx = Math.max(0, Math.min(lacingOrderedSpokes.length - 1, this.lacingPlacedCount - 1));
         const activeEntry = lacingOrderedSpokes[activeIdx];
+        const guideSpoke = this.guide.spokes[activeIdx];
+        this.lacingTargets.flange = { point: activeEntry.sp.P_pureHole.clone(), label: `${activeEntry.side} flange hole — destination` };
+        this.lacingTargets.rim = { point: activeEntry.sp.P_rimBase.clone(), label: 'Rim hole — destination' };
+        if (guideSpoke.referenceFlange) {
+          const p = guideSpoke.referenceFlange.hole;
+          this.lacingTargets['reference-flange'] = { point: new THREE.Vector3(p.x, p.y, p.z), label: `${activeEntry.side} flange — count from here` };
+        }
+        if (guideSpoke.referenceRim) {
+          const p = guideSpoke.referenceRim.end;
+          this.lacingTargets['reference-rim'] = { point: new THREE.Vector3(p.x, p.y, p.z), label: 'Rim — count from here' };
+        }
+        this.lacingTargets.valve = { point: P_valveBed.clone(), label: 'Valve hole — count from here' };
+
+        const setup = guideSnapshot(this.guideState, this.guide).setup;
+        if (setup) {
+          const p = setup.reference.hole;
+          const referencePoint = new THREE.Vector3(p.x, p.y, p.z);
+          const radius = Math.hypot(p.x, p.y);
+          const alignmentPoint = new THREE.Vector3(radius * Math.cos(valveAngle), radius * Math.sin(valveAngle), p.z);
+          this.lacingTargets[setup.referenceTarget] = { point: referencePoint, label: setup.referenceTarget === 'setup-reference' ?
+            `${guideSpoke.side} flange — just counterclockwise of the valve line` : `${guideSpoke.side} flange — count from this already used hole` };
+          this.lacingTargets.alignment = { point: alignmentPoint, label: `Valve line across the ${guideSpoke.side.toLowerCase()} flange — between holes` };
+          // A steady construction line, not a spoke: project the valve direction
+          // onto the flange plane, then continue to the axle.
+          const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([
+            P_valveBed, alignmentPoint, new THREE.Vector3(0, 0, p.z)
+          ]), new THREE.LineDashedMaterial({ color: 0xfde047, dashSize: 4, gapSize: 3, depthTest: false, transparent: true, opacity: .85 }));
+          line.computeLineDistances(); line.renderOrder = 10;
+          this.lacingIndicatorGroup.add(line);
+          const referenceRing = new THREE.Mesh(new THREE.TorusGeometry(spokeHoleDiameter * 1.4, .65, 8, 24),
+            new THREE.MeshBasicMaterial({ color: 0xfbbf24, depthTest: false }));
+          referenceRing.position.copy(referencePoint); referenceRing.renderOrder = 11;
+          this.lacingIndicatorGroup.add(referenceRing);
+          if (setup.holeSteps > 0) {
+            const turn = setup.direction === 'clockwise' ? -1 : 1;
+            const startAngle = Math.atan2(p.y, p.x);
+            const sweep = setup.holeSteps * 2 * Math.PI / setup.flangeHoles.length;
+            const points = Array.from({ length: 49 }, (_, i) => {
+              const angle = startAngle + turn * sweep * i / 48;
+              return new THREE.Vector3((radius + 7) * Math.cos(angle), (radius + 7) * Math.sin(angle), p.z);
+            });
+            const arc = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0xfbbf24, depthTest: false }));
+            arc.renderOrder = 11; this.lacingIndicatorGroup.add(arc);
+            const end = startAngle + turn * sweep;
+            const arrow = new THREE.ArrowHelper(new THREE.Vector3(-turn * Math.sin(end), turn * Math.cos(end), 0), points.at(-1)!, 3, 0xfbbf24, 3, 2.5);
+            this.lacingIndicatorGroup.add(arrow);
+          }
+        }
 
         // 1. Target Flange Hole Ring (Neon Cyan)
         const fRingGeom = new THREE.TorusGeometry(spokeHoleDiameter * 0.9, 0.6, 12, 24);
@@ -1048,65 +1074,33 @@ export class Viewport3D {
       );
       hLogoRingMesh.position.copy(logoCenterPos);
       this.lacingIndicatorGroup.add(hLogoRingMesh);
+      if (this.guide?.valid && !this.guideState.preview && this.lacingPlacedCount <= 1) {
+        this.lacingTargets.logo = { point: logoCenterPos, label: 'Logo facing the valve — final orientation' };
+      }
 
       this.scene.add(this.lacingIndicatorGroup);
 
       // Auto-tracking camera focus
-      if (this.lacingCameraTracking && this.lacingPlacedCount > 0 && lacingOrderedSpokes.length > 0) {
+      const trackingKey = `${this.guide.key}:${this.lacingPlacedCount}`;
+      if (this.lacingCameraTracking && !this.guideState.preview && this.lacingPlacedCount > 0 && lacingOrderedSpokes.length > 0 && this.lastTrackedStep !== trackingKey) {
+        this.lastTrackedStep = trackingKey;
         const activeIdx = Math.min(lacingOrderedSpokes.length - 1, this.lacingPlacedCount - 1);
         const activeEntry = lacingOrderedSpokes[activeIdx];
 
         const midPoint = new THREE.Vector3().addVectors(activeEntry.sp.P_pureHole, activeEntry.sp.P_rimBase).multiplyScalar(0.5);
         const viewDir = new THREE.Vector3().subVectors(midPoint, new THREE.Vector3(0, 0, 0)).normalize();
-        const camPos = midPoint.clone().add(viewDir.clone().multiplyScalar(170)).add(new THREE.Vector3(0, 0, activeEntry.sp.P_pureHole.z + 50));
+        const camPos = midPoint.clone().add(viewDir.clone().multiplyScalar(170)).add(new THREE.Vector3(0, 0, activeEntry.side === 'Left' ? -170 : 170));
 
         this.camera.position.copy(camPos);
         this.controls.target.copy(midPoint);
         this.controls.update();
       }
 
-      // Dispatch 'lacing-update' event for UI controls & instructions panel
-      const count = this.lacingPlacedCount;
-      const gSize = N / 4;
-      const g1Count = Math.min(gSize, Math.max(0, count));
-      const g2Count = Math.min(gSize, Math.max(0, count - gSize));
-      const g3Count = Math.min(gSize, Math.max(0, count - 2 * gSize));
-      const g4Count = Math.min(gSize, Math.max(0, count - 3 * gSize));
-
-      let currentG = 1;
-      if (count > 3 * gSize) currentG = 4;
-      else if (count > 2 * gSize) currentG = 3;
-      else if (count > gSize) currentG = 2;
-      else if (count === 0) currentG = 0;
-
-      const activeEntry = count > 0 ? lacingOrderedSpokes[Math.min(N - 1, count - 1)] : null;
-
-      const event = new CustomEvent('lacing-update', {
-        detail: {
-          placedCount: count,
-          totalSpokes: N,
-          currentGroup: currentG,
-          groupCounts: [g1Count, g2Count, g3Count, g4Count],
-          groupTotals: [gSize, gSize, gSize, gSize],
-          activeSpoke: activeEntry ? {
-            sequenceIndex: activeEntry.sequenceIndex,
-            side: activeEntry.side,
-            group: activeEntry.group,
-            groupName: activeEntry.groupName,
-            flangeHoleIndex: activeEntry.flangeHoleIndex + 1,
-            rimHoleIndex: activeEntry.rimHoleIndex + 1,
-            isLeading: activeEntry.isLeading,
-            headsDir: activeEntry.isHeadsOut ? 'Heads Out (Elbows In)' : 'Heads In (Elbows Out)',
-            length: activeEntry.sp.model.traditionalLength,
-          } : null,
-        },
-      });
-      window.dispatchEvent(event);
     }
 
     // Draw initial 3D measurement ruler on primary spoke
     if (this.showMeasurement && this.showRuler && this.spokeMeshes.length > 0) {
-      this.drawRulerForSpoke(this.spokeMeshes[0]);
+      this.drawRulerForSpoke(this.lacingMode && !this.guideState.preview ? this.spokeMeshes[this.spokeMeshes.length - 1] : this.spokeMeshes[0]);
     } else if (this.rulerGroup) {
       this.scene.remove(this.rulerGroup);
       this.rulerGroup.clear();
@@ -1260,26 +1254,26 @@ export class Viewport3D {
   }
 
   private clearScene() {
-    // Clear all existing mesh and group objects except persistent lights and camera
-    const toRemove: THREE.Object3D[] = [];
-    this.scene.traverse((obj) => {
-      if (
-        (obj instanceof THREE.Mesh || obj instanceof THREE.Group) &&
-        obj.parent !== this.camera &&
-        obj !== this.studioLightGroup &&
-        obj.parent !== this.studioLightGroup &&
-        obj !== this.headTorchGroup &&
-        obj.parent !== this.headTorchGroup
-      ) {
-        toRemove.push(obj);
-      }
-    });
-    toRemove.forEach((obj) => this.scene.remove(obj));
+    const geometries = new Set<THREE.BufferGeometry>();
+    const materials = new Set<THREE.Material>();
+    for (const child of [...this.scene.children]) {
+      if (child === this.camera || child === this.studioLightGroup || child instanceof THREE.Light) continue;
+      child.traverse(obj => {
+        if (obj instanceof THREE.Mesh || obj instanceof THREE.Line || obj instanceof THREE.Sprite) {
+          if ('geometry' in obj) geometries.add(obj.geometry);
+          for (const mat of Array.isArray(obj.material) ? obj.material : [obj.material]) materials.add(mat);
+        }
+      });
+      this.scene.remove(child);
+    }
+    geometries.forEach(g => g.dispose());
+    materials.forEach(m => { if ('map' in m && m.map instanceof THREE.Texture) m.map.dispose(); m.dispose(); });
   }
 
   private animate() {
     requestAnimationFrame(this.animate.bind(this));
     this.controls.update();
+    this.updateLacingTargetMarker();
 
     // Update screen badge position for active 3D ruler midpoint
     if (this.showMeasurement && this.showRuler && this.activeRulerMidpoint && this.container) {

@@ -211,7 +211,7 @@ import { hubs, defaultHub } from '../data/hubs';
         </div>
 
         <!-- Camera Overlay controls -->
-        <div class="absolute bottom-4 left-4 flex flex-wrap gap-2 z-20">
+        <div id="viewport-camera-controls" class="absolute bottom-4 left-4 flex flex-wrap gap-2 z-20">
           <button data-cam="isometric" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Iso</button>
           <button data-cam="lateral" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Side (Lacing)</button>
           <button data-cam="dish" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Dish (Alignment)</button>
@@ -224,14 +224,14 @@ import { hubs, defaultHub } from '../data/hubs';
         </div>
 
         <!-- Settings Overlay controls -->
-        <div class="absolute top-4 right-4 flex flex-col gap-2.5 z-20 items-end max-w-[200px]">
+        <details id="viewport-settings" open class="absolute top-4 right-4 z-20 max-w-[200px]"><summary class="text-xs cursor-pointer">View settings</summary><div class="flex flex-col gap-2.5 items-end">
           <!-- Exploded Slider -->
-          <div class="flex flex-col gap-1 px-3 py-2 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 rounded-xl w-full">
+          <div id="explode-control" class="flex flex-col gap-1 px-3 py-2 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 rounded-xl w-full">
             <div class="flex justify-between text-[10px] font-bold text-titanium-400">
               <span>EXPLODE HUB</span>
               <span id="explode-val" class="mono-data">0%</span>
             </div>
-            <input type="range" id="slider-explode" min="0" max="1" step="0.05" value="0" class="w-full h-1 bg-titanium-900 rounded appearance-none cursor-pointer accent-cyan-500" />
+            <input type="range" id="slider-explode" aria-label="Explode hub" min="0" max="1" step="0.05" value="0" class="w-full h-1 bg-titanium-900 rounded appearance-none cursor-pointer accent-cyan-500" />
           </div>
 
           <!-- Visibility / Color / Interlacing / Ruler Selects -->
@@ -240,7 +240,7 @@ import { hubs, defaultHub } from '../data/hubs';
             <button id="toggle-r-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">DS (R)</button>
             <button id="toggle-interlace" aria-pressed="false" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-titanium-950 text-titanium-500 border border-cyan-500/20 hover:border-cyan-500/50 transition-all" title="Toggle 3D Spoke Over/Under Interlacing Weave">Non-interlaced</button>
             <button id="toggle-ruler" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-yellow-950/40 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/60 transition-all" title="Toggle Direct 3D Straight Measurement Vector Ruler">📏 Ruler</button>
-            <select id="select-colormode" class="bg-titanium-950 border border-titanium-800 rounded-lg text-[10px] font-bold px-1 py-1 text-titanium-200 cursor-pointer focus:outline-none">
+            <select id="select-colormode" aria-label="Spoke colour mode" class="bg-titanium-950 border border-titanium-800 rounded-lg text-[10px] font-bold px-1 py-1 text-titanium-200 cursor-pointer focus:outline-none">
               <option value="classic">Titanium Steel</option>
               <option value="side">Side Colors</option>
               <option value="tension">Tension Guide</option>
@@ -248,8 +248,9 @@ import { hubs, defaultHub } from '../data/hubs';
           </div>
         </div>
 
+        </details>
         <!-- Quick help text -->
-        <div class="absolute bottom-4 right-4 pointer-events-none select-none text-[10px] text-titanium-500 font-semibold uppercase tracking-widest hidden md:block">
+        <div id="viewport-help" class="absolute bottom-4 right-4 pointer-events-none select-none text-[10px] text-titanium-500 font-semibold uppercase tracking-widest hidden md:block">
           Drag to Rotate • Scroll to Zoom • Hover Spoke to Measure
         </div>
       </div>
@@ -628,192 +629,163 @@ import { hubs, defaultHub } from '../data/hubs';
   </div>
 
   <!-- ================= TAB 4: INTERACTIVE LACING GUIDE ================= -->
-  <div id="tab-content-lacing" class="tab-pane hidden flex flex-col lg:flex-row gap-8 w-full">
-    <!-- LEFT COLUMN: CONTROLS & GUIDANCE -->
-    <div class="w-full lg:w-[460px] flex-shrink-0 flex flex-col gap-5 lg:max-h-[calc(100vh-160px)] lg:overflow-y-auto pr-0 lg:pr-2">
-      
-      <!-- Progress Bar & Group Badges Card -->
-      <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl flex flex-col gap-4">
-        <div class="flex items-center justify-between border-b border-titanium-800 pb-2.5">
-          <div class="flex items-center gap-2">
-            <span class="text-yellow-400 font-bold text-sm">📈</span>
-            <h2 class="text-xs font-bold text-titanium-50 uppercase tracking-wider">Lacing Step Progress</h2>
-          </div>
-          <span id="lacing-spoke-counter" class="text-xs font-mono font-bold text-yellow-400 bg-yellow-950/60 border border-yellow-500/30 px-2.5 py-1 rounded-lg">
-            Spoke 0 / 32
-          </span>
-        </div>
-
-        <!-- 4-Group Progress Pills -->
-        <div class="grid grid-cols-2 gap-2">
-          <div id="badge-group-1" class="bg-titanium-950/80 border border-titanium-800 rounded-xl p-2.5 flex flex-col gap-1 transition-all">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-red-400 uppercase tracking-wider">Group 1 (Right trailing)</span>
-              <span id="badge-g1-count" class="text-[10px] font-mono text-titanium-400">0/8</span>
-            </div>
-            <div class="w-full bg-titanium-900 h-1.5 rounded-full overflow-hidden">
-              <div id="bar-g1" class="bg-red-500 h-full w-0 transition-all duration-300"></div>
-            </div>
-          </div>
-
-          <div id="badge-group-2" class="bg-titanium-950/80 border border-titanium-800 rounded-xl p-2.5 flex flex-col gap-1 transition-all">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-blue-400 uppercase tracking-wider">Group 2 (Left trailing)</span>
-              <span id="badge-g2-count" class="text-[10px] font-mono text-titanium-400">0/8</span>
-            </div>
-            <div class="w-full bg-titanium-900 h-1.5 rounded-full overflow-hidden">
-              <div id="bar-g2" class="bg-blue-500 h-full w-0 transition-all duration-300"></div>
-            </div>
-          </div>
-
-          <div id="badge-group-3" class="bg-titanium-950/80 border border-titanium-800 rounded-xl p-2.5 flex flex-col gap-1 transition-all">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider">Group 3 (Right leading)</span>
-              <span id="badge-g3-count" class="text-[10px] font-mono text-titanium-400">0/8</span>
-            </div>
-            <div class="w-full bg-titanium-900 h-1.5 rounded-full overflow-hidden">
-              <div id="bar-g3" class="bg-amber-500 h-full w-0 transition-all duration-300"></div>
-            </div>
-          </div>
-
-          <div id="badge-group-4" class="bg-titanium-950/80 border border-titanium-800 rounded-xl p-2.5 flex flex-col gap-1 transition-all">
-            <div class="flex items-center justify-between">
-              <span class="text-[10px] font-bold text-cyan-400 uppercase tracking-wider">Group 4 (Left leading)</span>
-              <span id="badge-g4-count" class="text-[10px] font-mono text-titanium-400">0/8</span>
-            </div>
-            <div class="w-full bg-titanium-900 h-1.5 rounded-full overflow-hidden">
-              <div id="bar-g4" class="bg-cyan-500 h-full w-0 transition-all duration-300"></div>
-            </div>
-          </div>
-        </div>
-
-        <!-- Overall Wheel Progress Bar -->
-        <div class="flex flex-col gap-1">
-          <div class="flex justify-between items-center text-[11px] font-semibold text-titanium-400">
-            <span>Overall Wheel Assembly</span>
-            <span id="lacing-percent-label" class="font-mono text-cyan-400">0%</span>
-          </div>
-          <div class="w-full bg-titanium-950 border border-titanium-800 h-2.5 rounded-full overflow-hidden p-0.5">
-            <div id="bar-overall-lacing" class="bg-gradient-to-r from-cyan-500 via-amber-400 to-emerald-400 h-full w-0 rounded-full transition-all duration-300"></div>
-          </div>
-        </div>
-
-        <!-- Step Control Action Buttons -->
-        <div class="flex flex-col gap-2 pt-1 border-t border-titanium-800/80">
-          <span class="text-[10px] font-bold uppercase tracking-wider text-titanium-400">Step Controls</span>
-          
-          <!-- Spoke-by-Spoke Row -->
-          <div class="grid grid-cols-2 gap-2">
-            <button id="btn-prev-spoke" class="px-3 py-2 bg-titanium-950 border border-titanium-800 hover:border-cyan-500/50 hover:bg-cyan-950/30 text-titanium-200 hover:text-cyan-300 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md">
-              <span>◀</span> Prev Spoke
-            </button>
-            <button id="btn-next-spoke" class="px-3 py-2 bg-cyan-950/60 border border-cyan-500/40 hover:bg-cyan-900/60 text-cyan-300 text-xs font-bold rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-md shadow-cyan-950/50">
-              Next Spoke <span>▶</span>
-            </button>
-          </div>
-
-          <!-- Group-by-Group Row -->
-          <div class="grid grid-cols-2 gap-2">
-            <button id="btn-prev-group" class="px-3 py-1.5 bg-titanium-950 border border-titanium-800 hover:border-titanium-700 text-titanium-400 hover:text-titanium-200 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1">
-              <span>⏮</span> Prev Group
-            </button>
-            <button id="btn-next-group" class="px-3 py-1.5 bg-titanium-900 border border-titanium-750 hover:border-yellow-500/40 text-yellow-400 text-[11px] font-bold rounded-xl transition-all flex items-center justify-center gap-1">
-              Next Group <span>⏭</span>
-            </button>
-          </div>
-
-          <!-- Quick Jump Row -->
-          <div class="grid grid-cols-2 gap-2 pt-1">
-            <button id="btn-lacing-reset" class="px-2.5 py-1.5 bg-red-950/30 border border-red-500/20 hover:border-red-500/50 text-red-400 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1">
-              <span>🔄</span> Reset (Bare Hub)
-            </button>
-            <button id="btn-lacing-complete" class="px-2.5 py-1.5 bg-emerald-950/30 border border-emerald-500/20 hover:border-emerald-500/50 text-emerald-400 text-[10px] font-bold rounded-lg transition-all flex items-center justify-center gap-1">
-              <span>✨</span> Complete Wheel
-            </button>
-          </div>
-        </div>
-
-        <!-- Camera Option Toggles -->
-        <div class="flex items-center justify-between bg-titanium-950/80 border border-titanium-800 p-2.5 rounded-xl gap-2">
-          <span class="text-[11px] font-bold text-titanium-300 flex items-center gap-1.5">
-            <span>📷</span> Camera Mode
-          </span>
-          <div class="flex bg-titanium-900 p-1 rounded-lg border border-titanium-800 gap-1">
-            <button id="btn-cam-fixed" class="px-2.5 py-1 text-[10px] font-bold rounded-md bg-cyan-950 text-cyan-300 border border-cyan-500/30 transition-all">
-              📌 Fixed
-            </button>
-            <button id="btn-cam-autotrack" class="px-2.5 py-1 text-[10px] font-bold rounded-md text-titanium-400 hover:text-titanium-200 transition-all">
-              🎯 Auto-Track
-            </button>
-          </div>
-        </div>
+  <div id="tab-content-lacing" class="tab-pane hidden lacing-layout">
+    <div class="lacing-summary guide-card">
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <h2 class="font-bold text-lg">Lacing sequence</h2>
+        <span id="lacing-spoke-counter" class="font-mono text-cyan-300">Setup · Step 0 / 32</span>
       </div>
-
-      <!-- Active Spoke Instruction & Hole Location Card -->
-      <div id="card-lacing-instruction" class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-5 shadow-xl flex flex-col gap-3">
-        <div class="flex items-center justify-between border-b border-titanium-800 pb-2">
-          <div class="flex items-center gap-2">
-            <span class="text-cyan-400">💡</span>
-            <h3 id="lacing-spoke-title" class="text-xs font-bold text-titanium-50 uppercase tracking-wider">
-              Bare Hub & Rim Setup
-            </h3>
-          </div>
-          <span id="lacing-spoke-side-badge" class="text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-yellow-950/60 text-yellow-400 border border-yellow-500/30">
-            Reference Landmark
-          </span>
-        </div>
-
-        <!-- Hole Positions Callout Grid -->
-        <div class="grid grid-cols-2 gap-2.5">
-          <div class="bg-titanium-950/80 border border-cyan-500/30 rounded-xl p-3 flex flex-col gap-1">
-            <span class="text-[9px] font-bold text-cyan-400 uppercase tracking-widest flex items-center gap-1">
-              <span>⭕</span> Hub Flange Hole
-            </span>
-            <span id="lacing-flange-hole-text" class="text-xs font-bold text-titanium-100 font-mono">
-              Flange Hole #1
-            </span>
-            <span id="lacing-heads-dir-text" class="text-[10px] text-titanium-400">
-              Heads Out (Elbows In)
-            </span>
-          </div>
-
-          <div class="bg-titanium-950/80 border border-emerald-500/30 rounded-xl p-3 flex flex-col gap-1">
-            <span class="text-[9px] font-bold text-emerald-400 uppercase tracking-widest flex items-center gap-1">
-              <span>🎯</span> Rim Bed Hole
-            </span>
-            <span id="lacing-rim-hole-text" class="text-xs font-bold text-titanium-100 font-mono">
-              Rim Hole #1 (Valve Neighbor)
-            </span>
-            <span id="lacing-spoke-length-text" class="text-[10px] text-titanium-400">
-              Length: -- mm
-            </span>
-          </div>
-        </div>
-
-        <!-- Educational Pro-Tip Guidance Box -->
-        <div class="bg-titanium-950/90 border border-titanium-800/80 rounded-xl p-3.5 flex flex-col gap-1.5">
-          <span class="text-[10px] font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1">
-            <span>🧠</span> Wheelbuilder Rule & Hole Counting
-          </span>
-          <p id="lacing-rule-tip-text" class="text-xs text-titanium-300 leading-relaxed font-sans">
-            Start by locating the Valve Hole on the rim bed (highlighted in yellow). Insert the Key Spoke (first right-side trailing spoke) into the hub flange, then seat it in the rim hole directly adjacent to the valve hole.
-          </p>
-        </div>
+      <p class="text-xs text-titanium-300">Sequence preview · not an installation checklist.</p>
+      <p id="lacing-notice" class="text-sm text-amber-300" role="status"></p>
+      <div id="lacing-error" class="hidden rounded-xl border border-red-400/50 bg-red-950/30 p-3" role="alert">
+        <p id="lacing-error-text"></p>
+        <button id="btn-lacing-review" class="guide-button mt-2">Review hub dimensions</button>
       </div>
-
+      <div id="lacing-progress" class="flex items-center gap-3">
+        <progress id="bar-overall-lacing" max="100" value="0" aria-label="Position in lacing sequence" class="flex-1 min-w-0"></progress>
+        <span id="lacing-percent-label" class="text-sm font-mono">0%</span>
+      </div>
+      <p id="lacing-announcement" class="sr-only" aria-live="polite" aria-atomic="true"></p>
     </div>
 
-    <!-- RIGHT COLUMN: DEDICATED LACING 3D VIEWPORT CONTAINER -->
-    <div class="flex-grow flex flex-col min-w-0">
-      <div id="lacing-viewport-host" class="w-full flex-grow min-h-[480px] lg:min-h-[580px] relative rounded-2xl overflow-hidden shadow-2xl border border-titanium-800">
-        <!-- ViewportCard will be mounted here when Tab 4 is active -->
+    <section id="card-lacing-instruction" class="lacing-instruction guide-card" aria-labelledby="lacing-spoke-title">
+      <div class="flex flex-wrap items-center justify-between gap-2">
+        <h3 id="lacing-spoke-title" class="font-bold text-base">Setup</h3>
+        <span id="lacing-spoke-side-badge" class="text-sm text-cyan-300"></span>
       </div>
-    </div>
+      <p id="lacing-spoke-length-text" class="hidden text-sm font-semibold text-cyan-300"></p>
+      <div id="lacing-setup-orientation" class="hidden space-y-2">
+        <p id="lacing-setup-intro" class="text-sm leading-relaxed"></p>
+        <figure id="lacing-setup-figure" class="hidden">
+          <button id="lacing-diagram-toggle" type="button" aria-expanded="true" aria-controls="lacing-diagram-content">
+            <span id="lacing-diagram-title">Starting flange hole</span><span id="lacing-diagram-toggle-icon" aria-hidden="true">−</span>
+          </button>
+          <div id="lacing-diagram-content">
+            <div id="lacing-setup-diagram"></div>
+            <figcaption class="text-xs text-titanium-300 text-center">Viewed from right · valve at top<br/>Amber start → cyan target</figcaption>
+          </div>
+        </figure>
+      </div>
+      <div id="lacing-target-summary" class="grid grid-cols-2 gap-3">
+        <div class="rounded-xl border border-cyan-500/40 p-3">
+          <p class="text-xs text-cyan-300">Hub flange target</p>
+          <p id="lacing-flange-hole-text" class="font-bold"></p>
+          <p id="lacing-heads-dir-text" class="text-sm text-titanium-300"></p>
+        </div>
+        <div class="rounded-xl border border-emerald-500/40 p-3">
+          <p class="text-xs text-emerald-300">Rim target</p>
+          <p id="lacing-rim-hole-text" class="font-bold"></p>
+        </div>
+      </div>
+      <ol id="lacing-rule-tip-text" class="list-decimal pl-5 space-y-3 text-sm leading-relaxed"></ol>
+      <details id="lacing-setup-adjustment" class="hidden text-sm leading-relaxed">
+        <summary class="cursor-pointer min-h-11 flex items-center text-amber-300">How to arrange your real hub</summary>
+        <p id="lacing-setup-adjustment-text"></p>
+        <p class="text-titanium-300">The logo position here is illustrative. Your hub’s logo may sit differently between its holes; a small logo offset is fine. Match the rim hole’s drilling to the correct flange. Logo alignment is cosmetic.</p>
+        <a href="https://sheldonbrown.com/wheelbuild.html" target="_blank" rel="noopener noreferrer" class="underline text-cyan-300">Key-spoke and logo alignment reference ↗</a>
+      </details>
+      <p id="lacing-link-help" class="text-xs text-titanium-300">Hover or focus an underlined link to highlight that hole. Click or tap to keep it highlighted and bring the wheel into view.</p>
+      <p class="text-sm text-titanium-300">Directions are viewed from the right side; reverse them when looking from the left. “Skip one hole” means pass one hole and use the following hole.</p>
+    </section>
+
+    <div id="lacing-viewport-host" class="lacing-model min-w-0"></div>
+
+    <details class="lacing-details guide-card">
+      <summary class="cursor-pointer font-semibold">Groups and camera settings</summary>
+      <div class="grid grid-cols-2 gap-3 mt-3">
+        {[1, 2, 3, 4].map(g => (
+          <div id={`badge-group-${g}`} class="rounded-xl border border-titanium-700 p-3">
+            <p id={`badge-g${g}-name`} class="text-sm">Group {g}</p>
+            <span id={`badge-g${g}-count`} class="text-xs font-mono">0/8</span>
+          </div>
+        ))}
+      </div>
+      <div class="grid grid-cols-2 gap-2 mt-3">
+        <button id="btn-prev-group" class="guide-button">Previous group</button>
+        <button id="btn-next-group" class="guide-button">Next group</button>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-3" role="group" aria-label="Lacing camera mode">
+        <button id="btn-cam-fixed" class="guide-button" aria-pressed="true">Fixed camera</button>
+        <button id="btn-cam-autotrack" class="guide-button" aria-pressed="false">Auto-Track</button>
+      </div>
+      <div class="flex flex-wrap gap-2 mt-3">
+        <button id="btn-lacing-reset" class="guide-button">Reset to Setup</button>
+        <button id="btn-lacing-complete" class="guide-button">Preview All Spokes</button>
+      </div>
+    </details>
+
+    <nav class="lacing-navigation guide-card" aria-label="Lacing steps">
+      <div id="lacing-step-controls" class="grid grid-cols-2 gap-3">
+        <button id="btn-prev-spoke" class="guide-button">Previous step</button>
+        <button id="btn-next-spoke" class="guide-button guide-primary">Next spoke</button>
+      </div>
+      <button id="btn-lacing-return" class="guide-button guide-primary hidden w-full">Return to Step</button>
+    </nav>
   </div>
 
 </div>
 
+<style is:global>
+  .guide-card { background: #141418; border: 1px solid #3a3a43; border-radius: 1rem; padding: 1rem; min-width: 0; }
+  .guide-card p + p { margin-top: .5rem; }
+  .guide-target-link { display: inline; padding: .1em .15em; color: #67e8f9; background: transparent; border: 0; border-radius: .2rem; font: inherit; text-align: inherit; text-decoration: underline; text-underline-offset: .2em; cursor: pointer; }
+  .guide-target-link[data-lacing-target$="rim"] { color: #6ee7b7; }
+  .guide-target-link[data-lacing-target="valve"] { color: #fde047; }
+  .guide-target-link[data-lacing-target="alignment"] { color: #fde047; }
+  .guide-target-link[data-lacing-target="setup-reference"], .guide-target-link[data-lacing-target="reference-flange"], .guide-target-link[data-lacing-target="logo"] { color: #fbbf24; }
+  #lacing-setup-figure { position: absolute; top: .5rem; right: .5rem; z-index: 36; width: 240px; max-width: calc(100% - 1rem); max-height: calc(100% - 1rem); overflow: auto; background: #141418; border: 1px solid #786138; border-radius: .75rem; box-shadow: 0 6px 20px #0008; cursor: default; }
+  #viewport-card:not(.is-lacing) #lacing-setup-figure { display: none; }
+  #lacing-diagram-toggle { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; min-height: 44px; padding: .5rem .75rem; text-align: left; color: #fbbf24; font-size: 14px !important; }
+  #lacing-diagram-content { padding: 0 .5rem .75rem; }
+  #lacing-setup-diagram [data-highlighted="true"] { stroke-width: 5; filter: drop-shadow(0 0 4px currentColor); }
+  .guide-target-link:hover, .guide-target-link:focus-visible, .guide-target-link[data-highlighted="true"] { background: #244252; text-decoration-thickness: 2px; }
+  .lacing-target-marker { position: absolute; pointer-events: none; z-index: 35; width: 0; height: 0; color: var(--target-color); }
+  .lacing-target-marker[hidden] { display: none; }
+  .lacing-target-halo { position: absolute; left: -17px; top: -17px; width: 34px; height: 34px; border: 3px solid currentColor; border-radius: 50%; box-shadow: 0 0 0 4px #0009, 0 0 18px currentColor; animation: lacing-hole-pulse 1.3s ease-in-out infinite; }
+  .lacing-target-label { position: absolute; bottom: 26px; width: 160px; transform: translateX(-50%); padding: .4rem .5rem; border: 1px solid currentColor; border-radius: .5rem; color: var(--target-color); background: #090e14f5; text-align: center; font-size: 13px; line-height: 1.35; }
+  .lacing-target-marker[data-offscreen="true"] .lacing-target-halo { border-style: dashed; }
+  @keyframes lacing-hole-pulse { 0%, 100% { transform: scale(1); opacity: 1; } 50% { transform: scale(1.35); opacity: .65; } }
+  @media (prefers-reduced-motion: reduce) { .lacing-target-halo { animation: none; border-width: 4px; } }
+  .guide-button { min-height: 44px; padding: .5rem .8rem; border: 1px solid #626273; border-radius: .65rem; font-size: 14px; background: #202028; color: #f4f4f5; }
+  .guide-button:hover:not(:disabled) { border-color: #67e8f9; }
+  .guide-button:disabled { opacity: .45; cursor: not-allowed; }
+  .guide-primary, .guide-button[aria-pressed="true"] { background: #164e63; border-color: #22d3ee; color: #cffafe; }
+  button:focus-visible, summary:focus-visible, select:focus-visible, input:focus-visible { outline: 3px solid #67e8f9; outline-offset: 3px; }
+  .lacing-layout:not(.hidden) { display: grid; grid-template-columns: minmax(0, 1fr); grid-template-areas: 'summary' 'model' 'instruction' 'details' 'navigation'; gap: 1rem; padding-bottom: calc(88px + env(safe-area-inset-bottom)); }
+  .lacing-summary { grid-area: summary; }
+  .lacing-instruction { grid-area: instruction; display: flex; flex-direction: column; gap: .8rem; }
+  .lacing-model { grid-area: model; }
+  .lacing-details { grid-area: details; align-self: start; }
+  .lacing-navigation { grid-area: navigation; position: fixed; z-index: 40; bottom: 0; left: 0; right: 0; border-radius: 1rem 1rem 0 0; padding-bottom: calc(1rem + env(safe-area-inset-bottom)); }
+  #bar-overall-lacing { accent-color: #22d3ee; height: 8px; border-radius: 8px; overflow: hidden; background: #292934; border: 0; appearance: none; }
+  #bar-overall-lacing::-webkit-progress-bar { background: #292934; border-radius: 8px; }
+  #bar-overall-lacing::-webkit-progress-value { background: #22d3ee; border-radius: 8px; }
+  #bar-overall-lacing::-moz-progress-bar { background: #22d3ee; border-radius: 8px; }
+  #lacing-progress { margin-top: .75rem; }
+  #viewport-card.is-lacing { height: 440px; display: flex; }
+  #viewport-card.is-lacing #canvas-container { flex: 1; height: 0; min-height: 200px; }
+  #viewport-card.is-lacing #viewport-camera-controls, #viewport-card.is-lacing #viewport-settings { position: static; padding: .5rem; max-width: none; background: #141418; }
+  #viewport-card.is-lacing #viewport-camera-controls { gap: .4rem; }
+  #viewport-card.is-lacing button, #viewport-card.is-lacing select, #viewport-card.is-lacing summary { min-height: 44px; font-size: 12px; }
+  #viewport-card.is-lacing #viewport-settings > div { display: flex; flex-wrap: wrap; gap: .5rem; }
+  #viewport-card.is-lacing #viewport-settings > div > div { width: auto; flex: 1; }
+  #viewport-card.is-lacing #viewport-settings span { font-size: 12px; }
+  #viewport-card.is-lacing #viewport-help, #viewport-card.is-lacing #toggle-l-spokes, #viewport-card.is-lacing #toggle-r-spokes, #viewport-card.is-lacing [data-cam="spoke-delta"], #viewport-card.is-lacing #explode-control { display: none; }
+  #viewport-card.is-lacing #ruler-3d-badge { display: none !important; }
+  #viewport-card.is-lacing #viewport-settings[open] { max-height: 180px; overflow: auto; }
+  .lacing-details summary { min-height: 44px; }
+  .lacing-fullpage { position: fixed; inset: 0; z-index: 9999; background: #0a0a0b; overflow-y: auto; padding: 1rem; }
+  @media (min-width: 1024px) {
+    .lacing-layout:not(.hidden) { grid-template-columns: minmax(320px, 400px) minmax(0, 1fr); grid-template-areas: 'summary summary' 'navigation model' 'instruction model' 'details model'; align-items: start; padding-bottom: 0; }
+    .lacing-navigation { position: static; border-radius: 1rem; }
+    #viewport-card.is-lacing { height: 620px; }
+    .lacing-fullpage #viewport-card.is-lacing { height: min(720px, calc(100dvh - 180px)); }
+  }
+</style>
+
 <script>
+  import type { LacingSnapshot, LacingTarget } from '../utils/lacingGuide';
+  import { lacingSetupDiagram } from '../utils/lacingSetupDiagram';
   import { calculateSpokePaths } from '../utils/spokePath';
   import { defaultHub } from '../data/hubs';
   import { calculateWheelBuild } from '../utils/physicsCalculator';
@@ -856,16 +828,12 @@ import { hubs, defaultHub } from '../data/hubs';
   // DOM Elements - Lacing Tab Controls
   const lacingSpokeCounter = document.getElementById('lacing-spoke-counter') as HTMLElement;
   const lacingPercentLabel = document.getElementById('lacing-percent-label') as HTMLElement;
-  const barOverallLacing = document.getElementById('bar-overall-lacing') as HTMLElement;
+  const barOverallLacing = document.getElementById('bar-overall-lacing') as HTMLProgressElement;
 
   const badgeG1Count = document.getElementById('badge-g1-count') as HTMLElement;
-  const barG1 = document.getElementById('bar-g1') as HTMLElement;
   const badgeG2Count = document.getElementById('badge-g2-count') as HTMLElement;
-  const barG2 = document.getElementById('bar-g2') as HTMLElement;
   const badgeG3Count = document.getElementById('badge-g3-count') as HTMLElement;
-  const barG3 = document.getElementById('bar-g3') as HTMLElement;
   const badgeG4Count = document.getElementById('badge-g4-count') as HTMLElement;
-  const barG4 = document.getElementById('bar-g4') as HTMLElement;
 
   const btnPrevSpoke = document.getElementById('btn-prev-spoke') as HTMLButtonElement;
   const btnNextSpoke = document.getElementById('btn-next-spoke') as HTMLButtonElement;
@@ -1002,6 +970,7 @@ import { hubs, defaultHub } from '../data/hubs';
 
   // 1. SWITCH TAB LOGIC
   function switchTab(tab: 'assembly' | 'lacing' | 'hub' | 'rim') {
+    clearLacingHighlight();
     const tabs = [
       { id: 'assembly', btn: btnTabAssembly, pane: paneAssembly },
       { id: 'lacing', btn: btnTabLacing, pane: paneLacing },
@@ -1010,6 +979,8 @@ import { hubs, defaultHub } from '../data/hubs';
     ];
 
     tabs.forEach(t => {
+      t.btn.setAttribute('aria-selected', String(t.id === tab));
+      t.btn.tabIndex = t.id === tab ? 0 : -1;
       if (t.id === tab) {
         t.pane.classList.remove('hidden');
         t.btn.classList.add('bg-cyan-500/20', 'text-cyan-300', 'border-cyan-500/40', 'shadow-md');
@@ -1032,6 +1003,9 @@ import { hubs, defaultHub } from '../data/hubs';
       }
     }
 
+    viewportCard.classList.toggle('is-lacing', tab === 'lacing');
+    const settings = document.getElementById('viewport-settings') as HTMLDetailsElement;
+    if (viewport?.lacingMode !== (tab === 'lacing')) settings.open = tab !== 'lacing';
     // Toggle viewport modes
     if (viewport) {
       if (tab === 'lacing') {
@@ -1048,6 +1022,25 @@ import { hubs, defaultHub } from '../data/hubs';
       if ((tab === 'assembly' || tab === 'lacing') && viewport) window.dispatchEvent(new Event('resize'));
     }, 50);
   }
+
+  const tabButtons = [btnTabAssembly, btnTabLacing, btnTabHub, btnTabRim];
+  const tabNames = ['assembly', 'lacing', 'hub', 'rim'] as const;
+  btnTabAssembly.parentElement!.setAttribute('role', 'tablist');
+  btnTabAssembly.parentElement!.setAttribute('aria-label', 'Wheel builder views');
+  tabButtons.forEach((button, index) => {
+    const pane = [paneAssembly, paneLacing, paneHub, paneRim][index];
+    button.setAttribute('role', 'tab');
+    button.setAttribute('aria-controls', pane.id);
+    button.setAttribute('aria-selected', String(index === 0));
+    button.tabIndex = index === 0 ? 0 : -1;
+    pane.setAttribute('role', 'tabpanel');
+    pane.setAttribute('aria-labelledby', button.id);
+    button.addEventListener('keydown', event => {
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? 3 : event.key === 'ArrowRight' ? (index + 1) % 4 : event.key === 'ArrowLeft' ? (index + 3) % 4 : -1;
+      if (next < 0) return;
+      event.preventDefault(); switchTab(tabNames[next]); tabButtons[next].focus();
+    });
+  });
 
   btnTabAssembly.addEventListener('click', () => switchTab('assembly'));
   btnTabLacing.addEventListener('click', () => switchTab('lacing'));
@@ -1495,6 +1488,25 @@ import { hubs, defaultHub } from '../data/hubs';
 
   function toggleFullPage() {
     if (!viewportCard) return;
+    if (paneLacing.classList.contains('lacing-fullpage')) {
+      isFullPage = false;
+      paneLacing.classList.remove('lacing-fullpage');
+      document.body.style.overflow = '';
+      fpIcon.textContent = '🗖'; fpLabel.textContent = 'Full Page';
+      btnFullpage.focus();
+      window.dispatchEvent(new Event('resize'));
+      return;
+    }
+    if (!isFullPage && viewport?.lacingMode) {
+      isFullPage = true;
+      paneLacing.classList.add('lacing-fullpage');
+      document.body.style.overflow = 'hidden';
+      fpIcon.textContent = '✕'; fpLabel.textContent = 'Exit Full Page';
+      btnFullpage.focus();
+      paneLacing.scrollTop = 0;
+      window.dispatchEvent(new Event('resize'));
+      return;
+    }
     isFullPage = !isFullPage;
 
     if (isFullPage) {
@@ -1533,6 +1545,7 @@ import { hubs, defaultHub } from '../data/hubs';
         btnFullpage.classList.add('bg-cyan-950/40', 'text-cyan-300', 'border-cyan-500/30');
       }
       document.body.style.overflow = '';
+      btnFullpage.focus();
     }
 
     setTimeout(() => window.dispatchEvent(new Event('resize')), 50);
@@ -1542,6 +1555,14 @@ import { hubs, defaultHub } from '../data/hubs';
 
   window.addEventListener('keydown', (e) => {
     if (e.key === 'Escape' && isFullPage) toggleFullPage();
+    if (e.key === 'Tab' && isFullPage) {
+      const root = paneLacing.classList.contains('lacing-fullpage') ? paneLacing : viewportCard;
+      const items = Array.from(root.querySelectorAll<HTMLElement>('button:not(:disabled), summary, select, input, [tabindex="0"]')).filter(el => el.getClientRects().length > 0 && el.offsetHeight > 0);
+      const index = items.indexOf(document.activeElement as HTMLElement);
+      if (items.length && (e.shiftKey ? index <= 0 : index === items.length - 1 || index < 0)) {
+        e.preventDefault(); items[e.shiftKey ? items.length - 1 : 0].focus();
+      }
+    }
   });
 
   // 7. RAYCAST & TOOLTIP EVENTS
@@ -1591,123 +1612,171 @@ import { hubs, defaultHub } from '../data/hubs';
     if (tooltip) tooltip.classList.add('hidden');
   });
 
-  // Lacing Mode UI Control Handlers
-  if (btnPrevSpoke) btnPrevSpoke.addEventListener('click', () => viewport?.prevLacingSpoke());
-  if (btnNextSpoke) btnNextSpoke.addEventListener('click', () => viewport?.nextLacingSpoke());
-  if (btnPrevGroup) btnPrevGroup.addEventListener('click', () => viewport?.prevLacingGroup());
-  if (btnNextGroup) btnNextGroup.addEventListener('click', () => viewport?.nextLacingGroup());
-  if (btnLacingReset) btnLacingReset.addEventListener('click', () => viewport?.setLacingPlacedCount(0));
-  if (btnLacingComplete) btnLacingComplete.addEventListener('click', () => {
-    if (viewport) {
-      const inputs = getInputs();
-      viewport.setLacingPlacedCount(inputs.spokeCount);
-    }
+  // All guide controls consume the same typed renderer snapshot.
+  btnPrevSpoke.addEventListener('click', () => viewport?.prevLacingSpoke());
+  btnNextSpoke.addEventListener('click', () => viewport?.nextLacingSpoke());
+  btnPrevGroup.addEventListener('click', () => viewport?.prevLacingGroup());
+  btnNextGroup.addEventListener('click', () => viewport?.nextLacingGroup());
+  btnLacingReset.addEventListener('click', () => viewport?.navigateLacing('reset'));
+  btnLacingComplete.addEventListener('click', () => viewport?.navigateLacing('preview'));
+  const btnLacingReturn = document.getElementById('btn-lacing-return') as HTMLButtonElement;
+  btnLacingReturn.addEventListener('click', () => { viewport?.navigateLacing('return'); btnNextSpoke.disabled ? btnPrevSpoke.focus() : btnNextSpoke.focus(); });
+  btnLacingComplete.addEventListener('click', () => btnLacingReturn.focus());
+  btnCamFixed.addEventListener('click', () => viewport?.setLacingCameraTracking(false));
+  btnCamAutotrack.addEventListener('click', () => viewport?.setLacingCameraTracking(true));
+  document.getElementById('btn-lacing-review')!.addEventListener('click', () => {
+    if (isFullPage) toggleFullPage();
+    switchTab('hub');
+    const details = odlIn.closest('details');
+    if (details) details.open = true;
+    const invalid = [odlIn, odrIn, ftlIn, ftrIn].find(input => !Number.isFinite(numeric(input)) || numeric(input) <= 0);
+    (invalid ?? odlIn).focus();
   });
 
-  if (btnCamFixed) {
-    btnCamFixed.addEventListener('click', () => {
-      viewport?.setLacingCameraTracking(false);
-      btnCamFixed.classList.add('bg-cyan-950', 'text-cyan-300', 'border', 'border-cyan-500/30');
-      btnCamFixed.classList.remove('text-titanium-400');
-      btnCamAutotrack?.classList.remove('bg-cyan-950', 'text-cyan-300', 'border', 'border-cyan-500/30');
-      btnCamAutotrack?.classList.add('text-titanium-400');
-    });
-  }
-
-  if (btnCamAutotrack) {
-    btnCamAutotrack.addEventListener('click', () => {
-      viewport?.setLacingCameraTracking(true);
-      btnCamAutotrack.classList.add('bg-cyan-950', 'text-cyan-300', 'border', 'border-cyan-500/30');
-      btnCamAutotrack.classList.remove('text-titanium-400');
-      btnCamFixed?.classList.remove('bg-cyan-950', 'text-cyan-300', 'border', 'border-cyan-500/30');
-      btnCamFixed?.classList.add('text-titanium-400');
-    });
-  }
-
-  // Real-time listener for 'lacing-update' custom event
-  window.addEventListener('lacing-update', (e: any) => {
-    const { placedCount, totalSpokes, currentGroup, groupCounts, groupTotals, activeSpoke } = e.detail;
-
-    if (lacingSpokeCounter) lacingSpokeCounter.textContent = `Spoke ${placedCount} / ${totalSpokes}`;
-
-    const pct = Math.round((placedCount / totalSpokes) * 100);
-    if (lacingPercentLabel) lacingPercentLabel.textContent = `${pct}%`;
-    if (barOverallLacing) barOverallLacing.style.width = `${pct}%`;
-
-    // Group progress badges
-    if (groupCounts && groupTotals) {
-      if (badgeG1Count) badgeG1Count.textContent = `${groupCounts[0]}/${groupTotals[0]}`;
-      if (barG1) barG1.style.width = `${(groupCounts[0] / groupTotals[0]) * 100}%`;
-
-      if (badgeG2Count) badgeG2Count.textContent = `${groupCounts[1]}/${groupTotals[1]}`;
-      if (barG2) barG2.style.width = `${(groupCounts[1] / groupTotals[1]) * 100}%`;
-
-      if (badgeG3Count) badgeG3Count.textContent = `${groupCounts[2]}/${groupTotals[2]}`;
-      if (barG3) barG3.style.width = `${(groupCounts[2] / groupTotals[2]) * 100}%`;
-
-      if (badgeG4Count) badgeG4Count.textContent = `${groupCounts[3]}/${groupTotals[3]}`;
-      if (barG4) barG4.style.width = `${(groupCounts[3] / groupTotals[3]) * 100}%`;
+  let hoveredLacingTarget: LacingTarget | null = null;
+  let focusedLacingTarget: LacingTarget | null = null;
+  let pinnedLacingTarget: LacingTarget | null = null;
+  function refreshLacingHighlight(locate = false) {
+    const target = hoveredLacingTarget ?? focusedLacingTarget ?? pinnedLacingTarget;
+    viewport?.emphasizeLacingTarget(target, locate);
+    if (locate && target && !setupFigure.classList.contains('hidden') && diagramToggle.getAttribute('aria-expanded') === 'true') {
+      const marker = document.querySelector<HTMLElement>('.lacing-target-marker');
+      const point = marker?.getBoundingClientRect();
+      const panel = setupFigure.getBoundingClientRect();
+      if (point && point.x >= panel.left && point.x <= panel.right && point.y >= panel.top && point.y <= panel.bottom) {
+        setDiagramExpanded(false);
+      }
     }
-
-    // Active Group highlight styling on progress pills
-    const groupBadges = [
-      document.getElementById('badge-group-1'),
-      document.getElementById('badge-group-2'),
-      document.getElementById('badge-group-3'),
-      document.getElementById('badge-group-4'),
-    ];
-    groupBadges.forEach((bg, idx) => {
-      if (!bg) return;
-      const gNum = idx + 1;
-      if (gNum === currentGroup) {
-        bg.classList.add('border-yellow-500/60', 'bg-yellow-950/20');
-        bg.classList.remove('border-titanium-800');
-      } else {
-        bg.classList.remove('border-yellow-500/60', 'bg-yellow-950/20');
-        bg.classList.add('border-titanium-800');
+    paneLacing.querySelectorAll<HTMLElement>('[data-lacing-target]').forEach(link => {
+      link.dataset.highlighted = String(link.dataset.lacingTarget === target);
+    });
+  }
+  function clearLacingHighlight() {
+    hoveredLacingTarget = focusedLacingTarget = pinnedLacingTarget = null;
+    refreshLacingHighlight();
+  }
+  function holeLink(text: string, target: LacingTarget): HTMLButtonElement {
+    // This is an in-page action styled as a hyperlink, so use button semantics.
+    // In particular, do not replace the build parameters in the URL fragment.
+    const link = document.createElement('button');
+    link.type = 'button'; link.className = 'guide-target-link'; link.textContent = text;
+    link.dataset.lacingTarget = target;
+    link.setAttribute('aria-controls', 'canvas-container');
+    link.setAttribute('aria-describedby', 'lacing-link-help');
+    link.addEventListener('pointerenter', event => {
+      if (event.pointerType === 'touch') return;
+      hoveredLacingTarget = target; refreshLacingHighlight();
+    });
+    link.addEventListener('pointerleave', () => { hoveredLacingTarget = null; refreshLacingHighlight(); });
+    link.addEventListener('focus', () => { focusedLacingTarget = target; refreshLacingHighlight(); });
+    link.addEventListener('blur', () => { focusedLacingTarget = null; refreshLacingHighlight(); });
+    link.addEventListener('click', () => {
+      pinnedLacingTarget = target; hoveredLacingTarget = null; focusedLacingTarget = target;
+      refreshLacingHighlight(true);
+      const canvas = document.getElementById('canvas-container')!;
+      const bounds = canvas.getBoundingClientRect();
+      if (bounds.top < 0 || bounds.bottom > window.innerHeight - 88) {
+        canvas.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'instant' : 'smooth' });
       }
     });
+    return link;
+  }
+  window.addEventListener('keydown', event => { if (event.key === 'Escape') clearLacingHighlight(); });
 
-    // Update active spoke instruction callout card
-    if (activeSpoke && placedCount > 0) {
-      if (lacingSpokeTitle) lacingSpokeTitle.textContent = `Spoke #${placedCount}: ${activeSpoke.groupName}`;
-      if (lacingSpokeSideBadge) {
-        lacingSpokeSideBadge.textContent = `${activeSpoke.side} Side (${activeSpoke.side === 'Right' ? 'Drive' : 'Non-Drive'})`;
-        lacingSpokeSideBadge.className = `text-[10px] font-mono font-bold px-2 py-0.5 rounded border ${activeSpoke.side === 'Right' ? 'bg-red-950/60 text-red-300 border-red-500/30' : 'bg-blue-950/60 text-blue-300 border-blue-500/30'}`;
-      }
-      if (lacingFlangeHoleText) lacingFlangeHoleText.textContent = `${activeSpoke.side} Flange Hole #${activeSpoke.flangeHoleIndex}`;
-      if (lacingHeadsDirText) lacingHeadsDirText.textContent = activeSpoke.headsDir;
-      if (lacingRimHoleText) lacingRimHoleText.textContent = `Rim Hole #${activeSpoke.rimHoleIndex}`;
-      if (lacingSpokeLengthText) lacingSpokeLengthText.textContent = `Length: ${activeSpoke.length ? activeSpoke.length.toFixed(1) : '--'} mm`;
-
-      // Rule Tips per Group
-      if (lacingRuleTipText) {
-        if (activeSpoke.group === 1) {
-          lacingRuleTipText.textContent = `Group 1: Right-side trailing Spokes (Heads-Out). Hub Logo Alignment: Position the Hub Brand Logo facing the Valve Hole before placing Spoke #1 (Key Spoke). Place remaining spokes in every 2nd flange hole into every 4th rim hole. When complete, the spokes frame the Hub Logo directly beneath the Valve Hole!`;
-        } else if (activeSpoke.group === 2) {
-          lacingRuleTipText.textContent = `Group 2: Left-side trailing Spokes (Heads-Out). Look down the axle to align left flange holes relative to the right flange. Insert trailing spokes in the left flange and seat them in the corresponding rim holes assigned to the left flange.`;
-        } else if (activeSpoke.group === 3) {
-          lacingRuleTipText.textContent = `Group 3: Right-side leading Spokes (Heads-In). Twist the hub relative to the rim to set bracing. Insert leading spokes from inside the right flange, crossing over/under the Group 1 spokes into the remaining rim holes assigned to the right flange.`;
-        } else {
-          lacingRuleTipText.textContent = `Group 4: Left-side leading Spokes (Heads-In). Insert remaining leading spokes from inside the left flange, weaving over/under Group 2 spokes into the remaining rim holes assigned to the left flange to complete the wheel assembly!`;
-        }
-      }
+  let lastAnnouncement = '';
+  const setupFigure = document.getElementById('lacing-setup-figure')!;
+  document.getElementById('canvas-container')!.append(setupFigure);
+  const diagramToggle = document.getElementById('lacing-diagram-toggle')!;
+  let lastDiagramKey = '';
+  function setDiagramExpanded(expanded: boolean) {
+    diagramToggle.setAttribute('aria-expanded', String(expanded));
+    document.getElementById('lacing-diagram-content')!.classList.toggle('hidden', !expanded);
+    document.getElementById('lacing-diagram-toggle-icon')!.textContent = expanded ? '−' : '+';
+  }
+  diagramToggle.addEventListener('click', () => setDiagramExpanded(diagramToggle.getAttribute('aria-expanded') !== 'true'));
+  function renderLacing(detail: LacingSnapshot) {
+    clearLacingHighlight();
+    const { step, valid, preview, totalSpokes, targetSpoke, activeSpoke, notice } = detail;
+    lacingSpokeCounter.textContent = !valid ? 'Guide unavailable' : preview ? `Preview · saved step ${step} / ${totalSpokes}` : step === 0 ? `Setup · Step 0 / ${totalSpokes}` : `Step ${step} / ${totalSpokes}`;
+    document.getElementById('lacing-notice')!.textContent = notice;
+    document.getElementById('lacing-error')!.classList.toggle('hidden', valid);
+    document.getElementById('lacing-error-text')!.textContent = detail.errors.slice(0, 2).join(' ');
+    document.getElementById('lacing-progress')!.classList.toggle('hidden', !valid);
+    barOverallLacing.value = detail.percent ?? 0;
+    lacingPercentLabel.textContent = valid ? `${detail.percent}%` : '';
+    btnPrevSpoke.disabled = !detail.canPrevious;
+    btnNextSpoke.disabled = !detail.canNext;
+    btnPrevGroup.disabled = !detail.canPrevious;
+    btnNextGroup.disabled = !detail.canNextGroup;
+    btnLacingComplete.disabled = !valid || preview;
+    document.getElementById('lacing-step-controls')!.classList.toggle('hidden', preview);
+    btnLacingReturn.classList.toggle('hidden', !preview);
+    btnCamFixed.setAttribute('aria-pressed', String(!detail.cameraTracking));
+    btnCamAutotrack.setAttribute('aria-pressed', String(detail.cameraTracking));
+    [badgeG1Count, badgeG2Count, badgeG3Count, badgeG4Count].forEach((count, i) => {
+      count.textContent = valid ? `${detail.groupCounts[i]} / ${detail.groupTotals[i]}` : 'Unavailable';
+      document.getElementById(`badge-g${i + 1}-name`)!.textContent = `${i + 1}. ${detail.groupNames[i]}`;
+      const badge = document.getElementById(`badge-group-${i + 1}`)!;
+      badge.setAttribute('aria-current', String(detail.currentGroup === i + 1));
+      badge.style.borderColor = detail.currentGroup === i + 1 ? '#22d3ee' : '';
+    });
+    lacingSpokeTitle.textContent = !valid ? 'Geometry needs attention' : preview ? 'All spokes preview' : activeSpoke ? `Spoke ${step}: ${activeSpoke.groupName}` : 'Setup: locate the first spoke';
+    lacingSpokeSideBadge.textContent = preview ? 'Sequence position preserved' : targetSpoke?.sideLabel ?? '';
+    const setup = detail.setup;
+    if (setup && targetSpoke) {
+      document.getElementById('lacing-diagram-title')!.textContent = `${targetSpoke.side} flange · heads ${targetSpoke.path.headsOut ? 'out' : 'in'}`;
+      const diagramKey = `${detail.key}:${targetSpoke.group}`;
+      if (diagramKey !== lastDiagramKey) setDiagramExpanded(true);
+      lastDiagramKey = diagramKey;
+    }
+    document.getElementById('lacing-target-summary')!.classList.toggle('hidden', !!setup);
+    setupFigure.classList.toggle('hidden', !setup);
+    document.getElementById('lacing-setup-orientation')!.classList.toggle('hidden', !setup);
+    const adjustment = document.getElementById('lacing-setup-adjustment') as HTMLDetailsElement;
+    adjustment.classList.toggle('hidden', !setup || step > 1);
+    if (!setup || step > 1) adjustment.open = false;
+    document.getElementById('lacing-setup-diagram')!.innerHTML = setup ? lacingSetupDiagram(setup) : '';
+    const intro = document.getElementById('lacing-setup-intro')!;
+    intro.replaceChildren();
+    if (setup) {
+      if (step > 1) {
+        intro.append(`Start the ${targetSpoke!.side.toLowerCase()} flange group using the diagram in the canvas. It shows only the ${targetSpoke!.side.toLowerCase()} flange, viewed from the right with the valve at the top. Count from `,
+          holeLink(setup.referenceTarget === 'reference-flange' ? 'the amber already used hole' : 'the amber hole beside the valve line', setup.referenceTarget),
+          ' to ', holeLink('the cyan target hole', 'flange'), '. Keep the hub in its current orientation.');
+      } else intro.append('Look from the right. Follow ', holeLink('the yellow line from the valve', 'alignment'),
+        ' toward the axle. It passes between flange holes; no hole needs to sit exactly on it. The ',
+        holeLink('hub logo faces the valve', 'logo'), ' in the final orientation shown.');
+      const adjustmentText = document.getElementById('lacing-setup-adjustment-text')!;
+      adjustmentText.replaceChildren(setup.crossed ?
+        'Hold the rim still and turn the whole hub so its logo faces the valve. Use the valve line and clockwise count to choose the first flange hole. Connect the first spoke loosely to the indicated rim hole. With it still loose, gently turn the hub clockwise, viewed from the right, until that spoke takes up its slack. Check the logo again. If it is far off, move the first spoke to a neighbouring flange hole and recheck before adding more spokes.' :
+        'Hold the rim still and turn the whole hub so its logo faces the valve. Connect the highlighted flange and rim holes loosely. This side is radial: keep the spoke radial instead of twisting the hub to create a crossed pattern.');
+    }
+    lacingFlangeHoleText.replaceChildren(!preview && targetSpoke ? holeLink(`${targetSpoke.side} flange hole`, 'flange') : '—');
+    lacingHeadsDirText.textContent = !preview ? targetSpoke?.headsDir ?? '' : '';
+    lacingRimHoleText.replaceChildren(!preview && targetSpoke ? holeLink('Rim hole for this spoke', 'rim') : '—');
+    const selection = detail.spokeSelection;
+    lacingSpokeLengthText.classList.toggle('hidden', !selection);
+    lacingSpokeLengthText.textContent = selection ? `Spoke length: ${selection.roundedLength} mm` : '';
+    lacingRuleTipText.replaceChildren();
+    document.getElementById('lacing-link-help')!.classList.toggle('hidden', !valid || preview);
+    if (!valid || preview || !targetSpoke) {
+      const item = document.createElement('li');
+      item.textContent = preview ? 'This shows the entire spoke pattern. Return to Step to continue from your saved position.' : 'Correct the build dimensions to generate a complete lacing sequence.';
+      lacingRuleTipText.append(item);
     } else {
-      // 0 Spokes Placed (Bare Hub)
-      if (lacingSpokeTitle) lacingSpokeTitle.textContent = `Bare Hub & Rim Setup`;
-      if (lacingSpokeSideBadge) {
-        lacingSpokeSideBadge.textContent = `Hub Logo & Valve Alignment`;
-        lacingSpokeSideBadge.className = `text-[10px] font-mono font-bold px-2 py-0.5 rounded bg-yellow-950/60 text-yellow-400 border border-yellow-500/30`;
-      }
-      if (lacingFlangeHoleText) lacingFlangeHoleText.textContent = `Flange Hole #1`;
-      if (lacingHeadsDirText) lacingHeadsDirText.textContent = `Select Next Spoke`;
-      if (lacingRimHoleText) lacingRimHoleText.textContent = `Rim Hole #1 (Valve Neighbor)`;
-      if (lacingSpokeLengthText) lacingSpokeLengthText.textContent = `Length: -- mm`;
-      if (lacingRuleTipText) {
-        lacingRuleTipText.textContent = `Hub Logo Rule: Professional wheelbuilders position the Hub Brand Logo (highlighted in gold on the hub shell) directly facing the Rim Valve Hole (highlighted in yellow). Click 'Next Spoke' to place the Key Spoke so that the Hub Logo is perfectly framed through the valve hole when complete.`;
+      for (const parts of targetSpoke.instructionSteps) {
+        const item = document.createElement('li');
+        for (const part of parts) item.append(part.target ? holeLink(part.text, part.target) : document.createTextNode(part.text));
+        lacingRuleTipText.append(item);
       }
     }
-  });
+    const announcement = `${lacingSpokeCounter.textContent}. ${lacingSpokeTitle.textContent}. ${!preview && targetSpoke ? `${targetSpoke.sideLabel}, ${targetSpoke.headsDir}. ${selection ? `Spoke length ${selection.roundedLength} millimetres. ` : ''}Use the instruction links to locate the holes.` : ''} ${notice}`;
+    if (announcement !== lastAnnouncement) {
+      document.getElementById('lacing-announcement')!.textContent = announcement;
+      lastAnnouncement = announcement;
+    }
+  }
+  window.addEventListener('lacing-update', event => renderLacing(event.detail));
 
   // 8. URL HASH SHARING
   function updateHash(inputs: ReturnType<typeof getInputs>) {

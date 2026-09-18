@@ -1,0 +1,261 @@
+import { test } from 'node:test';
+import assert from 'node:assert/strict';
+import { calculateSpokePaths } from '../src/utils/spokePath.ts';
+import { createLacingGuide, guideKey, guideSnapshot, initialGuideState, reconcileGuide, transitionGuide } from '../src/utils/lacingGuide.ts';
+import { defaultHub, hubs } from '../src/data/hubs.ts';
+import { defaultRim } from '../src/data/rims.ts';
+
+const inputs = (front = false) => ({ ...defaultRim, ...(front ? hubs.find(h => h.id === 'hope-pro5-front-100-6b')! : defaultHub),
+  spokeCount: 32, spokeDiameter: 2, hubOffset: 0, rimFlip: 'Auto' as const, crossesLeft: 2, crossesRight: 2,
+  interlaced: false, isRear: !front });
+const buildGuide = (overrides = {}) => { const i = { ...inputs(), ...overrides }; return createLacingGuide(i, calculateSpokePaths(i)); };
+
+test('setup and tab re-entry preserve step zero and use the actual first spoke', () => {
+  const g = buildGuide(); assert.equal(g.valid, true);
+  let state = reconcileGuide(initialGuideState(), g);
+  assert.equal(state.step, 0);
+  const setup = guideSnapshot(state, g);
+  assert.equal(setup.activeSpoke, null);
+  assert.equal(setup.targetSpoke, g.spokes[0]);
+  state = reconcileGuide(state, g); assert.equal(state.step, 0);
+  state = transitionGuide(state, g, 'next');
+  assert.equal(guideSnapshot(state, g).activeSpoke, setup.targetSpoke);
+  state = reconcileGuide(state, g); assert.equal(state.step, 1);
+  state = transitionGuide(state, g, 'reset');
+  assert.equal(reconcileGuide(state, g).step, 0);
+});
+
+test('step and group navigation use real starts and stop at boundaries', () => {
+  const g = buildGuide(); let state = reconcileGuide(initialGuideState(), g);
+  assert.deepEqual(g.groupStarts, [1, 9, 17, 25]);
+  state = transitionGuide(state, g, 'previous'); assert.equal(state.step, 0);
+  state = transitionGuide(state, g, 'next-group'); assert.equal(state.step, 1);
+  state = transitionGuide(state, g, 'next-group'); assert.equal(state.step, 9);
+  state = transitionGuide(state, g, 'next'); assert.equal(state.step, 10);
+  state = transitionGuide(state, g, 'previous-group'); assert.equal(state.step, 9);
+  state = transitionGuide(state, g, 'previous-group'); assert.equal(state.step, 1);
+  state = transitionGuide(state, g, 'previous-group'); assert.equal(state.step, 0);
+  for (let i = 0; i < 40; i++) state = transitionGuide(state, g, 'next');
+  assert.equal(state.step, 32); assert.equal(guideSnapshot(state, g).canNext, false);
+  assert.equal(guideSnapshot(state, g).canNextGroup, false);
+  assert.equal(transitionGuide(state, g, 'next-group').step, 32);
+});
+
+test('preview preserves the step, blocks navigation and returns or resets cleanly', () => {
+  const g = buildGuide(); let state = reconcileGuide(initialGuideState(), g);
+  state = transitionGuide(state, g, 'next-group');
+  state = transitionGuide(state, g, 'preview');
+  assert.equal(state.step, 1); assert.equal(state.preview, true);
+  assert.equal(guideSnapshot(state, g).percent, 3);
+  for (const action of ['next', 'previous', 'next-group', 'previous-group'] as const) assert.equal(transitionGuide(state, g, action).step, 1);
+  state = transitionGuide(state, g, 'return'); assert.equal(state.step, 1); assert.equal(state.preview, false);
+  state = transitionGuide(transitionGuide(state, g, 'preview'), g, 'reset');
+  assert.equal(state.step, 0); assert.equal(state.preview, false);
+});
+
+test('changing a completed 32-spoke build to 28 resets progress instead of showing 114%', () => {
+  const g = buildGuide(); let state = { ...reconcileGuide(initialGuideState(), g), step: 32, preview: true };
+  const changed = buildGuide({ spokeCount: 28 }); assert.equal(changed.valid, true);
+  state = reconcileGuide(state, changed);
+  assert.equal(state.step, 0); assert.equal(state.preview, false);
+  assert.match(state.notice, /Build changed/);
+  assert.equal(guideSnapshot(state, changed).percent, 0);
+  assert.equal(reconcileGuide({ ...state, step: 999 }, changed).step, 28);
+});
+
+test('geometry and pattern changes reset the guide; display and provenance do not', () => {
+  const i = inputs(), g = buildGuide(); const state = { ...reconcileGuide(initialGuideState(), g), step: 12 };
+  for (const change of [{ erd: 390 }, { crossesLeft: 1 }, { crossesRight: 3 }, { interlaced: true }, { isRear: false }, { flangeThicknessLeft: 3.8 }]) {
+    const next = { ...i, ...change };
+    assert.equal(reconcileGuide(state, createLacingGuide(next, calculateSpokePaths(next))).step, 0);
+  }
+  const displayOnly = { ...i, geometryProvenance: 'Changed description', colorMode: 'side', explodedValue: .5, showRuler: false };
+  assert.equal(guideKey(displayOnly), g.key);
+  assert.equal(reconcileGuide(state, createLacingGuide(displayOnly, calculateSpokePaths(displayOnly))).step, 12);
+  assert.equal(initialGuideState().cameraTracking, false);
+  const tracked = transitionGuide(state, g, 'track'); assert.equal(tracked.cameraTracking, true); assert.equal(tracked.step, 12);
+  assert.equal(reconcileGuide(tracked, buildGuide({ spokeCount: 28 })).cameraTracking, true);
+  assert.equal(transitionGuide(tracked, g, 'fixed').cameraTracking, false);
+});
+
+test('missing, invalid and partial path results cannot navigate or preview', () => {
+  const i = inputs(); const validPaths = calculateSpokePaths(i);
+  for (const paths of [calculateSpokePaths({ ...i, flangeOuterDiameterLeft: undefined }),
+    { ...validPaths, spokes: validPaths.spokes.slice(1) },
+    { ...validPaths, spokes: validPaths.spokes.map((p, index) => index === 0 ? { ...p, valid: false } : p) },
+    { ...validPaths, errors: ['Unsatisfied crossing constraint'] }]) {
+    const g = createLacingGuide(i, paths); assert.equal(g.valid, false);
+    let state = reconcileGuide({ ...initialGuideState(), step: 32, preview: true }, g);
+    for (const action of ['next', 'next-group', 'preview'] as const) state = transitionGuide(state, g, action);
+    const snapshot = guideSnapshot(state, g);
+    assert.equal(state.step, 0); assert.equal(state.preview, false); assert.equal(snapshot.percent, null);
+    assert.equal(snapshot.targetSpoke, null); assert.equal(snapshot.canNext, false); assert.ok(snapshot.errors.length);
+  }
+  const catalogHub = hubs.find(h => h.id === 'dt-350-classic-rear')!;
+  assert.equal(buildGuide({ ...catalogHub, flangeOuterDiameterLeft: undefined, flangeOuterDiameterRight: undefined }).valid, false);
+});
+
+test('instructions match front/rear, radial, mixed, crossed and interlacing settings', () => {
+  for (const front of [false, true]) for (const crosses of [0, 1, 2, 3]) for (const interlaced of [false, true]) {
+    const i = { ...inputs(front), crossesLeft: crosses, crossesRight: crosses, interlaced };
+    const g = createLacingGuide(i, calculateSpokePaths(i)); assert.equal(g.valid, true);
+    for (const s of g.spokes) {
+      assert.doesNotMatch(s.instruction, /#\d|hole \d/);
+      assert.deepEqual(s.instructionSteps.flat(), s.instructionParts);
+      assert.equal(s.instructionParts.filter(p => p.target === 'flange').length, 1);
+      assert.equal(s.instructionParts.filter(p => p.target === 'rim').length, 1);
+      if (front) assert.doesNotMatch(s.sideLabel, /drive/); else assert.match(s.sideLabel, /drive/);
+      if (crosses === 0) { assert.doesNotMatch(s.groupName, /leading|trailing/); assert.match(s.instruction, /no spoke crossings or weaving/); }
+      else if (!interlaced) assert.match(s.instruction, /do not weave/);
+      else assert.match(s.instruction, /interlaced/);
+    }
+  }
+  const mixed = buildGuide({ crossesLeft: 0, crossesRight: 2 }); assert.equal(mixed.valid, true);
+  assert.match(mixed.groupNames[1], /radial/); assert.match(mixed.groupNames[0], /trailing/);
+  assert.equal(buildGuide({ isRear: false, discType: 'None' }).spokes[0].sideLabel, 'Right / front');
+});
+
+test('all supported spoke counts have unique hole mappings and stable landmarks', () => {
+  for (let spokeCount = 16; spokeCount <= 40; spokeCount += 4) {
+    const g = buildGuide({ spokeCount }); assert.equal(g.valid, true);
+    assert.equal(new Set(g.spokes.map(s => s.rimHoleIndex)).size, spokeCount);
+    assert.equal(new Set(g.spokes.map(s => `${s.side}:${s.flangeHoleIndex}`)).size, spokeCount);
+    for (const s of g.spokes) {
+      const angle = (s.rimHoleIndex - 1) * Math.PI * 2 / spokeCount;
+      assert.ok(Math.abs(Math.cos(angle) - s.path.end.x / (defaultRim.erd / 2)) < 1e-8);
+      assert.ok(Math.abs(Math.sin(angle) - s.path.end.y / (defaultRim.erd / 2)) < 1e-8);
+    }
+    assert.equal(g.valveAngle, buildGuide({ spokeCount }).valveAngle);
+  }
+});
+
+
+test('successive spokes use the previous connections as relative counting references', () => {
+  const g = buildGuide();
+  const first = g.spokes[0], second = g.spokes[1];
+  assert.equal(first.referenceFlange, undefined);
+  assert.equal(first.referenceRim, undefined);
+  assert.ok(first.instructionParts.some(p => p.target === 'valve'));
+  assert.match(first.instruction, /count one spoke hole counterclockwise/);
+  assert.equal(second.referenceFlange, first.path);
+  assert.equal(second.referenceRim, first.path);
+  assert.match(second.instructionSteps[0].map(p => p.text).join(''), /skip one hole counterclockwise/);
+  assert.match(second.instructionSteps[1].map(p => p.text).join(''), /skip three holes counterclockwise/);
+  assert.deepEqual(second.instructionParts.filter(p => p.target).map(p => p.target), ['reference-flange', 'flange', 'reference-rim', 'rim']);
+});
+
+test('group changes anchor to an already used hole and never require absolute hole numbers', () => {
+  for (let spokeCount = 16; spokeCount <= 40; spokeCount += 4) {
+    for (const crosses of [0, 1, 2]) {
+      const g = buildGuide({ spokeCount, crossesLeft: crosses, crossesRight: crosses });
+      assert.equal(g.valid, true);
+      for (const [index, spoke] of g.spokes.entries()) {
+        const earlier = g.spokes.slice(0, index);
+        if (spoke.referenceFlange) {
+          assert.ok(earlier.some(s => s.side === spoke.side && s.path === spoke.referenceFlange));
+          const distance = (spoke.path.index - spoke.referenceFlange.index + spokeCount / 2) % (spokeCount / 2);
+          assert.ok(distance === 1 || distance === 2);
+          assert.match(spoke.instructionSteps[0].map(p => p.text).join(''), distance === 1 ? /very next hole/ : /skip one hole/);
+        }
+        if (spoke.referenceRim) assert.ok(earlier.some(s => s.path === spoke.referenceRim));
+        else assert.equal(index, 0);
+        assert.doesNotMatch(spoke.instruction, /#\d|hole \d|empty hole/);
+      }
+    }
+  }
+});
+
+test('setup references the valve gap and counts clockwise to the actual first spoke across patterns', () => {
+  const tau = Math.PI * 2;
+  for (const spokeCount of [16, 20, 24, 28, 32, 36, 40]) for (const crossesRight of [0, 1, 2, 3]) {
+    const guide = buildGuide({ spokeCount, crossesRight, crossesLeft: 0 });
+    if (!guide.valid) { assert.equal(guide.setup, null); continue; }
+    const setup = guide.setup!;
+    assert.equal(setup.first, guide.spokes[0].path);
+    assert.equal(setup.flangeHoles.length, spokeCount / 2);
+    assert.equal(setup.crossed, crossesRight > 0);
+    const refAngle = Math.atan2(setup.reference.hole.y, setup.reference.hole.x);
+    const fromValve = (refAngle - guide.valveAngle + tau * 2) % tau;
+    assert.ok(fromValve > 0 && fromValve < tau / (spokeCount / 2));
+    const targetAngle = refAngle - setup.holeSteps * tau / (spokeCount / 2);
+    const firstAngle = Math.atan2(setup.first.hole.y, setup.first.hole.x);
+    assert.ok(Math.abs(Math.sin(targetAngle) - Math.sin(firstAngle)) < 1e-8);
+    assert.ok(Math.abs(Math.cos(targetAngle) - Math.cos(firstAngle)) < 1e-8);
+    assert.ok(guide.spokes[0].instructionParts.some(part => part.target === 'setup-reference'));
+    if (crossesRight === 0) assert.equal(setup.holeSteps, 0);
+    const state = reconcileGuide(initialGuideState(), guide);
+    assert.equal(guideSnapshot(state, guide).setup, setup);
+    assert.equal(guideSnapshot({ ...state, step: 1 }, guide).setup, setup);
+    assert.equal(guideSnapshot({ ...state, step: 2 }, guide).setup, null);
+    assert.equal(guideSnapshot({ ...state, preview: true }, guide).setup, null);
+  }
+  const invalid = buildGuide({ flangeOuterDiameterRight: undefined });
+  assert.equal(invalid.setup, null);
+  assert.equal(guideSnapshot(reconcileGuide(initialGuideState(), invalid), invalid).setup, null);
+});
+
+test('each flange group starts with its own diagram matching the instruction reference and direction', () => {
+  for (const front of [false, true]) for (const crossesLeft of [0, 2, 3]) for (const crossesRight of [0, 2, 3]) {
+    const i = { ...inputs(front), crossesLeft, crossesRight };
+    const guide = createLacingGuide(i, calculateSpokePaths(i));
+    assert.equal(guide.valid, true);
+    let state = reconcileGuide(initialGuideState(), guide);
+    for (const [group, step] of guide.groupStarts.entries()) {
+      state = transitionGuide(state, guide, 'next-group');
+      assert.equal(state.step, step);
+      const snapshot = guideSnapshot(state, guide);
+      const diagram = snapshot.setup!;
+      const spoke = snapshot.activeSpoke!;
+      assert.equal(diagram.first, spoke.path);
+      assert.equal(diagram.first.side, group % 2 ? 'Left' : 'Right');
+      assert.ok(diagram.flangeHoles.every(p => p.side === spoke.side));
+      assert.equal(diagram.reference.side, spoke.side);
+      assert.ok(spoke.instructionParts.some(p => p.target === diagram.referenceTarget));
+      if (group >= 2) {
+        assert.equal(diagram.reference, spoke.referenceFlange);
+        assert.equal(diagram.referenceTarget, 'reference-flange');
+        assert.equal(diagram.direction, 'counterclockwise');
+      } else assert.equal(diagram.referenceTarget, 'setup-reference');
+      const n = i.spokeCount / 2;
+      const turn = diagram.direction === 'clockwise' ? -1 : 1;
+      assert.equal((diagram.reference.index + turn * diagram.holeSteps + n) % n, diagram.first.index);
+      assert.ok(diagram.holeSteps <= n / 2);
+      if (diagram.holeSteps) assert.ok(spoke.instructionSteps[0].map(p => p.text).join('').includes(diagram.direction));
+      assert.equal(guideSnapshot(transitionGuide(state, guide, 'next'), guide).setup, null);
+      const preview = transitionGuide(state, guide, 'preview');
+      assert.equal(guideSnapshot(preview, guide).setup, null);
+      assert.equal(guideSnapshot(transitionGuide(preview, guide, 'return'), guide).setup, diagram);
+      assert.equal(guideSnapshot(reconcileGuide(state, guide), guide).setup, diagram);
+    }
+  }
+});
+
+test('every lacing step selects the matching assembly group length including its bend allowance', () => {
+  for (const front of [false, true]) for (const interlaced of [false, true]) {
+    const i = { ...inputs(front), interlaced };
+    const paths = calculateSpokePaths(i);
+    const guide = createLacingGuide(i, paths);
+    assert.equal(guide.valid, true);
+    const state = reconcileGuide(initialGuideState(), guide);
+    for (let step = 0; step <= guide.total; step++) {
+      const snapshot = guideSnapshot({ ...state, step }, guide);
+      const spoke = snapshot.targetSpoke!;
+      const source = paths.spokes.find(p => p.side === spoke.side && p.index === spoke.path.index)!;
+      const selection = snapshot.spokeSelection!;
+      assert.equal(selection.estimatedLength, source.estimatedLength);
+      assert.equal(selection.traditionalLength, source.traditionalLength);
+      assert.equal(selection.roundedLength, Math.round(source.estimatedLength));
+      assert.equal(selection.label, `${spoke.sideLabel} · heads ${source.headsOut ? 'out' : 'in'}`);
+    }
+    const selections = guide.groupStarts.map(step => guideSnapshot({ ...state, step }, guide).spokeSelection!);
+    assert.equal(new Set(selections.map(s => s.label)).size, 4);
+    assert.ok(selections.some(s => s.estimatedLength > s.traditionalLength + .05));
+    assert.equal(guideSnapshot({ ...state, step: 9, preview: true }, guide).spokeSelection, null);
+  }
+  const i = inputs();
+  const paths = calculateSpokePaths(i);
+  paths.spokes[0].estimatedLength = NaN;
+  const invalid = createLacingGuide(i, paths);
+  assert.equal(invalid.valid, false);
+  assert.equal(guideSnapshot(reconcileGuide(initialGuideState(), invalid), invalid).spokeSelection, null);
+});
