@@ -47,6 +47,7 @@ import { hubs, defaultHub } from '../data/hubs';
 
 <!-- MAIN TABBED CONTENT AREA -->
 <div class="max-w-7xl mx-auto px-4 py-4 flex-grow flex flex-col w-full">
+  <p id="build-import-error" role="alert" class="hidden mb-4 rounded-xl border border-amber-500/40 bg-amber-950/30 p-3 text-sm text-amber-200"></p>
 
   <!-- ================= TAB 1: WHEEL ASSEMBLY & 3D ENGINE ================= -->
   <div id="tab-content-assembly" class="tab-pane flex flex-col lg:flex-row gap-8 w-full">
@@ -144,7 +145,7 @@ import { hubs, defaultHub } from '../data/hubs';
       <div class="bg-titanium-900/60 backdrop-blur-md border border-titanium-800/80 rounded-2xl p-4 shadow-xl animate-fade-in flex items-center justify-between gap-3">
         <div class="flex flex-col gap-0.5">
           <span class="text-xs font-bold text-titanium-50 uppercase tracking-wide">Share Build</span>
-          <span class="text-[10px] text-titanium-500">Copy URL to save or send specs</span>
+          <span class="text-[10px] text-titanium-500">Remembered in this tab · copy a link to share</span>
         </div>
         <button id="copy-url-btn" class="flex items-center gap-1.5 px-3 py-1.5 bg-cyan-950/20 hover:bg-cyan-900/30 border border-cyan-500/20 hover:border-cyan-500/50 text-cyan-400 hover:text-cyan-300 text-xs font-bold rounded-xl transition-all">
           <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
@@ -153,6 +154,11 @@ import { hubs, defaultHub } from '../data/hubs';
           Copy Link
         </button>
       </div>
+      <div id="share-link-fallback" class="hidden rounded-xl border border-titanium-800 p-3">
+        <label for="share-link-value" class="text-xs text-titanium-300">Copy this build link:</label>
+        <input id="share-link-value" type="text" readonly class="w-full mt-2 bg-titanium-950 text-titanium-100 p-2 rounded" />
+      </div>
+      <p id="share-status" role="status" class="text-xs text-titanium-300"></p>
     </div>
 
     <!-- RIGHT COLUMN: 3D VIEWPORT & OUTCOMES -->
@@ -164,6 +170,10 @@ import { hubs, defaultHub } from '../data/hubs';
         <!-- 3D Canvas Container -->
         <p id="lacing-viewing-side" class="text-xs px-3 py-2 text-cyan-200 bg-titanium-950 shrink-0"></p>
         <div id="canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
+        <div id="viewport-load-status" class="absolute inset-0 z-30 flex flex-col items-center justify-center gap-3 bg-titanium-950/90 p-6 text-center">
+          <p id="viewport-load-message" role="status" class="text-sm text-titanium-200">The 3D view will load when visible.</p>
+          <button id="viewport-retry" type="button" class="hidden guide-button guide-primary">Retry 3D view</button>
+        </div>
 
         <!-- Fixed 3D Measurement HUD Panel (Top-Left) -->
         <div id="ruler-3d-badge" class="absolute top-4 left-4 hidden bg-titanium-950/85 backdrop-blur-md border border-cyan-500/40 p-3 rounded-xl shadow-2xl text-xs flex flex-col gap-1.5 z-20 pointer-events-none select-none min-w-[210px]">
@@ -794,11 +804,12 @@ import { hubs, defaultHub } from '../data/hubs';
   import { calculateSpokePaths } from '../utils/spokePath';
   import { defaultHub } from '../data/hubs';
   import { calculateWheelBuild } from '../utils/physicsCalculator';
-  import { Viewport3D } from './Viewport3D';
-  import { HubCadVisualizer } from './HubCadVisualizer';
-  import { RimCadVisualizer } from './RimCadVisualizer';
-  import { Chart } from 'chart.js/auto';
+  import type { Viewport3D as Viewport3DInstance } from './Viewport3D';
+  import type { HubCadVisualizer as HubCadVisualizerInstance } from './HubCadVisualizer';
+  import type { RimCadVisualizer as RimCadVisualizerInstance } from './RimCadVisualizer';
+  import type { BracingChartInstance } from './BracingChart';
   import { defaultRim, type RimAppearance } from '../data/rims';
+  import { numericFields, serializeConfiguration, parseConfiguration, restoreConfiguration, saveConfiguration, type BuildConfiguration, type NumericField } from '../utils/buildConfiguration';
 
   let rimAppearance: RimAppearance = { rimProfile: defaultRim.rimProfile, rimEyelets: defaultRim.rimEyelets, rimValveDiameter: defaultRim.rimValveDiameter };
 
@@ -811,10 +822,15 @@ import { hubs, defaultHub } from '../data/hubs';
     };
   }
 
-  let viewport: Viewport3D | null = null;
-  let hubCad: HubCadVisualizer | null = null;
-  let rimCad: RimCadVisualizer | null = null;
-  let chartInstance: Chart | null = null;
+  let viewport: Viewport3DInstance | null = null;
+  let hubCad: HubCadVisualizerInstance | null = null;
+  let rimCad: RimCadVisualizerInstance | null = null;
+  let chartInstance: BracingChartInstance | null = null;
+  let viewportLoad: Promise<void> | null = null;
+  let hubCadLoad: Promise<void> | null = null;
+  let rimCadLoad: Promise<void> | null = null;
+  let chartLoad: Promise<void> | null = null;
+  let latestChartValues: [number, number] | null = null;
 
   // DOM Elements - Tabs
   const btnTabAssembly = document.getElementById('btn-tab-assembly') as HTMLButtonElement;
@@ -891,6 +907,7 @@ import { hubs, defaultHub } from '../data/hubs';
   let interlaced = false;
   let customHubType = 'Rear';
   let customHubSpacing = '135mm';
+  let customHubDisc: '6-Bolt' | 'Centerlock' | 'None' = '6-Bolt';
   let geometryProvenance = defaultHub.geometryProvenance ?? 'Manual geometry';
   const numeric = (field: HTMLInputElement | HTMLSelectElement) => field.value.trim() === '' ? NaN : Number(field.value);
   function syncHubControls() {
@@ -1020,6 +1037,10 @@ import { hubs, defaultHub } from '../data/hubs';
       }
     }
 
+    if (tab === 'assembly' || tab === 'lacing') void ensureViewport();
+    if (tab === 'hub') void ensureHubCad().then(() => hubCad?.resize());
+    if (tab === 'rim') void ensureRimCad().then(() => rimCad?.resize());
+
     // Handle canvas resizes when tab becomes visible
     setTimeout(() => {
       if (tab === 'hub' && hubCad) hubCad.resize();
@@ -1065,7 +1086,7 @@ import { hubs, defaultHub } from '../data/hubs';
     const hubBrand = hubOpt?.getAttribute('data-brand') || '';
     const hubName = hubOpt?.getAttribute('data-name') || 'Custom Hub';
     const hubSpacing = hubOpt?.getAttribute('data-spacing') || customHubSpacing;
-    const hubDisc = (hubOpt?.getAttribute('data-disctype') as '6-Bolt' | 'Centerlock' | 'None') || '6-Bolt';
+    const hubDisc = (hubOpt?.getAttribute('data-disctype') as '6-Bolt' | 'Centerlock' | 'None') || customHubDisc;
     const hubTypeAttr = hubOpt?.getAttribute('data-hubtype') ?? customHubType;
     const isRear = hubTypeAttr ? hubTypeAttr === 'Rear' : (hubName.toLowerCase().includes('rear') || hubSpacing.includes('148') || hubSpacing.includes('142') || hubSpacing.includes('135') || hubSpacing.includes('157'));
 
@@ -1099,6 +1120,182 @@ import { hubs, defaultHub } from '../data/hubs';
     };
   }
 
+  let viewportState: 'idle' | 'loading' | 'ready' | 'failed' = 'idle';
+  let viewportModuleLoaded = false;
+  const viewportControls = Array.from(document.querySelectorAll<HTMLButtonElement | HTMLInputElement | HTMLSelectElement>(
+    '#viewport-camera-controls button, #viewport-settings button, #viewport-settings input, #viewport-settings select, ' +
+    '#btn-prev-spoke, #btn-next-spoke, #btn-prev-group, #btn-next-group, #btn-lacing-reset, #btn-lacing-complete, #btn-lacing-return, #btn-cam-fixed, #btn-cam-autotrack',
+  ));
+  function setViewportState(state: typeof viewportState) {
+    viewportState = state;
+    const card = document.getElementById('viewport-card')!;
+    card.dataset.loadState = state;
+    card.setAttribute('aria-busy', String(state === 'loading'));
+    document.getElementById('viewport-load-status')!.classList.toggle('hidden', state === 'ready');
+    document.getElementById('viewport-retry')!.classList.toggle('hidden', state !== 'failed');
+    document.getElementById('viewport-retry')!.textContent = viewportModuleLoaded ? 'Retry 3D view' : 'Reload page to retry';
+    document.getElementById('viewport-load-message')!.textContent = state === 'failed'
+      ? 'The 3D view could not load. Your calculations are still available. Retry, or reload the page if the problem continues.'
+      : state === 'loading' ? 'Loading the 3D view…' : 'The 3D view will load when visible.';
+    for (const control of viewportControls) control.disabled = state !== 'ready';
+  }
+  document.getElementById('viewport-retry')!.addEventListener('click', () => {
+    // Browsers cache failed module evaluation/downloads for this document.
+    // A new document retries the same deployment URL without unsafe cache-busting imports.
+    if (!viewportModuleLoaded) {
+      if (!saveCurrentBuild()) {
+        // Preserve edits across the recovery reload even if tab storage is blocked.
+        const recoveryUrl = new URL(window.location.href);
+        recoveryUrl.hash = serializeConfiguration(captureConfiguration());
+        history.replaceState(history.state, '', recoveryUrl);
+      }
+      window.location.reload();
+      return;
+    }
+    setViewportState('idle');
+    void ensureViewport();
+  });
+
+  async function ensureViewport(): Promise<void> {
+    if (viewport || viewportState === 'failed') return;
+    if (viewportLoad) return viewportLoad;
+    setViewportState('loading');
+
+    viewportLoad = import('./Viewport3D')
+      .then(({ Viewport3D }) => {
+        viewportModuleLoaded = true;
+        const container = document.getElementById('canvas-container');
+        if (!container || viewport) return;
+
+        viewport = new Viewport3D(container);
+        viewport.enableInterlacing = interlaced;
+        viewport.explodedValue = Number(sliderExplode.value);
+        viewport.showLeftSpokes = showLeft;
+        viewport.showRightSpokes = showRight;
+        viewport.colorMode = selectColorMode.value as 'classic' | 'side' | 'tension';
+        syncInterlaceControl();
+        viewport.setCameraPreset('isometric');
+        viewport.setLacingMode(!paneLacing.classList.contains('hidden'));
+        const inputs = getInputs();
+        // The lacing snapshot emitted by update sets its own navigation limits.
+        setViewportState('ready');
+        viewport.update(inputs, calculateSpokePaths(inputs));
+      })
+      .catch(error => {
+        viewport?.dispose();
+        viewport = null;
+        setViewportState('failed');
+        console.error('Failed to load the 3D viewport:', error);
+      })
+      .finally(() => { viewportLoad = null; });
+
+    return viewportLoad;
+  }
+
+  async function ensureHubCad() {
+    if (hubCad) return;
+    if (hubCadLoad) return hubCadLoad;
+
+    hubCadLoad = import('./HubCadVisualizer')
+      .then(({ HubCadVisualizer }) => {
+        const container = document.getElementById('hub-cad-container');
+        if (!container || hubCad) return;
+        const inputs = getInputs();
+        const option = hubPreset.options[hubPreset.selectedIndex];
+        hubCad = new HubCadVisualizer(container, {
+          flangePcdLeft: inputs.flangePcdLeft,
+          flangePcdRight: inputs.flangePcdRight,
+          centerToLeft: inputs.centerToLeft,
+          centerToRight: inputs.centerToRight,
+          spokeHoleDiameter: inputs.spokeHoleDiameter,
+          flangeThickness: inputs.flangeThickness,
+          flangeThicknessLeft: inputs.flangeThicknessLeft,
+          flangeThicknessRight: inputs.flangeThicknessRight,
+          flangeOuterDiameterLeft: Number.isFinite(inputs.flangeOuterDiameterLeft) ? inputs.flangeOuterDiameterLeft : undefined,
+          flangeOuterDiameterRight: Number.isFinite(inputs.flangeOuterDiameterRight) ? inputs.flangeOuterDiameterRight : undefined,
+          hubOffset: inputs.hubOffset,
+          brand: option?.dataset.brand || '',
+          name: option?.dataset.name || '',
+          spacing: option?.dataset.spacing || '',
+        });
+      })
+      .catch(error => {
+        hubCadLoad = null;
+        console.error('Failed to load the hub visualizer:', error);
+      });
+
+    return hubCadLoad;
+  }
+
+  async function ensureRimCad() {
+    if (rimCad) return;
+    if (rimCadLoad) return rimCadLoad;
+
+    rimCadLoad = import('./RimCadVisualizer')
+      .then(({ RimCadVisualizer }) => {
+        const container = document.getElementById('rim-cad-container');
+        if (!container || rimCad) return;
+        const inputs = getInputs();
+        const option = rimPreset.options[rimPreset.selectedIndex];
+        rimCad = new RimCadVisualizer(container, {
+          erd: inputs.erd,
+          osb: inputs.osb,
+          drillingOffsetLeft: inputs.drillingOffsetLeft,
+          drillingOffsetRight: inputs.drillingOffsetRight,
+          rimWidthOuter: inputs.rimWidthOuter,
+          rimWidthInner: inputs.rimWidthInner,
+          rimDepth: inputs.rimDepth,
+          ...rimAppearance,
+          rimFlip: inputs.rimFlip,
+          brand: option?.dataset.brand || '',
+          name: option?.dataset.name || '',
+        });
+      })
+      .catch(error => {
+        rimCadLoad = null;
+        console.error('Failed to load the rim visualizer:', error);
+      });
+
+    return rimCadLoad;
+  }
+
+  async function ensureChart() {
+    if (chartInstance) return;
+    if (chartLoad) return chartLoad;
+
+    chartLoad = import('./BracingChart')
+      .then(({ createBracingChart }) => {
+        const canvas = document.getElementById('balanceChart') as HTMLCanvasElement | null;
+        if (!canvas || chartInstance) return;
+        const results = calculateWheelBuild(getInputs());
+        chartInstance = createBracingChart(
+          canvas,
+          latestChartValues ?? [results.left.bracingAngle, results.right.bracingAngle],
+        );
+      })
+      .catch(error => {
+        chartLoad = null;
+        console.error('Failed to load the bracing chart:', error);
+      });
+
+    return chartLoad;
+  }
+
+  function loadWhenNearViewport(element: Element | null, load: () => Promise<void> | null) {
+    if (!element) return;
+    if (!('IntersectionObserver' in window)) {
+      void load();
+      return;
+    }
+
+    const observer = new IntersectionObserver(entries => {
+      if (!entries.some(entry => entry.isIntersecting)) return;
+      observer.disconnect();
+      void load();
+    }, { rootMargin: '200px' });
+    observer.observe(element);
+  }
+
   // Helpers to apply preset selection to form fields
   function applyRimPreset() {
     const selectedOpt = rimPreset.options[rimPreset.selectedIndex];
@@ -1119,6 +1316,7 @@ import { hubs, defaultHub } from '../data/hubs';
     if (hubPreset.value !== 'custom' && selectedOpt) {
       customHubType = selectedOpt.dataset.hubtype ?? 'Rear';
       customHubSpacing = selectedOpt.dataset.spacing ?? '';
+      customHubDisc = (selectedOpt.dataset.disctype as typeof customHubDisc) ?? '6-Bolt';
       if (selectedOpt.hasAttribute('data-pcdl')) pcdlIn.value = selectedOpt.getAttribute('data-pcdl') || '57.0';
       if (selectedOpt.hasAttribute('data-pcdr')) pcdrIn.value = selectedOpt.getAttribute('data-pcdr') || '59.0';
       if (selectedOpt.hasAttribute('data-wl')) wlIn.value = selectedOpt.getAttribute('data-wl') || String(defaultHub.centerToLeft);
@@ -1306,53 +1504,17 @@ import { hubs, defaultHub } from '../data/hubs';
     // 4. Update Chart
     updateCharts(results.left.bracingAngle, results.right.bracingAngle);
 
-    // 5. Update URL Hash
-    updateHash(inputs);
+    // 5. Remember this tab without changing the address bar.
+    saveCurrentBuild();
   }
 
   // 4. CHARTS UPDATES
   function updateCharts(bracingL: number, bracingR: number) {
-    const ctx = (document.getElementById('balanceChart') as HTMLCanvasElement)?.getContext('2d');
-    if (!ctx) return;
+    latestChartValues = [bracingL, bracingR];
 
     if (chartInstance) {
       chartInstance.data.datasets[0].data = [bracingL, bracingR];
       chartInstance.update();
-    } else {
-      chartInstance = new Chart(ctx, {
-        type: 'bar',
-        data: {
-          labels: ['Left bracing', 'Right bracing'],
-          datasets: [{
-            label: 'Bracing Angle (deg)',
-            data: [bracingL, bracingR],
-            backgroundColor: ['rgba(59, 130, 246, 0.45)', 'rgba(239, 68, 68, 0.45)'],
-            borderColor: ['#3b82f6', '#ef4444'],
-            borderWidth: 1.5,
-            borderRadius: 6,
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: {
-            legend: { display: false },
-            tooltip: { enabled: true }
-          },
-          scales: {
-            y: {
-              grid: { color: 'rgba(255, 255, 255, 0.05)' },
-              ticks: { color: '#919299', font: { family: 'JetBrains Mono' } },
-              max: 15,
-              min: 0
-            },
-            x: {
-              grid: { display: false },
-              ticks: { color: '#bebfc4', font: { family: 'Space Grotesk', weight: 'bold' } }
-            }
-          }
-        }
-      });
     }
   }
 
@@ -1795,171 +1957,109 @@ import { hubs, defaultHub } from '../data/hubs';
     document.getElementById('lacing-viewing-side')!.textContent = event.detail;
   });
 
-  // 8. URL HASH SHARING
-  function updateHash(inputs: ReturnType<typeof getInputs>) {
-    const params = new URLSearchParams();
-    for (const [key, val] of Object.entries(inputs)) {
-      if (typeof val !== 'number' || Number.isFinite(val)) params.set(key, val.toString());
-    }
-    params.set('rp', rimPreset.value);
-    params.set('hp', hubPreset.value);
+  // 8. BUILD PERSISTENCE AND EXPLICIT SHARING
+  const sessionStorageForBuild = () => window.sessionStorage;
+  let importedFragment: string | null = null;
 
-    history.replaceState(null, '', `#${params.toString()}`);
+  function captureConfiguration(): BuildConfiguration {
+    const inputs = getInputs();
+    const measurements = Object.fromEntries(Object.entries(numericFields).map(([key, id]) => {
+      const value = numeric(document.getElementById(id) as HTMLInputElement);
+      return [key, Number.isFinite(value) ? value : null];
+    })) as Record<NumericField, number | null>;
+    return {
+      ...measurements, rp: rimPreset.value, hp: hubPreset.value,
+      rimProfile: rimAppearance.rimProfile ?? 'standard',
+      rimEyelets: rimAppearance.rimEyelets ?? false,
+      rimValveDiameter: rimAppearance.rimValveDiameter ?? 6.5,
+      rimFlip: inputs.rimFlip, interlaced,
+      isRear: inputs.isRear, spacing: inputs.spacing, discType: inputs.discType,
+    };
   }
 
-  function loadHash() {
-    const hash = window.location.hash;
-    if (!hash || hash.length < 2) return false;
+  function applyConfiguration(config: BuildConfiguration) {
+    rimPreset.value = config.rp;
+    hubPreset.value = config.hp;
+    applyRimPreset();
+    applyHubPreset();
+    for (const [key, id] of Object.entries(numericFields)) {
+      const value = config[key as NumericField];
+      (document.getElementById(id) as HTMLInputElement).value = value === null ? '' : String(value);
+    }
+    rimAppearance = { rimProfile: config.rimProfile, rimEyelets: config.rimEyelets, rimValveDiameter: config.rimValveDiameter };
+    rimflipIn.value = config.rimFlip;
+    interlaced = config.interlaced;
+    if (viewport) viewport.enableInterlacing = interlaced;
+    customHubType = config.isRear ? 'Rear' : 'Front';
+    customHubSpacing = config.spacing;
+    customHubDisc = config.discType;
+    if (config.hp === 'custom') geometryProvenance = 'User-entered geometry; approximate measurements.';
+    syncHubControls();
+    syncInterlaceControl();
+  }
 
+  function saveCurrentBuild() {
+    const saved = saveConfiguration(captureConfiguration(), sessionStorageForBuild);
+    if (saved && importedFragment !== null && window.location.hash === importedFragment) {
+      history.replaceState(history.state, '', window.location.pathname + window.location.search);
+      importedFragment = null;
+    }
+    return saved;
+  }
+
+  const shareStatus = document.getElementById('share-status')!;
+  const shareFallback = document.getElementById('share-link-fallback')!;
+  const shareValue = document.getElementById('share-link-value') as HTMLInputElement;
+  shareValue.addEventListener('click', () => shareValue.select());
+  copyUrlBtn.addEventListener('click', async () => {
+    const url = new URL(window.location.href);
+    url.hash = serializeConfiguration(captureConfiguration());
+    copyUrlBtn.disabled = true;
+    shareStatus.textContent = '';
+    shareFallback.classList.add('hidden');
     try {
-      const params = new URLSearchParams(hash.substring(1));
-      const rpVal = params.get('rp');
-      const hpVal = params.get('hp');
-      if (rpVal && Array.from(rimPreset.options).some(option => option.value === rpVal)) rimPreset.value = rpVal;
-      if (rpVal && rpVal !== 'custom') applyRimPreset();
-      // Legacy custom links have no appearance metadata: retain the old renderer.
-      if (!rpVal || rpVal === 'custom') rimAppearance = { rimProfile: 'standard', rimEyelets: false, rimValveDiameter: 6.5 };
-      else readRimAppearance();
-      if (params.has('rimProfile')) rimAppearance.rimProfile = params.get('rimProfile') === 'shallow-double-wall' ? 'shallow-double-wall' : 'standard';
-      if (params.has('rimEyelets')) rimAppearance.rimEyelets = params.get('rimEyelets') === 'true';
-      const valveDiameter = Number(params.get('rimValveDiameter'));
-      if (valveDiameter > 0 && Number.isFinite(valveDiameter)) rimAppearance.rimValveDiameter = valveDiameter;
-      if (hpVal) hubPreset.value = Array.from(hubPreset.options).some(o => o.value === hpVal) ? hpVal : 'custom';
-      applyHubPreset();
-      if (params.has('isRear')) customHubType = params.get('isRear') === 'true' ? 'Rear' : 'Front';
-      if (params.has('spacing')) customHubSpacing = params.get('spacing')!;
-      const restoredOption = hubPreset.selectedOptions[0];
-      if (hubPreset.value === 'custom') { odlIn.value = ''; odrIn.value = ''; }
-      if (params.has('interlaced')) interlaced = params.get('interlaced') !== 'false';
-      if (params.has('geometryProvenance')) geometryProvenance = params.get('geometryProvenance')!;
-
-      const mapField = (id: string, paramName: string) => {
-        const input = document.getElementById(id) as HTMLInputElement;
-        const val = params.get(paramName);
-        if (input && val !== null) input.value = val;
-      };
-
-      mapField('input-erd', 'erd');
-      mapField('input-rim-wo', 'rimWidthOuter');
-      mapField('input-rim-wi', 'rimWidthInner');
-      mapField('input-rim-dep', 'rimDepth');
-      mapField('input-osb', 'osb');
-      mapField('input-ol', 'ol');
-      mapField('input-or', 'or');
-      mapField('input-ol', 'drillingOffsetLeft');
-      mapField('input-or', 'drillingOffsetRight');
-      mapField('input-pcdl', 'flangePcdLeft');
-      mapField('input-pcdr', 'flangePcdRight');
-      mapField('input-wl', 'centerToLeft');
-      mapField('input-wr', 'centerToRight');
-      mapField('input-sh', 'spokeHoleDiameter');
-      mapField('input-ftl', 'flangeThickness');
-      mapField('input-ftr', 'flangeThickness');
-      mapField('input-ftl', 'flangeThicknessLeft');
-      mapField('input-ftr', 'flangeThicknessRight');
-      mapField('input-odl', 'flangeOuterDiameterLeft');
-      mapField('input-odr', 'flangeOuterDiameterRight');
-      mapField('input-sd', 'spokeDiameter');
-      mapField('input-ho', 'hubOffset');
-      mapField('input-count', 'spokeCount');
-      mapField('input-crossl', 'crossesLeft');
-      mapField('input-crossr', 'crossesRight');
-      mapField('input-rimflip', 'rimFlip');
-      if (rimPreset.value === defaultRim.id && [osbIn, olIn, orIn].some(field => numeric(field) !== 0)) rimPreset.value = 'custom';
-      const checks: [HTMLInputElement, string][] = [[pcdlIn,'pcdl'],[pcdrIn,'pcdr'],[wlIn,'wl'],[wrIn,'wr'],[shIn,'sh'],[ftlIn,'ftl'],[ftrIn,'ftr'],[odlIn,'odl'],[odrIn,'odr']];
-      if (restoredOption?.value !== 'custom' && (checks.some(([field,key]) => restoredOption?.dataset[key] !== undefined && numeric(field) !== Number(restoredOption.dataset[key])) || (restoredOption?.dataset.count && numeric(countIn) !== Number(restoredOption.dataset.count)))) {
-        hubPreset.value = 'custom'; geometryProvenance = 'Custom geometry restored from shared link.';
-      }
-      syncHubControls();
-      return true;
-    } catch (e) {
-      console.warn('Failed parsing share link parameters:', e);
-      return false;
+      await navigator.clipboard.writeText(url.href);
+      shareStatus.textContent = 'Build link copied.';
+    } catch {
+      shareStatus.textContent = 'Automatic copying is unavailable. Select and copy the link below.';
+      shareValue.value = url.href;
+      shareFallback.classList.remove('hidden');
+      shareValue.focus();
+      shareValue.select();
+    } finally {
+      copyUrlBtn.disabled = false;
     }
-  }
-
-  if (copyUrlBtn) {
-    copyUrlBtn.addEventListener('click', () => {
-      navigator.clipboard.writeText(window.location.href);
-
-      const originalText = copyUrlBtn.innerHTML;
-      copyUrlBtn.innerHTML = `
-        <svg class="w-3.5 h-3.5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
-          <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5" />
-        </svg>
-        Link Copied!
-      `;
-      copyUrlBtn.classList.remove('bg-cyan-950/20', 'border-cyan-500/20', 'text-cyan-400');
-      copyUrlBtn.classList.add('bg-emerald-950/20', 'border-emerald-500/50', 'text-emerald-400');
-
-      setTimeout(() => {
-        copyUrlBtn.innerHTML = originalText;
-        copyUrlBtn.classList.add('bg-cyan-950/20', 'border-cyan-500/20', 'text-cyan-400');
-        copyUrlBtn.classList.remove('bg-emerald-950/20', 'border-emerald-500/50', 'text-emerald-400');
-      }, 2000);
-    });
-  }
+  });
 
   // 9. INITIALIZATION
-  window.addEventListener('DOMContentLoaded', () => {
-    const hasHash = loadHash();
-    if (!hasHash) {
-      applyHubPreset();
-      applyRimPreset();
+  let initialized = false;
+  function restoreBuild() {
+    const restored = restoreConfiguration(window.location.hash, sessionStorageForBuild);
+    applyConfiguration(restored.config);
+    importedFragment = restored.imported ? window.location.hash : null;
+    const message = document.getElementById('build-import-error')!;
+    message.classList.toggle('hidden', !restored.error);
+    if (restored.error) {
+      message.textContent = `Could not open the shared build: ${restored.error} Your saved build or defaults have been loaded.`;
     }
-
-    const initialInputs = getInputs();
-
-    // Initialize 3D Viewport
-    const canvasContainer = document.getElementById('canvas-container');
-    if (canvasContainer) {
-      viewport = new Viewport3D(canvasContainer);
-      viewport.enableInterlacing = interlaced;
-      syncInterlaceControl();
-      viewport.setCameraPreset('isometric');
-    }
-
-    // Initialize 2D CAD Hub Visualizer
-    const hubCadContainer = document.getElementById('hub-cad-container');
-    if (hubCadContainer) {
-      const hubOpt = hubPreset.options[hubPreset.selectedIndex];
-      hubCad = new HubCadVisualizer(hubCadContainer, {
-        flangePcdLeft: initialInputs.flangePcdLeft,
-        flangePcdRight: initialInputs.flangePcdRight,
-        centerToLeft: initialInputs.centerToLeft,
-        centerToRight: initialInputs.centerToRight,
-        spokeHoleDiameter: initialInputs.spokeHoleDiameter,
-        flangeThickness: initialInputs.flangeThickness,
-        flangeThicknessLeft: initialInputs.flangeThicknessLeft, flangeThicknessRight: initialInputs.flangeThicknessRight,
-        flangeOuterDiameterLeft: Number.isFinite(initialInputs.flangeOuterDiameterLeft) ? initialInputs.flangeOuterDiameterLeft : undefined,
-        flangeOuterDiameterRight: Number.isFinite(initialInputs.flangeOuterDiameterRight) ? initialInputs.flangeOuterDiameterRight : undefined,
-        hubOffset: initialInputs.hubOffset,
-        brand: hubOpt?.getAttribute('data-brand') || '',
-        name: hubOpt?.getAttribute('data-name') || '',
-        spacing: hubOpt?.getAttribute('data-spacing') || '',
-      });
-    }
-
-    // Initialize 2D CAD Rim Visualizer
-    const rimCadContainer = document.getElementById('rim-cad-container');
-    if (rimCadContainer) {
-      const rimOpt = rimPreset.options[rimPreset.selectedIndex];
-      rimCad = new RimCadVisualizer(rimCadContainer, {
-        erd: initialInputs.erd,
-        osb: initialInputs.osb,
-        drillingOffsetLeft: initialInputs.drillingOffsetLeft,
-        drillingOffsetRight: initialInputs.drillingOffsetRight,
-        rimWidthOuter: initialInputs.rimWidthOuter,
-        rimWidthInner: initialInputs.rimWidthInner,
-        rimDepth: initialInputs.rimDepth,
-        ...rimAppearance,
-        rimFlip: initialInputs.rimFlip,
-        brand: rimOpt?.getAttribute('data-brand') || '',
-        name: rimOpt?.getAttribute('data-name') || '',
-      });
-    }
-
-    // Initial Trigger
+  }
+  window.addEventListener('hashchange', () => {
+    if (!initialized || parseConfiguration(window.location.hash).kind === 'unrelated') return;
+    restoreBuild();
     updateAll();
   });
+  function initialize() {
+    if (initialized) return;
+    initialized = true;
+    restoreBuild();
+    setViewportState('idle');
+    updateAll();
+    loadWhenNearViewport(document.getElementById('viewport-card'), ensureViewport);
+    loadWhenNearViewport(document.getElementById('balanceChart'), ensureChart);
+  }
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initialize, { once: true });
+  } else {
+    initialize();
+  }
 </script>

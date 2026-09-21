@@ -72,11 +72,19 @@ export class Viewport3D {
   private mouse = new THREE.Vector2();
   private hoveredSpoke: THREE.Mesh | null = null;
   private originalSpokeColor: THREE.Color | null = null;
+  private animationFrame = 0;
+  private resizeObserver?: ResizeObserver;
+  private readonly resizeHandler = () => this.onWindowResize();
 
   constructor(container: HTMLElement) {
     this.container = container;
-    this.init();
-    this.animate();
+    try {
+      this.init();
+      this.animate();
+    } catch (error) {
+      this.dispose();
+      throw error;
+    }
   }
 
   private init() {
@@ -87,7 +95,7 @@ export class Viewport3D {
     // 2. Camera
     this.camera = new THREE.PerspectiveCamera(
       45,
-      this.container.clientWidth / this.container.clientHeight,
+      Math.max(1, this.container.clientWidth) / Math.max(1, this.container.clientHeight),
       0.1,
       1000
     );
@@ -159,8 +167,9 @@ export class Viewport3D {
     this.scene.add(this.camera);
 
     // 6. Handle resizing
-    window.addEventListener('resize', this.onWindowResize.bind(this));
-    new ResizeObserver(() => this.onWindowResize()).observe(this.container);
+    window.addEventListener('resize', this.resizeHandler);
+    this.resizeObserver = new ResizeObserver(this.resizeHandler);
+    this.resizeObserver.observe(this.container);
 
     // 7. Raycasting events
     this.renderer.domElement.addEventListener('mousemove', this.onMouseMove.bind(this));
@@ -1313,8 +1322,19 @@ export class Viewport3D {
     materials.forEach(m => { if ('map' in m && m.map instanceof THREE.Texture) m.map.dispose(); m.dispose(); });
   }
 
+  public dispose() {
+    cancelAnimationFrame(this.animationFrame);
+    window.removeEventListener('resize', this.resizeHandler);
+    this.resizeObserver?.disconnect();
+    this.controls?.dispose();
+    if (this.scene) this.clearScene();
+    this.renderer?.dispose();
+    this.renderer?.domElement.remove();
+    this.lacingTargetMarker?.remove();
+  }
+
   private animate() {
-    requestAnimationFrame(this.animate.bind(this));
+    this.animationFrame = requestAnimationFrame(this.animate.bind(this));
     this.controls.update();
     this.updateLacingTargetMarker();
     if (this.lacingMode && this.currentInputs) {
