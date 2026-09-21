@@ -111,3 +111,5 @@ Thumbs.db
 .astro/
 dist/
 
+.wrangler/
+wrangler.jsonc
