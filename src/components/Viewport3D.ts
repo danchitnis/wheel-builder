@@ -1,5 +1,5 @@
 import { calculateSpokePaths, type SpokePath, type SpokePaths, type Point3 } from '../utils/spokePath';
-import { createLacingGuide, guideKey, guideSnapshot, initialGuideState, reconcileGuide, transitionGuide, type GuideAction, type LacingGuide, type LacingTarget } from '../utils/lacingGuide';
+import { createLacingGuide, guideDirection, guideWorldTurn, guideViewingLabel, guideKey, guideSnapshot, initialGuideState, reconcileGuide, transitionGuide, type GuideAction, type LacingGuide, type LacingTarget } from '../utils/lacingGuide';
 import { shallowRimSection } from '../utils/rimProfile';
 import * as THREE from 'three';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
@@ -47,7 +47,9 @@ export class Viewport3D {
   private guide?: LacingGuide;
   private cachedPaths?: SpokePaths;
   private lastTrackedStep = '';
-  private hasOpenedLacing = false;
+  private lastInstructionViewKey = '';
+  private lastInstructionSide?: 'Left' | 'Right';
+  private lastViewingLabel = '';
   private lacingTargets: Partial<Record<LacingTarget, { point: THREE.Vector3; label: string }>> = {};
   private highlightedLacingTarget: LacingTarget | null = null;
   private lacingTargetMarker!: HTMLDivElement;
@@ -233,6 +235,7 @@ export class Viewport3D {
 
   public setCameraPreset(preset: 'isometric' | 'lateral' | 'dish' | 'hub' | 'spoke-delta') {
     if (this.lacingMode) this.setLacingCameraTracking(false);
+    this.setCameraUp(new THREE.Vector3(0, 1, 0));
     const wasDeltaMode = this.isSpokeDeltaMode;
     if (preset === 'spoke-delta') {
       this.isSpokeDeltaMode = true;
@@ -297,13 +300,53 @@ export class Viewport3D {
 
   public setLacingMode(enabled: boolean) {
     this.lacingMode = enabled;
-    if (enabled && !this.hasOpenedLacing && this.currentInputs) {
-      this.hasOpenedLacing = true;
-      this.camera.position.set(0, 0, Math.max(420, this.currentInputs.erd * 1.5));
-      this.controls.target.set(0, 0, 0);
-      this.controls.update();
-    }
     if (this.currentInputs) this.update(this.currentInputs);
+  }
+
+  private setCameraUp(up: THREE.Vector3) {
+    if (this.camera.up.distanceToSquared(up) < 1e-12) return;
+    // OrbitControls caches the camera's up-axis at construction. Recreate it
+    // when rolling the view so dragging still follows the displayed axes.
+    const previous = this.controls;
+    const target = previous.target.clone();
+    previous.dispose();
+    this.camera.up.copy(up);
+    this.controls = new OrbitControls(this.camera, this.renderer.domElement);
+    this.controls.target.copy(target);
+    this.controls.enableDamping = previous.enableDamping;
+    this.controls.dampingFactor = previous.dampingFactor;
+    this.controls.minDistance = previous.minDistance;
+    this.controls.maxDistance = previous.maxDistance;
+    this.controls.maxPolarAngle = previous.maxPolarAngle;
+  }
+
+  /** Restore the instruction's camera framing without changing sequence or
+   * tracking state. Auto-Track uses the same framing when the step changes. */
+  public resetLacingView() {
+    if (!this.lacingMode || !this.guide?.valid || !this.currentInputs) return;
+    const snapshot = guideSnapshot(this.guideState, this.guide);
+    const spoke = this.guideState.preview ? null : snapshot.activeSpoke;
+    // Flush pending orbit/pan damping before applying the requested view.
+    const damping = this.controls.enableDamping;
+    this.controls.enableDamping = false;
+    this.controls.update();
+    const overview = !!snapshot.setup || !spoke;
+    this.setCameraUp(new THREE.Vector3(Math.cos(this.guide.valveAngle), Math.sin(this.guide.valveAngle), 0));
+    this.camera.zoom = 1;
+    if (spoke && !overview) {
+      const { hole, end } = spoke.path;
+      const midpoint = new THREE.Vector3(hole.x + end.x, hole.y + end.y, hole.z + end.z).multiplyScalar(.5);
+      this.controls.target.copy(midpoint);
+      this.camera.position.copy(midpoint).add(new THREE.Vector3(0, 0, spoke.side === 'Left' ? -240 : 240));
+    } else {
+      this.controls.target.set(0, 0, 0);
+      const side = snapshot.targetSpoke?.side ?? 'Right';
+      this.camera.position.set(0, 0, (side === 'Left' ? -1 : 1) * Math.max(420, this.currentInputs.erd * 1.5));
+    }
+    this.camera.updateProjectionMatrix();
+    this.controls.update();
+    this.controls.enableDamping = damping;
+    this.updateLacingTargetMarker();
   }
 
   /** Link hover/focus highlights without changing the step or camera. A click
@@ -1005,7 +1048,7 @@ export class Viewport3D {
           const radius = Math.hypot(p.x, p.y);
           const alignmentPoint = new THREE.Vector3(radius * Math.cos(valveAngle), radius * Math.sin(valveAngle), p.z);
           this.lacingTargets[setup.referenceTarget] = { point: referencePoint, label: setup.referenceTarget === 'setup-reference' ?
-            `${guideSpoke.side} flange — just counterclockwise of the valve line` : `${guideSpoke.side} flange — count from this already used hole` };
+            `${guideSpoke.side} flange — just ${guideDirection(guideSpoke.side, 1)} of the valve line` : `${guideSpoke.side} flange — count from this already used hole` };
           this.lacingTargets.alignment = { point: alignmentPoint, label: `Valve line across the ${guideSpoke.side.toLowerCase()} flange — between holes` };
           // A steady construction line, not a spoke: project the valve direction
           // onto the flange plane, then continue to the axle.
@@ -1019,7 +1062,7 @@ export class Viewport3D {
           referenceRing.position.copy(referencePoint); referenceRing.renderOrder = 11;
           this.lacingIndicatorGroup.add(referenceRing);
           if (setup.holeSteps > 0) {
-            const turn = setup.direction === 'clockwise' ? -1 : 1;
+            const turn = guideWorldTurn(setup.first.side, setup.direction);
             const startAngle = Math.atan2(p.y, p.x);
             const sweep = setup.holeSteps * 2 * Math.PI / setup.flangeHoles.length;
             const points = Array.from({ length: 49 }, (_, i) => {
@@ -1080,20 +1123,20 @@ export class Viewport3D {
 
       this.scene.add(this.lacingIndicatorGroup);
 
-      // Auto-tracking camera focus
+      // Each group-start diagram faces the active flange with the valve at the
+      // top. Match it once on entry, including in Fixed mode; subsequent
+      // display changes must not undo a user's camera adjustments.
+      const instructionViewKey = `${this.guide.key}:${this.lacingPlacedCount}:${this.guideState.preview}`;
+      const snapshot = guideSnapshot(this.guideState, this.guide);
+      const enteringGroup = snapshot.setup && this.lastInstructionViewKey !== instructionViewKey;
+      // Previous can cross to the end of the other flange's group, too.
+      const changingSide = !snapshot.preview && snapshot.targetSpoke && snapshot.targetSpoke.side !== this.lastInstructionSide;
+      if (!snapshot.preview) this.lastInstructionSide = snapshot.targetSpoke?.side;
+      this.lastInstructionViewKey = instructionViewKey;
       const trackingKey = `${this.guide.key}:${this.lacingPlacedCount}`;
-      if (this.lacingCameraTracking && !this.guideState.preview && this.lacingPlacedCount > 0 && lacingOrderedSpokes.length > 0 && this.lastTrackedStep !== trackingKey) {
+      if (enteringGroup || changingSide || (this.lacingCameraTracking && !this.guideState.preview && this.lacingPlacedCount > 0 && lacingOrderedSpokes.length > 0 && this.lastTrackedStep !== trackingKey)) {
         this.lastTrackedStep = trackingKey;
-        const activeIdx = Math.min(lacingOrderedSpokes.length - 1, this.lacingPlacedCount - 1);
-        const activeEntry = lacingOrderedSpokes[activeIdx];
-
-        const midPoint = new THREE.Vector3().addVectors(activeEntry.sp.P_pureHole, activeEntry.sp.P_rimBase).multiplyScalar(0.5);
-        const viewDir = new THREE.Vector3().subVectors(midPoint, new THREE.Vector3(0, 0, 0)).normalize();
-        const camPos = midPoint.clone().add(viewDir.clone().multiplyScalar(170)).add(new THREE.Vector3(0, 0, activeEntry.side === 'Left' ? -170 : 170));
-
-        this.camera.position.copy(camPos);
-        this.controls.target.copy(midPoint);
-        this.controls.update();
+        this.resetLacingView();
       }
 
     }
@@ -1274,6 +1317,15 @@ export class Viewport3D {
     requestAnimationFrame(this.animate.bind(this));
     this.controls.update();
     this.updateLacingTargetMarker();
+    if (this.lacingMode && this.currentInputs) {
+      const offset = this.camera.position.clone().sub(this.controls.target).normalize();
+      const label = Math.abs(offset.z) < .15 ? '3D view: edge-on · rotate to see a flange' :
+        `3D view from ${guideViewingLabel(this.currentInputs, offset.z < 0 ? 'Left' : 'Right')} side`;
+      if (label !== this.lastViewingLabel) {
+        this.lastViewingLabel = label;
+        window.dispatchEvent(new CustomEvent('lacing-view-change', { detail: label }));
+      }
+    }
 
     // Update screen badge position for active 3D ruler midpoint
     if (this.showMeasurement && this.showRuler && this.activeRulerMidpoint && this.container) {

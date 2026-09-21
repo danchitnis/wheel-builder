@@ -4,6 +4,8 @@ import { calculateSpokePaths } from '../src/utils/spokePath.ts';
 import { createLacingGuide, guideKey, guideSnapshot, initialGuideState, reconcileGuide, transitionGuide } from '../src/utils/lacingGuide.ts';
 import { defaultHub, hubs } from '../src/data/hubs.ts';
 import { defaultRim } from '../src/data/rims.ts';
+import { lacingSetupDiagram } from '../src/utils/lacingSetupDiagram.ts';
+import * as THREE from 'three';
 
 const inputs = (front = false) => ({ ...defaultRim, ...(front ? hubs.find(h => h.id === 'hope-pro5-front-100-6b')! : defaultHub),
   spokeCount: 32, spokeDiameter: 2, hubOffset: 0, rimFlip: 'Auto' as const, crossesLeft: 2, crossesRight: 2,
@@ -214,10 +216,10 @@ test('each flange group starts with its own diagram matching the instruction ref
       if (group >= 2) {
         assert.equal(diagram.reference, spoke.referenceFlange);
         assert.equal(diagram.referenceTarget, 'reference-flange');
-        assert.equal(diagram.direction, 'counterclockwise');
+        assert.equal(diagram.direction, spoke.side === 'Right' ? 'counterclockwise' : 'clockwise');
       } else assert.equal(diagram.referenceTarget, 'setup-reference');
       const n = i.spokeCount / 2;
-      const turn = diagram.direction === 'clockwise' ? -1 : 1;
+      const turn = (diagram.direction === 'clockwise' ? -1 : 1) * (spoke.side === 'Right' ? 1 : -1);
       assert.equal((diagram.reference.index + turn * diagram.holeSteps + n) % n, diagram.first.index);
       assert.ok(diagram.holeSteps <= n / 2);
       if (diagram.holeSteps) assert.ok(spoke.instructionSteps[0].map(p => p.text).join('').includes(diagram.direction));
@@ -226,6 +228,60 @@ test('each flange group starts with its own diagram matching the instruction ref
       assert.equal(guideSnapshot(preview, guide).setup, null);
       assert.equal(guideSnapshot(transitionGuide(preview, guide, 'return'), guide).setup, diagram);
       assert.equal(guideSnapshot(reconcileGuide(state, guide), guide).setup, diagram);
+    }
+  }
+});
+
+test('left-side instructions mirror counting directions without changing the physical connections', () => {
+  for (const front of [false, true]) for (const crossesLeft of [0, 2, 3]) for (const interlaced of [false, true]) {
+    const i = { ...inputs(front), crossesLeft, interlaced };
+    const guide = createLacingGuide(i, calculateSpokePaths(i));
+    assert.equal(guide.valid, true);
+    for (const spoke of guide.spokes) {
+      const direction = spoke.side === 'Left' ? 'clockwise' : 'counterclockwise';
+      if (spoke.referenceFlange) assert.ok(spoke.instructionSteps[0].some(p => p.text.includes(`hole ${direction}`)));
+      if (spoke.referenceRim) assert.ok(spoke.instructionSteps[1].some(p => new RegExp(`holes? ${direction}`).test(p.text)));
+      if (spoke.side === 'Left') {
+        assert.match(spoke.viewingLabel, /left · six-bolt disc/);
+        assert.equal(spoke.viewingLabel.includes('non-drive'), !front);
+      }
+    }
+    assert.match(guide.spokes[8].instruction, /first hole clockwise of the yellow valve line/);
+  }
+  assert.match(buildGuide({ discType: 'Centerlock' }).spokes[8].viewingLabel, /Centerlock disc/);
+  assert.equal(buildGuide({ isRear: false, discType: 'None' }).spokes[8].viewingLabel, 'left · front');
+});
+
+test('each diagram projects its target and counting arc from the active side with the valve at the top', () => {
+  for (const crossesLeft of [0, 2, 3]) {
+    const guide = buildGuide({ crossesLeft });
+    for (const step of guide.groupStarts) {
+      const setup = guide.spokes[step - 1].groupStart!;
+      const svg = lacingSetupDiagram(setup);
+      assert.ok(svg.includes(`viewed from the ${setup.viewingLabel} side`));
+      const camera = new THREE.OrthographicCamera(-160, 160, 140, -85, .1, 2000);
+      camera.up.set(Math.cos(setup.valveAngle), Math.sin(setup.valveAngle), 0);
+      camera.position.set(0, 0, setup.first.side === 'Left' ? -500 : 500);
+      camera.lookAt(0, 0, 0); camera.updateMatrixWorld();
+      const project = (angle: number, radius: number) => {
+        const p = new THREE.Vector3(Math.cos(angle) * radius, Math.sin(angle) * radius, 0).project(camera);
+        return { x: (p.x + 1) * 160, y: (1 - p.y) * 112.5 };
+      };
+      const valve = project(setup.valveAngle, 108);
+      assert.ok(Math.abs(valve.x - 160) < 1e-8 && Math.abs(valve.y - 32) < 1e-8);
+      const target = project(Math.atan2(setup.first.hole.y, setup.first.hole.x), 58);
+      const marker = svg.match(/<circle cx="([^"]+)" cy="([^"]+)"[^>]+data-lacing-target="flange"/)!;
+      assert.ok(Math.abs(Number(marker[1]) - target.x) < 1e-8);
+      assert.ok(Math.abs(Number(marker[2]) - target.y) < 1e-8);
+      if (setup.holeSteps) {
+        const arc = svg.match(/<polyline points="([^"]+)"/)![1].split(' ').map(pair => pair.split(',').map(Number));
+        const end = project(Math.atan2(setup.first.hole.y, setup.first.hole.x), 82);
+        assert.ok(Math.abs(arc.at(-1)![0] - end.x) < 1e-8);
+        assert.ok(Math.abs(arc.at(-1)![1] - end.y) < 1e-8);
+        const [a, b] = arc;
+        const screenTurn = (a[0] - 160) * (b[1] - 140) - (a[1] - 140) * (b[0] - 160);
+        assert.equal(screenTurn > 0, setup.direction === 'clockwise');
+      }
     }
   }
 });

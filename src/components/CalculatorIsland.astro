@@ -162,6 +162,7 @@ import { hubs, defaultHub } from '../data/hubs';
         <!-- 3D Viewport Box -->
         <div id="viewport-card" class="relative bg-titanium-900/40 border border-titanium-850 rounded-2xl h-[420px] sm:h-[480px] lg:h-[520px] overflow-hidden shadow-2xl flex flex-col transition-[background-color,border-color,box-shadow] duration-300">
         <!-- 3D Canvas Container -->
+        <p id="lacing-viewing-side" class="text-xs px-3 py-2 text-cyan-200 bg-titanium-950 shrink-0"></p>
         <div id="canvas-container" class="w-full h-full cursor-grab active:cursor-grabbing"></div>
 
         <!-- Fixed 3D Measurement HUD Panel (Top-Left) -->
@@ -212,6 +213,7 @@ import { hubs, defaultHub } from '../data/hubs';
 
         <!-- Camera Overlay controls -->
         <div id="viewport-camera-controls" class="absolute bottom-4 left-4 flex flex-wrap gap-2 z-20">
+          <button id="btn-reset-instruction-view" type="button" class="guide-button guide-primary" title="Restore the camera for this instruction without changing your step">Reset instruction view</button>
           <button data-cam="isometric" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Iso</button>
           <button data-cam="lateral" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Side (Lacing)</button>
           <button data-cam="dish" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Dish (Alignment)</button>
@@ -661,8 +663,9 @@ import { hubs, defaultHub } from '../data/hubs';
             <span id="lacing-diagram-title">Starting flange hole</span><span id="lacing-diagram-toggle-icon" aria-hidden="true">−</span>
           </button>
           <div id="lacing-diagram-content">
+            <p id="lacing-diagram-view" class="text-xs text-cyan-200 text-center px-2"></p>
             <div id="lacing-setup-diagram"></div>
-            <figcaption class="text-xs text-titanium-300 text-center">Viewed from right · valve at top<br/>Amber start → cyan target</figcaption>
+            <figcaption class="text-xs text-titanium-300 text-center">Valve at top · amber start → cyan target</figcaption>
           </div>
         </figure>
       </div>
@@ -685,7 +688,7 @@ import { hubs, defaultHub } from '../data/hubs';
         <a href="https://sheldonbrown.com/wheelbuild.html" target="_blank" rel="noopener noreferrer" class="underline text-cyan-300">Key-spoke and logo alignment reference ↗</a>
       </details>
       <p id="lacing-link-help" class="text-xs text-titanium-300">Hover or focus an underlined link to highlight that hole. Click or tap to keep it highlighted and bring the wheel into view.</p>
-      <p class="text-sm text-titanium-300">Directions are viewed from the right side; reverse them when looking from the left. “Skip one hole” means pass one hole and use the following hole.</p>
+      <p id="lacing-direction-help" class="text-sm text-titanium-300"></p>
     </section>
 
     <div id="lacing-viewport-host" class="lacing-model min-w-0"></div>
@@ -735,6 +738,8 @@ import { hubs, defaultHub } from '../data/hubs';
   .guide-target-link[data-lacing-target="setup-reference"], .guide-target-link[data-lacing-target="reference-flange"], .guide-target-link[data-lacing-target="logo"] { color: #fbbf24; }
   #lacing-setup-figure { position: absolute; top: .5rem; right: .5rem; z-index: 36; width: 240px; max-width: calc(100% - 1rem); max-height: calc(100% - 1rem); overflow: auto; background: #141418; border: 1px solid #786138; border-radius: .75rem; box-shadow: 0 6px 20px #0008; cursor: default; }
   #viewport-card:not(.is-lacing) #lacing-setup-figure { display: none; }
+  #viewport-card:not(.is-lacing) #lacing-viewing-side { display: none; }
+  #viewport-card:not(.is-lacing) #btn-reset-instruction-view { display: none; }
   #lacing-diagram-toggle { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; min-height: 44px; padding: .5rem .75rem; text-align: left; color: #fbbf24; font-size: 14px !important; }
   #lacing-diagram-content { padding: 0 .5rem .75rem; }
   #lacing-setup-diagram [data-highlighted="true"] { stroke-width: 5; filter: drop-shadow(0 0 4px currentColor); }
@@ -1684,6 +1689,11 @@ import { hubs, defaultHub } from '../data/hubs';
   window.addEventListener('keydown', event => { if (event.key === 'Escape') clearLacingHighlight(); });
 
   let lastAnnouncement = '';
+  const resetInstructionView = document.getElementById('btn-reset-instruction-view') as HTMLButtonElement;
+  resetInstructionView.addEventListener('click', () => {
+    clearLacingHighlight();
+    viewport?.resetLacingView();
+  });
   const setupFigure = document.getElementById('lacing-setup-figure')!;
   document.getElementById('canvas-container')!.append(setupFigure);
   const diagramToggle = document.getElementById('lacing-diagram-toggle')!;
@@ -1697,6 +1707,7 @@ import { hubs, defaultHub } from '../data/hubs';
   function renderLacing(detail: LacingSnapshot) {
     clearLacingHighlight();
     const { step, valid, preview, totalSpokes, targetSpoke, activeSpoke, notice } = detail;
+    resetInstructionView.disabled = !valid;
     lacingSpokeCounter.textContent = !valid ? 'Guide unavailable' : preview ? `Preview · saved step ${step} / ${totalSpokes}` : step === 0 ? `Setup · Step 0 / ${totalSpokes}` : `Step ${step} / ${totalSpokes}`;
     document.getElementById('lacing-notice')!.textContent = notice;
     document.getElementById('lacing-error')!.classList.toggle('hidden', valid);
@@ -1721,10 +1732,13 @@ import { hubs, defaultHub } from '../data/hubs';
       badge.style.borderColor = detail.currentGroup === i + 1 ? '#22d3ee' : '';
     });
     lacingSpokeTitle.textContent = !valid ? 'Geometry needs attention' : preview ? 'All spokes preview' : activeSpoke ? `Spoke ${step}: ${activeSpoke.groupName}` : 'Setup: locate the first spoke';
-    lacingSpokeSideBadge.textContent = preview ? 'Sequence position preserved' : targetSpoke?.sideLabel ?? '';
+    lacingSpokeSideBadge.textContent = preview ? 'Sequence position preserved' : targetSpoke ? `View from ${targetSpoke.viewingLabel} side` : '';
+    document.getElementById('lacing-direction-help')!.textContent = !preview && targetSpoke ?
+      `Directions use this flange’s outside view. Reset instruction view restores it with the valve at the top. “Skip one hole” means pass one hole and use the following hole.` : '';
     const setup = detail.setup;
     if (setup && targetSpoke) {
       document.getElementById('lacing-diagram-title')!.textContent = `${targetSpoke.side} flange · heads ${targetSpoke.path.headsOut ? 'out' : 'in'}`;
+      document.getElementById('lacing-diagram-view')!.textContent = `2D view from ${setup.viewingLabel} side`;
       const diagramKey = `${detail.key}:${targetSpoke.group}`;
       if (diagramKey !== lastDiagramKey) setDiagramExpanded(true);
       lastDiagramKey = diagramKey;
@@ -1740,10 +1754,10 @@ import { hubs, defaultHub } from '../data/hubs';
     intro.replaceChildren();
     if (setup) {
       if (step > 1) {
-        intro.append(`Start the ${targetSpoke!.side.toLowerCase()} flange group using the diagram in the canvas. It shows only the ${targetSpoke!.side.toLowerCase()} flange, viewed from the right with the valve at the top. Count from `,
+        intro.append(`Look from the ${setup.viewingLabel} side. Both views now face this flange with the valve at the top. Move around the wheel to this side; keep the hub aligned with the rim. Count from `,
           holeLink(setup.referenceTarget === 'reference-flange' ? 'the amber already used hole' : 'the amber hole beside the valve line', setup.referenceTarget),
-          ' to ', holeLink('the cyan target hole', 'flange'), '. Keep the hub in its current orientation.');
-      } else intro.append('Look from the right. Follow ', holeLink('the yellow line from the valve', 'alignment'),
+          ' to ', holeLink('the cyan target hole', 'flange'), '.');
+      } else intro.append(`Look from the ${setup.viewingLabel} side, with the valve at the top in both views. Follow `, holeLink('the yellow line from the valve', 'alignment'),
         ' toward the axle. It passes between flange holes; no hole needs to sit exactly on it. The ',
         holeLink('hub logo faces the valve', 'logo'), ' in the final orientation shown.');
       const adjustmentText = document.getElementById('lacing-setup-adjustment-text')!;
@@ -1777,6 +1791,9 @@ import { hubs, defaultHub } from '../data/hubs';
     }
   }
   window.addEventListener('lacing-update', event => renderLacing(event.detail));
+  window.addEventListener('lacing-view-change', event => {
+    document.getElementById('lacing-viewing-side')!.textContent = event.detail;
+  });
 
   // 8. URL HASH SHARING
   function updateHash(inputs: ReturnType<typeof getInputs>) {

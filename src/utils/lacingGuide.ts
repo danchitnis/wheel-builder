@@ -3,11 +3,26 @@ import type { SpokePath, SpokePaths } from './spokePath';
 
 export type LacingTarget = 'flange' | 'rim' | 'valve' | 'reference-flange' | 'reference-rim' | 'setup-reference' | 'alignment' | 'logo';
 export interface GuideInstructionPart { text: string; target?: LacingTarget }
+export type GuideSide = 'Left' | 'Right';
+export type GuideDirection = 'clockwise' | 'counterclockwise';
+/** World angles increase counterclockwise from the right; the left view mirrors them. */
+export const guideDirection = (side: GuideSide, turn: number): GuideDirection =>
+  turn * (side === 'Right' ? 1 : -1) > 0 ? 'counterclockwise' : 'clockwise';
+export const guideWorldTurn = (side: GuideSide, direction: GuideDirection): number =>
+  (direction === 'counterclockwise' ? 1 : -1) * (side === 'Right' ? 1 : -1);
+export function guideViewingLabel(inputs: WheelBuildInputs, side: GuideSide): string {
+  const rear = inputs.isRear !== false;
+  const disc = inputs.discType === '6-Bolt' ? 'six-bolt disc' : inputs.discType === 'Centerlock' ? 'Centerlock disc' : '';
+  const role = side === 'Right' ? (rear ? 'drive' : disc ? 'non-disc' : 'front') :
+    [disc, rear ? 'non-drive' : ''].filter(Boolean).join(' / ') || 'front';
+  return `${side.toLowerCase()} · ${role}`;
+}
 export interface GuideSetup {
   reference: SpokePath;
   flangeHoles: SpokePath[];
   holeSteps: number;
-  direction: 'clockwise' | 'counterclockwise';
+  direction: GuideDirection;
+  viewingLabel: string;
   referenceTarget: 'setup-reference' | 'reference-flange';
   valveAngle: number;
   first: SpokePath;
@@ -21,6 +36,7 @@ export interface GuideSpoke {
   groupName: string;
   side: 'Left' | 'Right';
   sideLabel: string;
+  viewingLabel: string;
   flangeHoleIndex: number;
   rimHoleIndex: number;
   headsDir: string;
@@ -103,7 +119,7 @@ export function createLacingGuide(inputs: WheelBuildInputs, paths: SpokePaths): 
       !inputs.interlaced ? `${crosses}-cross pattern, non-interlaced: do not weave the spokes.` :
       path.headsOut ? `${crosses}-cross, interlaced pattern. The opposing heads-in spokes are added in a later group.` :
       `${crosses}-cross, interlaced pattern. Follow the illustrated path, interlacing at the final crossing with the heads-out spokes on this side.`;
-    return { path, sequenceIndex: 0, group, groupName: groupNames[group - 1], side: path.side, sideLabel,
+    return { path, sequenceIndex: 0, group, groupName: groupNames[group - 1], side: path.side, sideLabel, viewingLabel: guideViewingLabel(inputs, path.side),
       flangeHoleIndex: path.index + 1, rimHoleIndex, headsDir, instructionParts: [], instructionSteps: [], pattern,
       instruction: '', length: path.traditionalLength };
   });
@@ -112,9 +128,10 @@ export function createLacingGuide(inputs: WheelBuildInputs, paths: SpokePaths): 
   const fromValve = (path: SpokePath) => (Math.atan2(path.hole.y, path.hole.x) - valveAngle + 4 * Math.PI) % (2 * Math.PI);
   const countWords = ['zero', 'one', 'two', 'three', 'four'];
   const countText = (count: number) => countWords[count] ?? String(count);
-  const skipText = (distance: number) => distance === 1 ? 'use the very next hole counterclockwise: ' :
-    `skip ${countText(distance - 1)} ${distance === 2 ? 'hole' : 'holes'} counterclockwise and use `;
+  const skipText = (distance: number, direction: GuideDirection) => distance === 1 ? `use the very next hole ${direction}: ` :
+    `skip ${countText(distance - 1)} ${distance === 2 ? 'hole' : 'holes'} ${direction} and use `;
   spokes.forEach((spoke, i) => {
+    const forward = guideDirection(spoke.side, 1);
     spoke.sequenceIndex = i;
     const earlier = spokes.slice(0, i);
     const previous = earlier.at(-1);
@@ -133,17 +150,18 @@ export function createLacingGuide(inputs: WheelBuildInputs, paths: SpokePaths): 
       const clockwise = (reference.index - spoke.path.index + n) % n;
       spoke.groupStart = { first: spoke.path, reference, flangeHoles, valveAngle,
         holeSteps: flangeReference ? flangeDistance(flangeReference) : Math.min(clockwise, n - clockwise),
-        direction: flangeReference || clockwise > n / 2 ? 'counterclockwise' : 'clockwise',
+        direction: guideDirection(spoke.side, flangeReference || clockwise > n / 2 ? 1 : -1),
+        viewingLabel: spoke.viewingLabel,
         referenceTarget: flangeReference ? 'reference-flange' : 'setup-reference',
         crossed: (spoke.side === 'Right' ? inputs.crossesRight : inputs.crossesLeft) > 0 };
     }
     const parts: GuideInstructionPart[] = [{ text: `On the ${spoke.side.toLowerCase()} flange, ` }];
     if (flangeReference) {
       parts.push({ text: 'start from ' }, { text: sameGroup ? "the previous spoke’s flange hole" : 'this already used flange hole', target: 'reference-flange' },
-        { text: `, ${skipText(flangeDistance(flangeReference))}` });
+        { text: `, ${skipText(flangeDistance(flangeReference), forward)}` });
     } else if (spoke.groupStart) {
       const setup = spoke.groupStart;
-      parts.push({ text: 'find ' }, { text: 'the first hole counterclockwise of the yellow valve line', target: 'setup-reference' });
+      parts.push({ text: 'find ' }, { text: `the first hole ${forward} of the yellow valve line`, target: 'setup-reference' });
       parts.push({ text: setup.holeSteps === 0 ? '. Use ' :
         `. From there, move ${countText(setup.holeSteps)} hole ${setup.holeSteps === 1 ? 'position' : 'positions'} ${setup.direction} (${setup.holeSteps === 1 ? 'the next hole' : `skip ${countText(setup.holeSteps - 1)} ${setup.holeSteps === 2 ? 'hole' : 'holes'}`}) to ` });
     } else parts.push({ text: 'begin with ' });
@@ -153,12 +171,12 @@ export function createLacingGuide(inputs: WheelBuildInputs, paths: SpokePaths): 
     parts.push({ text: 'At the rim, start from ' });
     if (rimReference) {
       parts.push({ text: sameGroup ? "the previous spoke’s rim hole" : 'this already used rim hole', target: 'reference-rim' },
-        { text: `, ${skipText(rimDistance(rimReference))}` });
+        { text: `, ${skipText(rimDistance(rimReference), forward)}` });
     } else {
       const pitch = 2 * Math.PI / total;
       const distance = Math.max(1, Math.ceil(angularDistance(spoke) / pitch - 1e-9));
       parts.push({ text: 'the valve hole', target: 'valve' },
-        { text: `, count ${countText(distance)} spoke ${distance === 1 ? 'hole' : 'holes'} counterclockwise and use ` });
+        { text: `, count ${countText(distance)} spoke ${distance === 1 ? 'hole' : 'holes'} ${forward} and use ` });
     }
     parts.push({ text: 'this rim hole', target: 'rim' }, { text: '. ' }, { text: spoke.pattern });
     spoke.instructionSteps = [parts.slice(0, rimStart), parts.slice(rimStart, -1), [parts.at(-1)!]];
@@ -221,4 +239,5 @@ export function guideSnapshot(state: GuideState, guide: LacingGuide) {
 export type LacingSnapshot = ReturnType<typeof guideSnapshot>;
 declare global {
   interface WindowEventMap { 'lacing-update': CustomEvent<LacingSnapshot> }
+  interface WindowEventMap { 'lacing-view-change': CustomEvent<string> }
 }
