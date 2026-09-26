@@ -1,4 +1,4 @@
-import type { WheelBuildInputs } from './physicsCalculator';
+import { calculateWheelBuild, type WheelBuildInputs } from './physicsCalculator.ts';
 import type { SpokePath, SpokePaths } from './spokePath';
 
 export type LacingTarget = 'flange' | 'rim' | 'valve' | 'reference-flange' | 'reference-rim' | 'setup-reference' | 'alignment' | 'logo';
@@ -10,6 +10,19 @@ export const guideDirection = (side: GuideSide, turn: number): GuideDirection =>
   turn * (side === 'Right' ? 1 : -1) > 0 ? 'counterclockwise' : 'clockwise';
 export const guideWorldTurn = (side: GuideSide, direction: GuideDirection): number =>
   (direction === 'counterclockwise' ? 1 : -1) * (side === 'Right' ? 1 : -1);
+/** Signed angular sweep about the axle, following the actual hub-to-rim connection. */
+export function spokeOrientation(path: SpokePath, viewSide: GuideSide = path.side) {
+  const cross = path.hole.x * path.end.y - path.hole.y * path.end.x;
+  const dot = path.hole.x * path.end.x + path.hole.y * path.end.y;
+  const angle = Math.atan2(cross, dot);
+  return { degrees: Math.abs(angle) * 180 / Math.PI,
+    direction: Math.abs(angle) < 1e-9 ? null : guideDirection(viewSide, angle) };
+}
+export function spokeOrientationText(path: SpokePath, viewingLabel: string): string {
+  const { direction, degrees } = spokeOrientation(path);
+  return `Viewed from the ${viewingLabel} side, trace this spoke from hub to rim: ${direction ?
+    `it sweeps ${direction} around the axle. In the assembled position, the lines from the axle to its flange hole and rim hole are ${Number(degrees.toFixed(2))}° apart.` : 'it runs radially, with no clockwise or counterclockwise sweep.'}`;
+}
 export function guideViewingLabel(inputs: WheelBuildInputs, side: GuideSide): string {
   const rear = inputs.isRear !== false;
   const disc = inputs.discType === '6-Bolt' ? 'six-bolt disc' : inputs.discType === 'Centerlock' ? 'Centerlock disc' : '';
@@ -24,6 +37,8 @@ export interface GuideSetup {
   direction: GuideDirection;
   viewingLabel: string;
   referenceTarget: 'setup-reference' | 'reference-flange';
+  referenceStep?: number;
+  referenceAcrossHub: boolean;
   valveAngle: number;
   first: SpokePath;
   crossed: boolean;
@@ -47,6 +62,7 @@ export interface GuideSpoke {
   referenceRim?: SpokePath;
   groupStart?: GuideSetup;
   pattern: string;
+  orientationText: string;
   length: number;
 }
 export interface LacingGuide {
@@ -97,6 +113,7 @@ export function valveAngleFor(inputs: WheelBuildInputs): number {
 
 export function createLacingGuide(inputs: WheelBuildInputs, paths: SpokePaths): LacingGuide {
   const key = guideKey(inputs), valveAngle = valveAngleFor(inputs), total = inputs.spokeCount;
+  const lengths = calculateWheelBuild(inputs);
   const errors = [...paths.errors];
   const n = total / 2;
   if (!Number.isInteger(total) || total < 8 || total > 64 || total % 4 !== 0 || paths.spokes.length !== total ||
@@ -121,7 +138,8 @@ export function createLacingGuide(inputs: WheelBuildInputs, paths: SpokePaths): 
       `${crosses}-cross, interlaced pattern. Follow the illustrated path, interlacing at the final crossing with the heads-out spokes on this side.`;
     return { path, sequenceIndex: 0, group, groupName: groupNames[group - 1], side: path.side, sideLabel, viewingLabel: guideViewingLabel(inputs, path.side),
       flangeHoleIndex: path.index + 1, rimHoleIndex, headsDir, instructionParts: [], instructionSteps: [], pattern,
-      instruction: '', length: path.traditionalLength };
+      instruction: '', orientationText: spokeOrientationText(path, guideViewingLabel(inputs, path.side)),
+      length: lengths[right ? 'right' : 'left'].calculatedSpokeLength };
   });
   const angularDistance = (s: GuideSpoke) => (Math.atan2(s.path.end.y, s.path.end.x) - valveAngle + 4 * Math.PI) % (2 * Math.PI);
   spokes.sort((a, b) => a.group - b.group || angularDistance(a) - angularDistance(b));
@@ -141,24 +159,40 @@ export function createLacingGuide(inputs: WheelBuildInputs, paths: SpokePaths): 
     const flangeDistance = (other: GuideSpoke) => (spoke.path.index - other.path.index + n) % n;
     const rimDistance = (other: GuideSpoke) => (spoke.rimHoleIndex - other.rimHoleIndex + total) % total;
     const flangeReference = sameGroup ? previous : earlier.filter(s => s.side === spoke.side).sort((a, b) => flangeDistance(a) - flangeDistance(b))[0];
-    const rimReference = sameGroup ? previous : [...earlier].sort((a, b) => rimDistance(a) - rimDistance(b))[0];
-    spoke.referenceFlange = flangeReference?.path;
+    const flangeTurn = (other: GuideSpoke) => Math.atan2(
+      other.path.hole.x * spoke.path.hole.y - other.path.hole.y * spoke.path.hole.x,
+      other.path.hole.x * spoke.path.hole.x + other.path.hole.y * spoke.path.hole.y);
+    // The loose hub can rotate after group 1. Establish the opposite flange
+    // from an installed spoke, never by finding the valve line again.
+    const acrossReference = !flangeReference ? [...earlier].filter(s => s.side !== spoke.side)
+      .sort((a, b) => Math.abs(flangeTurn(a)) - Math.abs(flangeTurn(b)))[0] : undefined;
+    const rimReference = acrossReference ?? (sameGroup ? previous : [...earlier].sort((a, b) => rimDistance(a) - rimDistance(b))[0]);
+    const rimDistanceForward = rimReference ? rimDistance(rimReference) : 0;
+    const reverseRim = !!acrossReference && rimDistanceForward > total / 2;
+    const rimSteps = reverseRim ? total - rimDistanceForward : rimDistanceForward;
+    const rimDirection = guideDirection(spoke.side, reverseRim ? -1 : 1);
+    spoke.referenceFlange = (flangeReference ?? acrossReference)?.path;
     spoke.referenceRim = rimReference?.path;
     if (!sameGroup) {
       const flangeHoles = paths.spokes.filter(p => p.side === spoke.side);
-      const reference = flangeReference?.path ?? [...flangeHoles].sort((a, b) => fromValve(a) - fromValve(b))[0];
+      const reference = (flangeReference ?? acrossReference)?.path ?? [...flangeHoles].sort((a, b) => fromValve(a) - fromValve(b))[0];
       const clockwise = (reference.index - spoke.path.index + n) % n;
       spoke.groupStart = { first: spoke.path, reference, flangeHoles, valveAngle,
-        holeSteps: flangeReference ? flangeDistance(flangeReference) : Math.min(clockwise, n - clockwise),
-        direction: guideDirection(spoke.side, flangeReference || clockwise > n / 2 ? 1 : -1),
+        holeSteps: acrossReference ? Math.abs(flangeTurn(acrossReference)) / (2 * Math.PI / n) : flangeReference ? flangeDistance(flangeReference) : Math.min(clockwise, n - clockwise),
+        direction: guideDirection(spoke.side, acrossReference ? flangeTurn(acrossReference) : flangeReference || clockwise > n / 2 ? 1 : -1),
         viewingLabel: spoke.viewingLabel,
-        referenceTarget: flangeReference ? 'reference-flange' : 'setup-reference',
+        referenceTarget: flangeReference || acrossReference ? 'reference-flange' : 'setup-reference',
+        referenceStep: (flangeReference ?? acrossReference) ? (flangeReference ?? acrossReference)!.sequenceIndex + 1 : undefined,
+        referenceAcrossHub: !!acrossReference,
         crossed: (spoke.side === 'Right' ? inputs.crossesRight : inputs.crossesLeft) > 0 };
     }
     const parts: GuideInstructionPart[] = [{ text: `On the ${spoke.side.toLowerCase()} flange, ` }];
     if (flangeReference) {
-      parts.push({ text: 'start from ' }, { text: sameGroup ? "the previous spoke’s flange hole" : 'this already used flange hole', target: 'reference-flange' },
+      parts.push({ text: 'start from ' }, { text: sameGroup ? "the previous spoke’s flange hole" : `the flange hole of the spoke installed at step ${flangeReference.sequenceIndex + 1}`, target: 'reference-flange' },
         { text: `, ${skipText(flangeDistance(flangeReference), forward)}` });
+    } else if (acrossReference) {
+      parts.push({ text: 'use ' }, { text: `the spoke installed at step ${acrossReference.sequenceIndex + 1} on the opposite ${acrossReference.side.toLowerCase()} flange`, target: 'reference-flange' },
+        { text: ` as your reference. Look parallel to the axle to compare the two flanges. Viewed from the ${spoke.viewingLabel} side, the first staggered hole ${spoke.groupStart!.direction} of that reference is ` });
     } else if (spoke.groupStart) {
       const setup = spoke.groupStart;
       parts.push({ text: 'find ' }, { text: `the first hole ${forward} of the yellow valve line`, target: 'setup-reference' });
@@ -170,8 +204,8 @@ export function createLacingGuide(inputs: WheelBuildInputs, paths: SpokePaths): 
     const rimStart = parts.length;
     parts.push({ text: 'At the rim, start from ' });
     if (rimReference) {
-      parts.push({ text: sameGroup ? "the previous spoke’s rim hole" : 'this already used rim hole', target: 'reference-rim' },
-        { text: `, ${skipText(rimDistance(rimReference), forward)}` });
+      parts.push({ text: sameGroup ? "the previous spoke’s rim hole" : `the rim hole of the spoke installed at step ${rimReference.sequenceIndex + 1}`, target: 'reference-rim' },
+        { text: `, ${skipText(rimSteps, rimDirection)}` });
     } else {
       const pitch = 2 * Math.PI / total;
       const distance = Math.max(1, Math.ceil(angularDistance(spoke) / pitch - 1e-9));
@@ -215,16 +249,26 @@ export function transitionGuide(state: GuideState, guide: LacingGuide, action: G
 export function guideSnapshot(state: GuideState, guide: LacingGuide) {
   const activeSpoke = guide.valid && state.step > 0 ? guide.spokes[state.step - 1] : null;
   const targetSpoke = activeSpoke ?? guide.spokes[0] ?? null;
-  // Match the assembly table's “Traditional + allowance” column for this exact
-  // side and head orientation, rather than the side-only traditional estimate.
+  // Use the same per-side calculation and rounding as the main calculator.
   const spokeSelection = guide.valid && !state.preview && targetSpoke ? {
-    label: `${targetSpoke.sideLabel} · heads ${targetSpoke.path.headsOut ? 'out' : 'in'}`,
+    label: targetSpoke.sideLabel,
     estimatedLength: targetSpoke.path.estimatedLength,
-    roundedLength: Math.round(targetSpoke.path.estimatedLength),
-    traditionalLength: targetSpoke.path.traditionalLength,
+    roundedLength: Math.round(targetSpoke.length),
+    traditionalLength: targetSpoke.length,
   } : null;
+  let orientationCheckpoint: string | null = null;
+  if (guide.valid && !state.preview && state.step === guide.total / 2) {
+    const firstGroups = [1, 2].map(group => guide.spokes.find(spoke => spoke.group === group)!);
+    const [right, left] = firstGroups.map(spoke => spokeOrientation(spoke.path));
+    const equalCross = right.degrees > 1e-6 && Math.abs(right.degrees - left.degrees) < 1e-6;
+    const directions = firstGroups.map(spoke =>
+      spoke.orientationText).join('\n\n');
+    orientationCheckpoint = `Before group 3, trace each installed spoke from hub to rim. View each flange from its own outside.\n\n${directions}\n\n${
+      equalCross ? 'For this equal-cross pattern, an opposite-slope hub position can fit the same calculated lengths. Length alone does not confirm orientation.\n\n' : ''
+    }Match the illustrated direction and hole connections. Logo alignment is cosmetic.`;
+  }
   return { ...state, valid: guide.valid, errors: guide.errors, totalSpokes: guide.total,
-    spokeSelection,
+    spokeSelection, orientationCheckpoint,
     setup: guide.valid && !state.preview ? (state.step === 0 ? guide.setup : activeSpoke?.groupStart ?? null) : null,
     percent: guide.valid ? Math.round(state.step / guide.total * 100) : null,
     activeSpoke, targetSpoke,

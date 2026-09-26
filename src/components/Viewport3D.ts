@@ -1042,7 +1042,7 @@ export class Viewport3D {
         this.lacingTargets.rim = { point: activeEntry.sp.P_rimBase.clone(), label: 'Rim hole — destination' };
         if (guideSpoke.referenceFlange) {
           const p = guideSpoke.referenceFlange.hole;
-          this.lacingTargets['reference-flange'] = { point: new THREE.Vector3(p.x, p.y, p.z), label: `${activeEntry.side} flange — count from here` };
+          this.lacingTargets['reference-flange'] = { point: new THREE.Vector3(p.x, p.y, p.z), label: `${guideSpoke.referenceFlange.side} flange — count from here` };
         }
         if (guideSpoke.referenceRim) {
           const p = guideSpoke.referenceRim.end;
@@ -1057,7 +1057,7 @@ export class Viewport3D {
           const radius = Math.hypot(p.x, p.y);
           const alignmentPoint = new THREE.Vector3(radius * Math.cos(valveAngle), radius * Math.sin(valveAngle), p.z);
           this.lacingTargets[setup.referenceTarget] = { point: referencePoint, label: setup.referenceTarget === 'setup-reference' ?
-            `${guideSpoke.side} flange — just ${guideDirection(guideSpoke.side, 1)} of the valve line` : `${guideSpoke.side} flange — count from this already used hole` };
+            `${guideSpoke.side} flange — just ${guideDirection(guideSpoke.side, 1)} of the valve line` : `${setup.reference.side} flange — spoke installed at step ${setup.referenceStep}${setup.referenceAcrossHub ? ' (opposite flange)' : ''}` };
           this.lacingTargets.alignment = { point: alignmentPoint, label: `Valve line across the ${guideSpoke.side.toLowerCase()} flange — between holes` };
           // A steady construction line, not a spoke: project the valve direction
           // onto the flange plane, then continue to the axle.
@@ -1076,7 +1076,9 @@ export class Viewport3D {
             const sweep = setup.holeSteps * 2 * Math.PI / setup.flangeHoles.length;
             const points = Array.from({ length: 49 }, (_, i) => {
               const angle = startAngle + turn * sweep * i / 48;
-              return new THREE.Vector3((radius + 7) * Math.cos(angle), (radius + 7) * Math.sin(angle), p.z);
+              const progress = i / 48;
+              const arcRadius = radius + (Math.hypot(setup.first.hole.x, setup.first.hole.y) - radius) * progress + 7;
+              return new THREE.Vector3(arcRadius * Math.cos(angle), arcRadius * Math.sin(angle), p.z + (setup.first.hole.z - p.z) * progress);
             });
             const arc = new THREE.Line(new THREE.BufferGeometry().setFromPoints(points), new THREE.LineBasicMaterial({ color: 0xfbbf24, depthTest: false }));
             arc.renderOrder = 11; this.lacingIndicatorGroup.add(arc);
@@ -1127,7 +1129,7 @@ export class Viewport3D {
       hLogoRingMesh.position.copy(logoCenterPos);
       this.lacingIndicatorGroup.add(hLogoRingMesh);
       if (this.guide?.valid && !this.guideState.preview && this.lacingPlacedCount <= 1) {
-        this.lacingTargets.logo = { point: logoCenterPos, label: 'Logo facing the valve — final orientation' };
+        this.lacingTargets.logo = { point: logoCenterPos, label: 'Illustrative logo position — alignment is cosmetic' };
       }
 
       this.scene.add(this.lacingIndicatorGroup);

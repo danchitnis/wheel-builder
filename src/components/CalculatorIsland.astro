@@ -666,6 +666,11 @@ import { hubs, defaultHub } from '../data/hubs';
         <span id="lacing-spoke-side-badge" class="text-sm text-cyan-300"></span>
       </div>
       <p id="lacing-spoke-length-text" class="hidden text-sm font-semibold text-cyan-300"></p>
+      <p id="lacing-spoke-orientation" class="hidden text-sm font-semibold text-emerald-300"></p>
+      <aside id="lacing-orientation-checkpoint" class="hidden rounded-xl border border-amber-400/60 bg-amber-950/30 p-3" aria-labelledby="lacing-checkpoint-title">
+        <h4 id="lacing-checkpoint-title" class="font-bold text-amber-300">Halfway: check spoke direction</h4>
+        <p id="lacing-checkpoint-text" class="mt-2 text-sm leading-relaxed whitespace-pre-line"></p>
+      </aside>
       <div id="lacing-setup-orientation" class="hidden space-y-2">
         <p id="lacing-setup-intro" class="text-sm leading-relaxed"></p>
         <figure id="lacing-setup-figure" class="hidden">
@@ -675,7 +680,7 @@ import { hubs, defaultHub } from '../data/hubs';
           <div id="lacing-diagram-content">
             <p id="lacing-diagram-view" class="text-xs text-cyan-200 text-center px-2"></p>
             <div id="lacing-setup-diagram"></div>
-            <figcaption class="text-xs text-titanium-300 text-center">Valve at top · amber start → cyan target</figcaption>
+            <figcaption class="text-xs text-titanium-300 text-center">Intended assembled position · valve at top<br />Amber arrow: count holes<br />Green arrow: trace hub → rim<br />Schematic: distances enlarged for clarity</figcaption>
           </div>
         </figure>
       </div>
@@ -694,7 +699,7 @@ import { hubs, defaultHub } from '../data/hubs';
       <details id="lacing-setup-adjustment" class="hidden text-sm leading-relaxed">
         <summary class="cursor-pointer min-h-11 flex items-center text-amber-300">How to arrange your real hub</summary>
         <p id="lacing-setup-adjustment-text"></p>
-        <p class="text-titanium-300">The logo position here is illustrative. Your hub’s logo may sit differently between its holes; a small logo offset is fine. Match the rim hole’s drilling to the correct flange. Logo alignment is cosmetic.</p>
+        <p class="text-titanium-300">The logo position here is illustrative. Your hub’s logo may sit differently between its holes. Match the rim hole’s drilling to the correct flange. Logo alignment is cosmetic; do not change spoke holes to align it.</p>
         <a href="https://sheldonbrown.com/wheelbuild.html" target="_blank" rel="noopener noreferrer" class="underline text-cyan-300">Key-spoke and logo alignment reference ↗</a>
       </details>
       <p id="lacing-link-help" class="text-xs text-titanium-300">Hover or focus an underlined link to highlight that hole. Click or tap to keep it highlighted and bring the wheel into view.</p>
@@ -1900,7 +1905,7 @@ import { hubs, defaultHub } from '../data/hubs';
     const setup = detail.setup;
     if (setup && targetSpoke) {
       document.getElementById('lacing-diagram-title')!.textContent = `${targetSpoke.side} flange · heads ${targetSpoke.path.headsOut ? 'out' : 'in'}`;
-      document.getElementById('lacing-diagram-view')!.textContent = `2D view from ${setup.viewingLabel} side`;
+      document.getElementById('lacing-diagram-view')!.textContent = `Intended assembled position · viewed from ${setup.viewingLabel} side`;
       const diagramKey = `${detail.key}:${targetSpoke.group}`;
       if (diagramKey !== lastDiagramKey) setDiagramExpanded(true);
       lastDiagramKey = diagramKey;
@@ -1915,24 +1920,32 @@ import { hubs, defaultHub } from '../data/hubs';
     const intro = document.getElementById('lacing-setup-intro')!;
     intro.replaceChildren();
     if (setup) {
-      if (step > 1) {
-        intro.append(`Look from the ${setup.viewingLabel} side. Both views now face this flange with the valve at the top. Move around the wheel to this side; keep the hub aligned with the rim. Count from `,
+      if (setup.referenceAcrossHub) {
+        intro.append(`Viewed from the ${setup.viewingLabel} side, anchor this group to `,
+          holeLink(`the spoke installed at step ${setup.referenceStep} on the opposite ${setup.reference.side.toLowerCase()} flange`, 'reference-flange'),
+          `. The dashed amber ring shows that hole projected along the axle. Use the first staggered hole ${setup.direction} on this flange. Do not choose a new starting hole from the valve or logo: the loose hub may have rotated since group 1.`);
+      } else if (step > 1) {
+        intro.append(`Both diagrams show the intended assembled hub position, viewed from the ${setup.viewingLabel} side with the valve at the top. Move around the wheel to this side; keep the hub aligned with the rim. Count from `,
           holeLink(setup.referenceTarget === 'reference-flange' ? 'the amber already used hole' : 'the amber hole beside the valve line', setup.referenceTarget),
           ' to ', holeLink('the cyan target hole', 'flange'), '.');
-      } else intro.append(`Look from the ${setup.viewingLabel} side, with the valve at the top in both views. Follow `, holeLink('the yellow line from the valve', 'alignment'),
-        ' toward the axle. It passes between flange holes; no hole needs to sit exactly on it. The ',
-        holeLink('hub logo faces the valve', 'logo'), ' in the final orientation shown.');
+      } else intro.append(`Both diagrams show the intended assembled hub position, viewed from the ${setup.viewingLabel} side with the valve at the top. Follow `, holeLink('the yellow line from the valve', 'alignment'),
+        ' toward the axle. It passes between flange holes; no hole needs to sit exactly on it. Match the highlighted connection and its hub-to-rim direction. The illustrated logo alignment is cosmetic.');
       const adjustmentText = document.getElementById('lacing-setup-adjustment-text')!;
-      adjustmentText.replaceChildren(setup.crossed ?
-        'Hold the rim still and turn the whole hub so its logo faces the valve. Use the valve line and clockwise count to choose the first flange hole. Connect the first spoke loosely to the indicated rim hole. With it still loose, gently turn the hub clockwise, viewed from the right, until that spoke takes up its slack. Check the logo again. If it is far off, move the first spoke to a neighbouring flange hole and recheck before adding more spokes.' :
-        'Hold the rim still and turn the whole hub so its logo faces the valve. Connect the highlighted flange and rim holes loosely. This side is radial: keep the spoke radial instead of twisting the hub to create a crossed pattern.');
+      adjustmentText.replaceChildren('Hold the rim with the valve at the top and view it from the named side. Attach the spoke loosely at the illustrated flange and rim holes. The diagram shows the intended assembled position; a partly laced hub can rotate while the spokes are loose. Later groups must use the installed-spoke references, rather than selecting new starting holes from the valve or logo. ',
+        targetSpoke?.orientationText ?? '', setup.crossed ? ' Check both the direction and angular separation when comparing the wheel with the assembled view.' : ' Keep this connection radial.');
     }
     lacingFlangeHoleText.replaceChildren(!preview && targetSpoke ? holeLink(`${targetSpoke.side} flange hole`, 'flange') : '—');
     lacingHeadsDirText.textContent = !preview ? targetSpoke?.headsDir ?? '' : '';
     lacingRimHoleText.replaceChildren(!preview && targetSpoke ? holeLink('Rim hole for this spoke', 'rim') : '—');
     const selection = detail.spokeSelection;
+    const orientation = !preview && valid && targetSpoke ? targetSpoke.orientationText : '';
+    const orientationText = document.getElementById('lacing-spoke-orientation')!;
+    orientationText.textContent = orientation;
+    orientationText.classList.toggle('hidden', !orientation);
+    document.getElementById('lacing-orientation-checkpoint')!.classList.toggle('hidden', !detail.orientationCheckpoint);
+    document.getElementById('lacing-checkpoint-text')!.textContent = detail.orientationCheckpoint ?? '';
     lacingSpokeLengthText.classList.toggle('hidden', !selection);
-    lacingSpokeLengthText.textContent = selection ? `Spoke length: ${selection.roundedLength} mm` : '';
+    lacingSpokeLengthText.textContent = selection ? `${selection.label} — Spoke length: ${selection.roundedLength} mm` : '';
     lacingRuleTipText.replaceChildren();
     document.getElementById('lacing-link-help')!.classList.toggle('hidden', !valid || preview);
     if (!valid || preview || !targetSpoke) {
@@ -1946,7 +1959,7 @@ import { hubs, defaultHub } from '../data/hubs';
         lacingRuleTipText.append(item);
       }
     }
-    const announcement = `${lacingSpokeCounter.textContent}. ${lacingSpokeTitle.textContent}. ${!preview && targetSpoke ? `${targetSpoke.sideLabel}, ${targetSpoke.headsDir}. ${selection ? `Spoke length ${selection.roundedLength} millimetres. ` : ''}Use the instruction links to locate the holes.` : ''} ${notice}`;
+    const announcement = `${lacingSpokeCounter.textContent}. ${lacingSpokeTitle.textContent}. ${!preview && targetSpoke ? `${targetSpoke.sideLabel}, ${targetSpoke.headsDir}. ${selection ? `Spoke length ${selection.roundedLength} millimetres. ` : ''}${orientation} Use the instruction links to locate the holes.` : ''} ${detail.orientationCheckpoint ?? ''} ${notice}`;
     if (announcement !== lastAnnouncement) {
       document.getElementById('lacing-announcement')!.textContent = announcement;
       lastAnnouncement = announcement;

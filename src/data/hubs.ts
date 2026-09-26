@@ -175,7 +175,7 @@ export const hubs: Hub[] = [
     flangePcdLeft: 43.0,
     flangePcdRight: 43.0,
     centerToLeft: 27.0,
-    centerToRight: 35.6,
+    centerToRight: 35.0,
     spokeHoleDiameter: 2.6,
     flangeThickness: 3.0,
     category: 'MTB',
