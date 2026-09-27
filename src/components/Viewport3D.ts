@@ -53,7 +53,7 @@ export class Viewport3D {
   private lacingTargets: Partial<Record<LacingTarget, { point: THREE.Vector3; label: string }>> = {};
   private highlightedLacingTarget: LacingTarget | null = null;
   private lacingTargetMarker!: HTMLDivElement;
-  public get lacingPlacedCount() { return this.guideState.step; }
+  public get lacingPlacedCount() { return this.guideState.step * 2; }
   public get lacingCameraTracking() { return this.guideState.cameraTracking; }
   private lacingIndicatorGroup: THREE.Group = new THREE.Group();
 
@@ -106,6 +106,8 @@ export class Viewport3D {
     this.renderer.setSize(this.container.clientWidth, this.container.clientHeight);
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
     this.renderer.shadowMap.enabled = true;
+    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+    this.renderer.toneMappingExposure = 1.15;
     // Constrain canvas so it never forces the flex/grid container wider than its
     // available space. Without this, a full-page-sized canvas keeps the container
     // (and the whole layout) stuck at that width when exiting full-page mode,
@@ -133,7 +135,7 @@ export class Viewport3D {
     this.controls.maxDistance = 800;
 
     // 5. Lights
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.4);
+    const ambientLight = new THREE.HemisphereLight(0xffffff, 0xa8b4c4, 1.2);
     this.scene.add(ambientLight);
 
     // Standard Studio Fixed Lights (Main Wheel Assembly Tab)
@@ -145,23 +147,18 @@ export class Viewport3D {
     dirLight2.position.set(-200, -100, -300);
     this.studioLightGroup.add(dirLight2);
 
-    const pointLight = new THREE.PointLight(0xffffff, 0.6, 300);
-    pointLight.position.set(0, 0, 50);
-    this.studioLightGroup.add(pointLight);
-
     this.scene.add(this.studioLightGroup);
 
-    // Head Torch Light (ONLY active in Interactive Lacing Tab - follows user's camera view)
-    const headTorch = new THREE.PointLight(0xfff8e7, 1.3, 1200);
-    headTorch.position.set(0, 0, 10);
-    this.headTorchGroup.add(headTorch);
-
-    const torchDir = new THREE.DirectionalLight(0xffffff, 0.7);
-    torchDir.position.set(20, 40, 30);
-    this.headTorchGroup.add(torchDir);
-
-    this.headTorchGroup.add(new THREE.AmbientLight(0xffffff, 0.9));
-    this.headTorchGroup.visible = false; // Initially OFF for main tab
+    // Camera-relative soft key/fill: directional lights retain their brightness
+    // at millimetre-scale zoom distances. Targets must share the camera frame.
+    for (const [x,y,z,intensity,color] of [
+      [-80,100,60,2.4,0xffffff], [90,-35,40,1.3,0xdbeaff],
+    ]) {
+      const light = new THREE.DirectionalLight(color,intensity);
+      light.position.set(x,y,z);
+      light.target.position.set(0,0,-150);
+      this.headTorchGroup.add(light,light.target);
+    }
     this.camera.add(this.headTorchGroup);
 
     this.scene.add(this.camera);
@@ -343,8 +340,8 @@ export class Viewport3D {
     this.setCameraUp(new THREE.Vector3(Math.cos(this.guide.valveAngle), Math.sin(this.guide.valveAngle), 0));
     this.camera.zoom = 1;
     if (spoke && !overview) {
-      const { hole, end } = spoke.path;
-      const midpoint = new THREE.Vector3(hole.x + end.x, hole.y + end.y, hole.z + end.z).multiplyScalar(.5);
+      const points = snapshot.targetPair ? [snapshot.targetPair.a.path.hole,snapshot.targetPair.a.path.end,snapshot.targetPair.b.path.hole,snapshot.targetPair.b.path.end] : [spoke.path.hole,spoke.path.end];
+      const midpoint = points.reduce<THREE.Vector3>((sum,p) => sum.add(new THREE.Vector3(p.x,p.y,p.z)), new THREE.Vector3()).multiplyScalar(1/points.length);
       this.controls.target.copy(midpoint);
       this.camera.position.copy(midpoint).add(new THREE.Vector3(0, 0, spoke.side === 'Left' ? -240 : 240));
     } else {
@@ -392,7 +389,7 @@ export class Viewport3D {
     this.lacingTargetMarker.style.top = `${y}px`;
     this.lacingTargetMarker.dataset.target = target;
     this.lacingTargetMarker.dataset.offscreen = String(outside);
-    this.lacingTargetMarker.style.setProperty('--target-color', target === 'setup-reference' || target === 'reference-flange' || target === 'logo' ? '#fbbf24' :
+    this.lacingTargetMarker.style.setProperty('--target-color', target.includes('crossing-') || target.includes('reference') || target === 'logo' ? '#fbbf24' :
       target === 'valve' || target === 'alignment' ? '#fde047' : target.includes('flange') ? '#67e8f9' : '#6ee7b7');
     const label = this.lacingTargetMarker.querySelector<HTMLElement>('.lacing-target-label')!;
     label.textContent = outside ? `${entry.label} — click the link to locate` : entry.label;
@@ -430,16 +427,9 @@ export class Viewport3D {
     this.clearScene();
     this.spokeMeshes = [];
 
-    // Toggle lighting mode based on active tab
-    if (this.lacingMode) {
-      // Interactive Lacing Tab: Head Torch mounted to camera view
-      this.headTorchGroup.visible = true;
-      this.studioLightGroup.visible = false;
-    } else {
-      // Main Wheel Assembly Tab: Fixed studio lighting
-      this.headTorchGroup.visible = false;
-      this.studioLightGroup.visible = true;
-    }
+    // Keep both flange faces readable while orbiting in either tab.
+    this.headTorchGroup.visible = true;
+    this.studioLightGroup.visible = true;
 
     const {
       erd,
@@ -472,15 +462,15 @@ export class Viewport3D {
     });
 
     const hubMat = new THREE.MeshStandardMaterial({
-      color: 0xdd8800, // Anodized gold/orange accents
-      roughness: 0.2,
-      metalness: 0.9,
+      color: 0x526b86, // Neutral slate contrasts with amber target rings and cyan/green heads.
+      roughness: 0.48,
+      metalness: 0.35,
     });
 
     const freehubMat = new THREE.MeshStandardMaterial({
-      color: 0x777780, // Silver chrome
-      roughness: 0.3,
-      metalness: 0.8,
+      color: 0xa6afbb, // Satin silver
+      roughness: 0.45,
+      metalness: 0.4,
     });
 
     const nippleMat = new THREE.MeshStandardMaterial({
@@ -928,20 +918,20 @@ export class Viewport3D {
       this.scene.add(spokeHoleGroup);
 
       // Evaluate whether this spoke should be rendered
-      const isPlaced = !this.lacingMode || this.guideState.preview || (m < this.lacingPlacedCount);
+      const isPlaced = !this.lacingMode || this.guideState.preview || (m < Math.max(2, this.lacingPlacedCount));
       if (!isPlaced || (!this.lacingMode && !entry.visible)) return; // Unplaced spokes are COMPLETELY hidden (not rendered)
 
-      const isActiveSpoke = this.lacingMode && !this.guideState.preview && (m === this.lacingPlacedCount - 1);
+      const isActiveSpoke = this.lacingMode && !this.guideState.preview && (m >= Math.max(0, this.lacingPlacedCount - 2));
 
       let spokeMaterial: THREE.MeshStandardMaterial;
 
       if (isActiveSpoke) {
-        // High-contrast glowing Gold for newly placed active spoke
+        // Active spoke matches the route diagram; these are intended positions.
         spokeMaterial = new THREE.MeshStandardMaterial({
-          color: 0xffd700,
-          roughness: 0.1,
-          metalness: 0.9,
-          emissive: 0xff8800,
+          color: m % 2 ? 0x6ee7b7 : 0x67e8f9,
+          roughness: 0.35,
+          metalness: 0.4,
+          emissive: 0x166878,
           emissiveIntensity: 0.5,
         });
       } else if (this.isSpokeDeltaMode && !this.lacingMode) {
@@ -967,10 +957,18 @@ export class Viewport3D {
         });
       }
 
+      // Colour only the manufactured head/elbow by insertion orientation.
+      // Normal depth testing preserves which face actually occludes the head.
+      const headColor = sp.isHeadsOut ? 0x36c9f0 : 0x42df91;
+      const headMaterial = new THREE.MeshStandardMaterial({
+        color: headColor, roughness: .42, metalness: .2,
+        emissive: headColor, emissiveIntensity: .12,
+        transparent: spokeMaterial.transparent, opacity: spokeMaterial.opacity,
+      });
       // 1. Spoke Head Cap
       const headGeom = new THREE.CylinderGeometry(spokeRad * 1.8, spokeRad * 1.8, 0.8, 12);
       headGeom.rotateX(Math.PI / 2);
-      const headMesh = new THREE.Mesh(headGeom, spokeMaterial);
+      const headMesh = new THREE.Mesh(headGeom, headMaterial);
       headMesh.position.copy(sp.P_head);
       this.scene.add(headMesh);
 
@@ -983,7 +981,7 @@ export class Viewport3D {
       const spokeMesh = new THREE.Mesh(spokeTubeGeom, spokeMaterial);
       // Decorative manufactured elbow is separate and excluded from shaft length.
       const neck = new THREE.QuadraticBezierCurve3(sp.P_head, new THREE.Vector3(sp.P_head.x, sp.P_head.y, sp.P_holeExit.z), sp.P_holeExit);
-      this.scene.add(new THREE.Mesh(new THREE.TubeGeometry(neck, 12, spokeRad, 8, false), spokeMaterial));
+      this.scene.add(new THREE.Mesh(new THREE.TubeGeometry(neck, 12, spokeRad, 8, false), headMaterial));
       const finalSpan = new THREE.Vector3().subVectors(shaftPoints[shaftPoints.length-1], shaftPoints[shaftPoints.length-2]).normalize();
       const exitBendAngleDeg = Math.acos(Math.min(1, Math.abs(finalSpan.z))) * 180 / Math.PI;
       for (const point of [...sp.model.flangeContacts, ...(sp.model.crossingContact ? [sp.model.crossingContact] : [])]) {
@@ -1035,7 +1033,7 @@ export class Viewport3D {
 
     if (this.lacingMode) {
       if (!this.guideState.preview && lacingOrderedSpokes.length > 0) {
-        const activeIdx = Math.max(0, Math.min(lacingOrderedSpokes.length - 1, this.lacingPlacedCount - 1));
+        const activeIdx = Math.max(0, Math.min(lacingOrderedSpokes.length - 1, this.lacingPlacedCount - 2));
         const activeEntry = lacingOrderedSpokes[activeIdx];
         const guideSpoke = this.guide.spokes[activeIdx];
         this.lacingTargets.flange = { point: activeEntry.sp.P_pureHole.clone(), label: `${activeEntry.side} flange hole — destination` };
@@ -1057,7 +1055,7 @@ export class Viewport3D {
           const radius = Math.hypot(p.x, p.y);
           const alignmentPoint = new THREE.Vector3(radius * Math.cos(valveAngle), radius * Math.sin(valveAngle), p.z);
           this.lacingTargets[setup.referenceTarget] = { point: referencePoint, label: setup.referenceTarget === 'setup-reference' ?
-            `${guideSpoke.side} flange — just ${guideDirection(guideSpoke.side, 1)} of the valve line` : `${setup.reference.side} flange — spoke installed at step ${setup.referenceStep}${setup.referenceAcrossHub ? ' (opposite flange)' : ''}` };
+            `${guideSpoke.side} flange — just ${guideDirection(guideSpoke.side, 1)} of the valve line` : `${setup.reference.side} flange — installed spoke ${setup.referenceStep}${setup.referenceAcrossHub ? ' (opposite flange)' : ''}` };
           this.lacingTargets.alignment = { point: alignmentPoint, label: `Valve line across the ${guideSpoke.side.toLowerCase()} flange — between holes` };
           // A steady construction line, not a spoke: project the valve direction
           // onto the flange plane, then continue to the axle.
@@ -1088,21 +1086,33 @@ export class Viewport3D {
           }
         }
 
-        // 1. Target Flange Hole Ring (Neon Cyan)
-        const fRingGeom = new THREE.TorusGeometry(spokeHoleDiameter * 0.9, 0.6, 12, 24);
-        const fRingMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
-        const fRingMesh = new THREE.Mesh(fRingGeom, fRingMat);
-        fRingMesh.position.copy(activeEntry.sp.P_pureHole);
-        this.lacingIndicatorGroup.add(fRingMesh);
+        const ring = (point: THREE.Vector3, color: number, radius = 3.5) => {
+          const mesh = new THREE.Mesh(new THREE.TorusGeometry(radius, .6, 8, 24), new THREE.MeshBasicMaterial({color, depthTest: false}));
+          mesh.position.copy(point); mesh.renderOrder = 12; this.lacingIndicatorGroup.add(mesh);
+        };
+        for (const [target, p] of [['flange',guideSpoke.path.hole],['rim',guideSpoke.path.end],
+          ['reference-flange',guideSpoke.referenceFlange?.hole],['reference-rim',guideSpoke.referenceRim?.end]] as const) {
+          if (!p) continue;
+          ring(new THREE.Vector3(p.x,p.y,p.z), target.includes('reference') ? 0xfbbf24 : 0x67e8f9);
+        }
+        const partner = this.guide.spokes[activeIdx+1];
+        for (const [target,p] of [['b-flange',partner.path.hole],['b-rim',partner.path.end],
+          ['b-reference-flange',partner.referenceFlange?.hole],['b-reference-rim',partner.referenceRim?.end]] as const) {
+          if (!p) continue;
+          this.lacingTargets[target]={point:new THREE.Vector3(p.x,p.y,p.z),label:`B — ${target.replace('b-','')}`};
+          ring(new THREE.Vector3(p.x,p.y,p.z),target.includes('reference')?0xfbbf24:0x6ee7b7);
+        }
+        for (const [i,spoke] of [guideSpoke,partner].entries()) for (const crossing of spoke.crossings) {
+          const p=crossing.point, target=(i?`b-${crossing.target}`:crossing.target) as LacingTarget;
+          this.lacingTargets[target]={point:new THREE.Vector3(p.x,p.y,p.z),label:`${i?'B':'A'}: ${crossing.description}`};
+          ring(new THREE.Vector3(p.x,p.y,p.z),0xfbbf24,4.5);
+          if (crossing.other===guideSpoke || crossing.other===partner) continue;
+          const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(crossing.other.path.points.map(p=>new THREE.Vector3(p.x,p.y,p.z))),
+            new THREE.LineBasicMaterial({color:0xfbbf24,depthTest:false,transparent:true,opacity:.65}));
+          line.renderOrder=9; this.lacingIndicatorGroup.add(line);
+        }
 
-        // 2. Target Rim Hole Ring (Emerald Green)
-        const rRingGeom = new THREE.TorusGeometry(3.6, 0.7, 12, 24);
-        const rRingMat = new THREE.MeshBasicMaterial({ color: 0x10b981 });
-        const rRingMesh = new THREE.Mesh(rRingGeom, rRingMat);
-        const rRadDir = new THREE.Vector3(Math.cos(activeEntry.sp.rimHoleAngle), Math.sin(activeEntry.sp.rimHoleAngle), 0).normalize();
-        rRingMesh.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), rRadDir);
-        rRingMesh.position.copy(activeEntry.sp.P_rimBase);
-        this.lacingIndicatorGroup.add(rRingMesh);
+
       }
 
       // 3. Valve Hole Reference Marker (Glowing Yellow Pointer)

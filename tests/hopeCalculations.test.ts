@@ -75,7 +75,7 @@ test('primary Hope front and rear presets retain verified two-cross lengths thro
     const guide = createLacingGuide(input, calculateSpokePaths(input));
     assert.equal(guide.valid, true);
     const state = reconcileGuide(initialGuideState(), guide);
-    for (let step = 0; step <= guide.total; step++) {
+    for (let step = 0; step <= guide.pairs.length; step++) {
       const snapshot = guideSnapshot({ ...state, step }, guide);
       const side = snapshot.targetSpoke!.side === 'Left' ? 0 : 1;
       assert.equal(snapshot.spokeSelection!.roundedLength, reference.rounded[side]);

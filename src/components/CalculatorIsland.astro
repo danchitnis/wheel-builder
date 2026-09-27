@@ -223,6 +223,7 @@ import { hubs, defaultHub } from '../data/hubs';
 
         <!-- Camera Overlay controls -->
         <div id="viewport-camera-controls" class="absolute bottom-4 left-4 flex flex-wrap gap-2 z-20">
+          <p class="w-full text-xs rounded-lg bg-titanium-950/90 px-2 py-1" aria-label="Spoke head and elbow colours: cyan means heads-out, green means heads-in. Outside is away from the wheel centre."><span class="text-cyan-300">Cyan: heads-out</span> · <span class="text-emerald-300">Green: heads-in</span> <span class="text-titanium-300">(head / elbow)</span></p>
           <button id="btn-reset-instruction-view" type="button" class="guide-button guide-primary" title="Restore the camera for this instruction without changing your step">Reset instruction view</button>
           <button data-cam="isometric" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Iso</button>
           <button data-cam="lateral" class="cam-btn px-2.5 py-1.5 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 text-[11px] font-bold text-titanium-300 rounded-lg hover:text-titanium-100 hover:border-titanium-700 transition-all">Side (Lacing)</button>
@@ -250,7 +251,7 @@ import { hubs, defaultHub } from '../data/hubs';
           <div class="flex flex-wrap gap-1 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 p-1 rounded-xl">
             <button id="toggle-l-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">NDS (L)</button>
             <button id="toggle-r-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">DS (R)</button>
-            <button id="toggle-interlace" aria-pressed="false" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-titanium-950 text-titanium-500 border border-cyan-500/20 hover:border-cyan-500/50 transition-all" title="Toggle 3D Spoke Over/Under Interlacing Weave">Non-interlaced</button>
+            <button id="toggle-interlace" aria-pressed="false" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-titanium-950 text-titanium-500 border border-cyan-500/20 hover:border-cyan-500/50 transition-all" title="Interlace at the outermost crossing on both crossed sides; radial sides have no weave">Non-interlaced · both sides</button>
             <button id="toggle-ruler" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-yellow-950/40 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/60 transition-all" title="Toggle Direct 3D Straight Measurement Vector Ruler">📏 Ruler</button>
             <select id="select-colormode" aria-label="Spoke colour mode" class="bg-titanium-950 border border-titanium-800 rounded-lg text-[10px] font-bold px-1 py-1 text-titanium-200 cursor-pointer focus:outline-none">
               <option value="classic">Titanium Steel</option>
@@ -301,7 +302,7 @@ import { hubs, defaultHub } from '../data/hubs';
                 <tbody id="path-results" class="mono-data text-titanium-100"></tbody>
               </table>
             </div>
-            <p class="text-xs text-titanium-400">The bend allowance compares the shaft path with its own straight chord, excluding the manufactured J-bend. These are geometric estimates, not validated purchase lengths. Final stock length depends on measured ERD and nipple engagement.</p>
+            <p class="text-xs text-titanium-400">The bend allowance compares the shaft path with its own straight chord, excluding the manufactured J-bend. Head and elbow seating against the flange are not simulated. These are geometric estimates, not validated purchase lengths. Final stock length depends on measured ERD and nipple engagement.</p>
             <p id="path-errors" role="status" class="text-xs text-amber-300"></p>
 
             <!-- Invalid effective flange distance warning banner -->
@@ -647,7 +648,9 @@ import { hubs, defaultHub } from '../data/hubs';
         <h2 class="font-bold text-lg">Lacing sequence</h2>
         <span id="lacing-spoke-counter" class="font-mono text-cyan-300">Setup · Step 0 / 32</span>
       </div>
-      <p class="text-xs text-titanium-300">Sequence preview · not an installation checklist.</p>
+      <p class="text-xs text-titanium-300">Intended spoke positions · not simulated insertion movements.</p>
+      <p id="lacing-pattern-status" class="text-sm text-cyan-300"></p>
+      <button id="btn-lacing-use-noninterlacing" class="guide-button hidden">Use non-interlaced routing on both sides</button>
       <p id="lacing-notice" class="text-sm text-amber-300" role="status"></p>
       <div id="lacing-error" class="hidden rounded-xl border border-red-400/50 bg-red-950/30 p-3" role="alert">
         <p id="lacing-error-text"></p>
@@ -668,7 +671,7 @@ import { hubs, defaultHub } from '../data/hubs';
       <p id="lacing-spoke-length-text" class="hidden text-sm font-semibold text-cyan-300"></p>
       <p id="lacing-spoke-orientation" class="hidden text-sm font-semibold text-emerald-300"></p>
       <aside id="lacing-orientation-checkpoint" class="hidden rounded-xl border border-amber-400/60 bg-amber-950/30 p-3" aria-labelledby="lacing-checkpoint-title">
-        <h4 id="lacing-checkpoint-title" class="font-bold text-amber-300">Halfway: check spoke direction</h4>
+        <h4 id="lacing-checkpoint-title" class="font-bold text-amber-300">Right flange routing check</h4>
         <p id="lacing-checkpoint-text" class="mt-2 text-sm leading-relaxed whitespace-pre-line"></p>
       </aside>
       <div id="lacing-setup-orientation" class="hidden space-y-2">
@@ -680,18 +683,18 @@ import { hubs, defaultHub } from '../data/hubs';
           <div id="lacing-diagram-content">
             <p id="lacing-diagram-view" class="text-xs text-cyan-200 text-center px-2"></p>
             <div id="lacing-setup-diagram"></div>
-            <figcaption class="text-xs text-titanium-300 text-center">Intended assembled position · valve at top<br />Amber arrow: count holes<br />Green arrow: trace hub → rim<br />Schematic: distances enlarged for clarity</figcaption>
+            <figcaption id="lacing-diagram-caption" class="text-xs text-titanium-300 text-center">Intended positions · valve at top<br />Active spoke: cyan · installed references: amber<br />Crossing bridge: spoke toward flange outside<br />Amber counting arrows only in the flange inset</figcaption>
           </div>
         </figure>
       </div>
       <div id="lacing-target-summary" class="grid grid-cols-2 gap-3">
         <div class="rounded-xl border border-cyan-500/40 p-3">
-          <p class="text-xs text-cyan-300">Hub flange target</p>
+          <p class="text-xs text-cyan-300">Spoke A · heads-out</p>
           <p id="lacing-flange-hole-text" class="font-bold"></p>
           <p id="lacing-heads-dir-text" class="text-sm text-titanium-300"></p>
         </div>
         <div class="rounded-xl border border-emerald-500/40 p-3">
-          <p class="text-xs text-emerald-300">Rim target</p>
+          <p class="text-xs text-emerald-300">Spoke B · heads-in</p>
           <p id="lacing-rim-hole-text" class="font-bold"></p>
         </div>
       </div>
@@ -709,7 +712,7 @@ import { hubs, defaultHub } from '../data/hubs';
     <div id="lacing-viewport-host" class="lacing-model min-w-0"></div>
 
     <details class="lacing-details guide-card">
-      <summary class="cursor-pointer font-semibold">Groups and camera settings</summary>
+      <summary class="cursor-pointer font-semibold">Sides and camera settings</summary>
       <div class="grid grid-cols-2 gap-3 mt-3">
         {[1, 2, 3, 4].map(g => (
           <div id={`badge-group-${g}`} class="rounded-xl border border-titanium-700 p-3">
@@ -719,8 +722,8 @@ import { hubs, defaultHub } from '../data/hubs';
         ))}
       </div>
       <div class="grid grid-cols-2 gap-2 mt-3">
-        <button id="btn-prev-group" class="guide-button">Previous group</button>
-        <button id="btn-next-group" class="guide-button">Next group</button>
+        <button id="btn-prev-group" class="guide-button">Previous side</button>
+        <button id="btn-next-group" class="guide-button">Next side</button>
       </div>
       <div class="flex flex-wrap gap-2 mt-3" role="group" aria-label="Lacing camera mode">
         <button id="btn-cam-fixed" class="guide-button" aria-pressed="true">Fixed camera</button>
@@ -734,8 +737,8 @@ import { hubs, defaultHub } from '../data/hubs';
 
     <nav class="lacing-navigation guide-card" aria-label="Lacing steps">
       <div id="lacing-step-controls" class="grid grid-cols-2 gap-3">
-        <button id="btn-prev-spoke" class="guide-button">Previous step</button>
-        <button id="btn-next-spoke" class="guide-button guide-primary">Next spoke</button>
+        <button id="btn-prev-spoke" class="guide-button">Previous pair</button>
+        <button id="btn-next-spoke" class="guide-button guide-primary">Next pair</button>
       </div>
       <button id="btn-lacing-return" class="guide-button guide-primary hidden w-full">Return to Step</button>
     </nav>
@@ -804,8 +807,8 @@ import { hubs, defaultHub } from '../data/hubs';
 </style>
 
 <script>
-  import type { LacingSnapshot, LacingTarget } from '../utils/lacingGuide';
-  import { lacingSetupDiagram } from '../utils/lacingSetupDiagram';
+  import { type LacingSnapshot, type LacingTarget } from '../utils/lacingGuide';
+  import { lacingSetupDiagram, lacingSpokeDiagram } from '../utils/lacingSetupDiagram';
   import { calculateSpokePaths } from '../utils/spokePath';
   import { defaultHub } from '../data/hubs';
   import { calculateWheelBuild } from '../utils/physicsCalculator';
@@ -1601,9 +1604,17 @@ import { hubs, defaultHub } from '../data/hubs';
     toggleInterlace.classList.toggle('text-cyan-400', interlaced);
     toggleInterlace.classList.toggle('bg-titanium-950', !interlaced);
     toggleInterlace.classList.toggle('text-titanium-500', !interlaced);
-    toggleInterlace.textContent = interlaced ? 'Interlaced' : 'Non-interlaced';
+    toggleInterlace.textContent = interlaced ? 'Interlaced · both sides' : 'Non-interlaced · both sides';
     toggleInterlace.setAttribute('aria-pressed', String(interlaced));
   }
+
+  document.getElementById('btn-lacing-use-noninterlacing')!.addEventListener('click', () => {
+    if (!viewport) return;
+    interlaced = false;
+    viewport.enableInterlacing = interlaced;
+    syncInterlaceControl();
+    updateAll();
+  });
 
   if (toggleInterlace) {
     toggleInterlace.addEventListener('click', () => {
@@ -1873,9 +1884,13 @@ import { hubs, defaultHub } from '../data/hubs';
   diagramToggle.addEventListener('click', () => setDiagramExpanded(diagramToggle.getAttribute('aria-expanded') !== 'true'));
   function renderLacing(detail: LacingSnapshot) {
     clearLacingHighlight();
-    const { step, valid, preview, totalSpokes, targetSpoke, activeSpoke, notice } = detail;
+    const { step, valid, preview, totalSpokes, totalPairs, targetPair, activeSpoke, targetSpoke, notice } = detail;
     resetInstructionView.disabled = !valid;
-    lacingSpokeCounter.textContent = !valid ? 'Guide unavailable' : preview ? `Preview · saved step ${step} / ${totalSpokes}` : step === 0 ? `Setup · Step 0 / ${totalSpokes}` : `Step ${step} / ${totalSpokes}`;
+    const patternStatus = document.getElementById('lacing-pattern-status')!;
+    patternStatus.textContent = detail.interlaced ? 'This build uses optional interlaced routing: change sides at the outermost crossing. Radial sides have no weave.' : 'Non-interlaced on both sides (default): retain the same layer at every crossing. Flange holes still alternate heads-out and heads-in.';
+    document.getElementById('btn-lacing-use-noninterlacing')!.classList.toggle('hidden', !detail.interlaced);
+    (document.getElementById('btn-lacing-use-noninterlacing') as HTMLButtonElement).disabled = !valid;
+    lacingSpokeCounter.textContent = !valid ? 'Guide unavailable' : preview ? `Preview · saved pair ${step} / ${totalPairs}` : step === 0 ? `Setup · ${totalPairs} pairs · ${totalSpokes} spokes` : `Pair ${step} / ${totalPairs} · ${detail.representedSpokes} / ${totalSpokes} spokes`;
     document.getElementById('lacing-notice')!.textContent = notice;
     document.getElementById('lacing-error')!.classList.toggle('hidden', valid);
     document.getElementById('lacing-error-text')!.textContent = detail.errors.slice(0, 2).join(' ');
@@ -1884,6 +1899,7 @@ import { hubs, defaultHub } from '../data/hubs';
     lacingPercentLabel.textContent = valid ? `${detail.percent}%` : '';
     btnPrevSpoke.disabled = !detail.canPrevious;
     btnNextSpoke.disabled = !detail.canNext;
+    btnNextSpoke.textContent = step === 0 ? 'Start pair 1' : step === totalPairs ? 'Lacing complete' : 'Next pair';
     btnPrevGroup.disabled = !detail.canPrevious;
     btnNextGroup.disabled = !detail.canNextGroup;
     btnLacingComplete.disabled = !valid || preview;
@@ -1895,62 +1911,65 @@ import { hubs, defaultHub } from '../data/hubs';
       count.textContent = valid ? `${detail.groupCounts[i]} / ${detail.groupTotals[i]}` : 'Unavailable';
       document.getElementById(`badge-g${i + 1}-name`)!.textContent = `${i + 1}. ${detail.groupNames[i]}`;
       const badge = document.getElementById(`badge-group-${i + 1}`)!;
-      badge.setAttribute('aria-current', String(detail.currentGroup === i + 1));
-      badge.style.borderColor = detail.currentGroup === i + 1 ? '#22d3ee' : '';
+      badge.setAttribute('aria-current', String(detail.currentGroups.includes(i + 1)));
+      badge.style.borderColor = detail.currentGroups.includes(i + 1) ? '#22d3ee' : '';
     });
-    lacingSpokeTitle.textContent = !valid ? 'Geometry needs attention' : preview ? 'All spokes preview' : activeSpoke ? `Spoke ${step}: ${activeSpoke.groupName}` : 'Setup: locate the first spoke';
+    lacingSpokeTitle.textContent = !valid ? 'Geometry needs attention' : preview ? 'All spokes preview' : activeSpoke ? `Pair ${step}: ${activeSpoke.side} flange` : 'Setup: locate the first pair';
     lacingSpokeSideBadge.textContent = preview ? 'Sequence position preserved' : targetSpoke ? `View from ${targetSpoke.viewingLabel} side` : '';
     document.getElementById('lacing-direction-help')!.textContent = !preview && targetSpoke ?
       `Directions use this flange’s outside view. Reset instruction view restores it with the valve at the top. “Skip one hole” means pass one hole and use the following hole.` : '';
     const setup = detail.setup;
-    if (setup && targetSpoke) {
-      document.getElementById('lacing-diagram-title')!.textContent = `${targetSpoke.side} flange · heads ${targetSpoke.path.headsOut ? 'out' : 'in'}`;
-      document.getElementById('lacing-diagram-view')!.textContent = `Intended assembled position · viewed from ${setup.viewingLabel} side`;
-      const diagramKey = `${detail.key}:${targetSpoke.group}`;
+    const showSpoke = valid && !preview && targetSpoke;
+    document.getElementById('lacing-target-summary')!.classList.toggle('hidden', !showSpoke);
+    setupFigure.classList.toggle('hidden', !showSpoke);
+    document.getElementById('lacing-setup-orientation')!.classList.toggle('hidden', !showSpoke);
+    const adjustment = document.getElementById('lacing-setup-adjustment') as HTMLDetailsElement;
+    adjustment.classList.toggle('hidden', !setup);
+    if (showSpoke) {
+      document.getElementById('lacing-diagram-title')!.textContent = `${targetSpoke!.side} flange · pair ${targetPair!.index+1}`;
+      document.getElementById('lacing-diagram-view')!.textContent = `Intended positions · viewed from ${targetSpoke!.viewingLabel} side`;
+      document.getElementById('lacing-diagram-caption')!.textContent = `Intended positions · valve at top. Cyan: A, heads-out. Green: B, heads-in. Amber: installed crossing references. ${targetSpoke!.crosses===0 ? 'Radial: no crossings.' : 'Numbered crossings run from hub to rim; the bridge marks the outside layer.'} ${setup ? 'Enlarged flange inset: amber arrows count holes.' : ''}`;
+      const diagramKey = `${detail.key}:${targetSpoke!.sequenceIndex}`;
       if (diagramKey !== lastDiagramKey) setDiagramExpanded(true);
       lastDiagramKey = diagramKey;
     }
-    document.getElementById('lacing-target-summary')!.classList.toggle('hidden', !!setup);
-    setupFigure.classList.toggle('hidden', !setup);
-    document.getElementById('lacing-setup-orientation')!.classList.toggle('hidden', !setup);
-    const adjustment = document.getElementById('lacing-setup-adjustment') as HTMLDetailsElement;
-    adjustment.classList.toggle('hidden', !setup || step > 1);
-    if (!setup || step > 1) adjustment.open = false;
-    document.getElementById('lacing-setup-diagram')!.innerHTML = setup ? lacingSetupDiagram(setup) : '';
+    document.getElementById('lacing-setup-diagram')!.innerHTML = showSpoke ?
+      lacingSpokeDiagram(targetSpoke!, detail.valveAngle, detail.installedSpokes, targetPair!.b) + (setup ? lacingSetupDiagram(setup) : '') : '';
     const intro = document.getElementById('lacing-setup-intro')!;
     intro.replaceChildren();
-    if (setup) {
-      if (setup.referenceAcrossHub) {
-        intro.append(`Viewed from the ${setup.viewingLabel} side, anchor this group to `,
-          holeLink(`the spoke installed at step ${setup.referenceStep} on the opposite ${setup.reference.side.toLowerCase()} flange`, 'reference-flange'),
-          `. The dashed amber ring shows that hole projected along the axle. Use the first staggered hole ${setup.direction} on this flange. Do not choose a new starting hole from the valve or logo: the loose hub may have rotated since group 1.`);
-      } else if (step > 1) {
-        intro.append(`Both diagrams show the intended assembled hub position, viewed from the ${setup.viewingLabel} side with the valve at the top. Move around the wheel to this side; keep the hub aligned with the rim. Count from `,
-          holeLink(setup.referenceTarget === 'reference-flange' ? 'the amber already used hole' : 'the amber hole beside the valve line', setup.referenceTarget),
-          ' to ', holeLink('the cyan target hole', 'flange'), '.');
-      } else intro.append(`Both diagrams show the intended assembled hub position, viewed from the ${setup.viewingLabel} side with the valve at the top. Follow `, holeLink('the yellow line from the valve', 'alignment'),
-        ' toward the axle. It passes between flange holes; no hole needs to sit exactly on it. Match the highlighted connection and its hub-to-rim direction. The illustrated logo alignment is cosmetic.');
-      const adjustmentText = document.getElementById('lacing-setup-adjustment-text')!;
-      adjustmentText.replaceChildren('Hold the rim with the valve at the top and view it from the named side. Attach the spoke loosely at the illustrated flange and rim holes. The diagram shows the intended assembled position; a partly laced hub can rotate while the spokes are loose. Later groups must use the installed-spoke references, rather than selecting new starting holes from the valve or logo. ',
-        targetSpoke?.orientationText ?? '', setup.crossed ? ' Check both the direction and angular separation when comparing the wheel with the assembled view.' : ' Keep this connection radial.');
-    }
-    lacingFlangeHoleText.replaceChildren(!preview && targetSpoke ? holeLink(`${targetSpoke.side} flange hole`, 'flange') : '—');
-    lacingHeadsDirText.textContent = !preview ? targetSpoke?.headsDir ?? '' : '';
-    lacingRimHoleText.replaceChildren(!preview && targetSpoke ? holeLink('Rim hole for this spoke', 'rim') : '—');
+    if (setup?.referenceAcrossHub) {
+      intro.append(`Turn the supported wheel to view the ${setup.viewingLabel} side. Anchor the left side to `,
+        holeLink(`installed spoke ${setup.referenceStep} on the right flange`, 'reference-flange'),
+        `. Compare the flanges along the axle and use the first staggered hole ${setup.direction}. Use that same installed spoke at the rim, following the counts below. Keep the existing right-side connections; do not restart from the valve or logo.`);
+    } else if (setup) {
+      intro.append('The diagrams show the intended assembled position. Use the enlarged flange inset to count from ',
+        holeLink(setup.referenceStep ? `the hole of spoke ${setup.referenceStep}, already installed` : 'the amber hole beside the valve line', setup.referenceTarget),
+        '. Keep the existing hub-to-rim alignment; logo alignment is cosmetic.');
+    } else if (showSpoke) intro.textContent = 'Position A and B together before attaching either nipple. Follow both routes and every identified crossing.';
+    document.getElementById('lacing-setup-adjustment-text')!.textContent =
+      'Support the rim with axle clearance. Insert A from outside and hold its shaft while tilting the supported wheel to reach the inside face for B. Keep both nipples unattached until both routes are positioned. These diagrams do not simulate insertion movements. Stop and reposition if obstructed.';
+    lacingFlangeHoleText.replaceChildren(...(showSpoke ? [holeLink(`Flange hole ${targetPair!.a.flangeHoleIndex}`, 'flange'), ' → ',holeLink(`rim hole ${targetPair!.a.rimHoleIndex}`,'rim')] : ['—']));
+    lacingHeadsDirText.textContent = showSpoke ? 'A: head outside · insert from outside' : '';
+    lacingRimHoleText.replaceChildren(...(showSpoke ? [holeLink(`Flange hole ${targetPair!.b.flangeHoleIndex}`, 'b-flange'),' → ',holeLink(`rim hole ${targetPair!.b.rimHoleIndex}`,'b-rim'), ' · B: head inside · insert from inside'] : ['—']));
     const selection = detail.spokeSelection;
-    const orientation = !preview && valid && targetSpoke ? targetSpoke.orientationText : '';
+    const orientation = showSpoke ? [targetPair!.a,targetPair!.b].map((spoke,i)=>`${i?'B':'A'}: ${spoke.orientationText}`).join(' ') : '';
     const orientationText = document.getElementById('lacing-spoke-orientation')!;
     orientationText.textContent = orientation;
     orientationText.classList.toggle('hidden', !orientation);
     document.getElementById('lacing-orientation-checkpoint')!.classList.toggle('hidden', !detail.orientationCheckpoint);
+    document.getElementById('lacing-checkpoint-title')!.textContent = detail.checkpointTitle;
     document.getElementById('lacing-checkpoint-text')!.textContent = detail.orientationCheckpoint ?? '';
     lacingSpokeLengthText.classList.toggle('hidden', !selection);
-    lacingSpokeLengthText.textContent = selection ? `${selection.label} — Spoke length: ${selection.roundedLength} mm` : '';
+    lacingSpokeLengthText.textContent = selection ? `${selection.label} — Spoke length: ${selection.roundedLength} mm each (A and B)` : '';
     lacingRuleTipText.replaceChildren();
     document.getElementById('lacing-link-help')!.classList.toggle('hidden', !valid || preview);
     if (!valid || preview || !targetSpoke) {
       const item = document.createElement('li');
       item.textContent = preview ? 'This shows the entire spoke pattern. Return to Step to continue from your saved position.' : 'Correct the build dimensions to generate a complete lacing sequence.';
+      lacingRuleTipText.append(item);
+    } else if (step === 0) {
+      const item = document.createElement('li');
+      item.textContent = 'Support the rim with axle clearance. Work with one loose pair at a time: A heads-out, B heads-in. Position both routes before attaching either nipple loosely. Finish every right-flange pair, check routing, then move to the left. Do not put all heads on the same face. Select Start pair 1 to begin.';
       lacingRuleTipText.append(item);
     } else {
       for (const parts of targetSpoke.instructionSteps) {
@@ -1959,7 +1978,7 @@ import { hubs, defaultHub } from '../data/hubs';
         lacingRuleTipText.append(item);
       }
     }
-    const announcement = `${lacingSpokeCounter.textContent}. ${lacingSpokeTitle.textContent}. ${!preview && targetSpoke ? `${targetSpoke.sideLabel}, ${targetSpoke.headsDir}. ${selection ? `Spoke length ${selection.roundedLength} millimetres. ` : ''}${orientation} Use the instruction links to locate the holes.` : ''} ${detail.orientationCheckpoint ?? ''} ${notice}`;
+    const announcement = `${patternStatus.textContent} ${lacingSpokeCounter.textContent}. ${lacingSpokeTitle.textContent}. ${!preview && targetSpoke ? `${targetSpoke.sideLabel}. ${targetSpoke.headsDir}. ${selection ? `Spoke length ${selection.roundedLength} millimetres. ` : ''}${orientation} ${step > 0 ? targetSpoke.instructionSteps.flat().map(p => p.text).join(" ") ?? "" : "One heads-out and one heads-in spoke per pair. Position both before attaching either nipple; select Start pair 1."}` : ''} ${detail.orientationCheckpoint ?? ''} ${notice}`;
     if (announcement !== lastAnnouncement) {
       document.getElementById('lacing-announcement')!.textContent = announcement;
       lastAnnouncement = announcement;
