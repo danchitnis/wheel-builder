@@ -2011,7 +2011,10 @@ import { hubs, defaultHub } from '../data/hubs';
     syncInterlaceControl();
   }
 
+  const workshopLink = document.getElementById('workshop-link') as HTMLAnchorElement | null;
+
   function saveCurrentBuild() {
+    if (workshopLink) workshopLink.href = '/workshop#' + serializeConfiguration(captureConfiguration(), false);
     const saved = saveConfiguration(captureConfiguration(), sessionStorageForBuild);
     if (saved && importedFragment !== null && window.location.hash === importedFragment) {
       history.replaceState(history.state, '', window.location.pathname + window.location.search);

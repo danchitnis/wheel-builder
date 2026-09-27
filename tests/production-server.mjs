@@ -12,7 +12,8 @@ let importFailureUsed = false;
 const server = createServer(async (req, res) => {
   try {
     const url = new URL(req.url, 'http://127.0.0.1');
-    const path = resolve(root, '.' + decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));
+    let path = resolve(root, '.' + decodeURIComponent(url.pathname === '/' ? '/index.html' : url.pathname));
+    if (path.startsWith(root + sep) && (await stat(path)).isDirectory()) path = resolve(path, 'index.html');
     if (!path.startsWith(root + sep) || !(await stat(path)).isFile()) {
       res.writeHead(404).end(); return;
     }
@@ -48,6 +49,7 @@ const server = createServer(async (req, res) => {
     res.writeHead(200, { 'Content-Type': type, 'Cache-Control': 'no-store' }).end(body);
   } catch { res.writeHead(404).end(); }
 });
-server.listen(4322, '127.0.0.1', () => console.log(`Production test server: http://127.0.0.1:4322 (pid ${process.pid})`));
+const port = Number(process.env.PORT ?? 4322);
+server.listen(port, '127.0.0.1', () => console.log(`Production test server: http://127.0.0.1:${port} (pid ${process.pid})`));
 process.on('SIGTERM', () => { server.close(); server.closeAllConnections(); });
 process.on('SIGINT', () => { server.close(); server.closeAllConnections(); });
