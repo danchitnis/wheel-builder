@@ -1,4 +1,7 @@
 import * as THREE from 'three';
+import fusionHolderMeshes from './fusionHolderMeshes.json';
+import radialExport from './fusionRadialHolderMeshes.json';
+import hubCapExport from './fusionHubCapMeshes.json';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
 import type { Assembly, Part } from '../../utils/workshop';
 
@@ -22,6 +25,7 @@ export class WorkshopViewer {
   private reversed = false;
   private center = new THREE.Vector3();
   private span = 1000;
+  private inspection: {target:THREE.Vector3;distance:number}|undefined;
   private down = [0,0];
   constructor(private container:HTMLElement, private onSelect:(id:string)=>void) {
     this.renderer = new THREE.WebGLRenderer({antialias:true});
@@ -81,10 +85,34 @@ export class WorkshopViewer {
     const g=new THREE.Group();g.userData.partId=p.id;
     let mesh:THREE.Mesh;
     const block=(dims:number[],pos:number[])=>{const m=this.box(dims,colors[p.kind]);m.position.fromArray(pos);g.add(m);return m;};
-    if(p.shape==='angle'){
+    if(p.shape==='fusion-mesh' && (p.meshKey||p.radialMeshKey)){
+      const source=p.radialMeshKey?radialExport.meshes[p.radialMeshKey]:fusionHolderMeshes[p.meshKey!];
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute('position',new THREE.Float32BufferAttribute(source.positions,3));
+      geometry.setIndex(source.indices);
+      geometry.translate(...source.min.map((v,i)=>-(v+source.max[i])/2) as [number,number,number]);
+      // CAD face boundaries are duplicated in the tessellation, preserving sharp edges.
+      geometry.computeVertexNormals();
+      mesh=new THREE.Mesh(geometry,this.material(p.meshKey==='Illustrative dial face'?0xeef2e9:p.meshKey==='Illustrative needle'?0xc54830:colors[p.kind]));g.add(mesh);
+      if(p.meshKey==='Dial case and rear lug'){
+        const face=this.dialFace();face.position.set(-12-(source.min[0]+source.max[0])/2,0,22.55);g.add(face);
+      }
+      if(p.radialMeshKey==='Radial dial case and rear lug'){
+        const face=this.dialFace(),p=radialExport.metadata.parameters;
+        face.position.set(p.dial_reference_x-(source.min[0]+source.max[0])/2,-(source.min[1]+source.max[1])/2,p.case_rear+p.carriage_back+p.dial_thickness+.05-(source.min[2]+source.max[2])/2);g.add(face);
+      }
+    }else if(p.shape==='angle'){
       const L=p.size[0],q=L/2,r=(p.bore??7)/2;
       mesh=new THREE.Mesh(this.drilledPlate(L,L,4,[{x:q-L/2,y:0,r}],'y'),this.material(colors.metal));mesh.position.set(L/2,2,0);g.add(mesh);
       const upright=new THREE.Mesh(this.drilledPlate(L,L,4,[{x:0,y:q-L/2,r}],'x'),this.material(colors.metal));upright.position.set(2,L/2,0);g.add(upright);
+    }else if(p.shape==='top-cap' && p.capDesign==='centred-v2'){
+      const source=hubCapExport.meshes.cap;
+      const geometry=new THREE.BufferGeometry();
+      geometry.setAttribute('position',new THREE.Float32BufferAttribute(source.positions,3));
+      geometry.setIndex(source.indices);
+      geometry.computeVertexNormals();
+      // Export origin is the rail-end datum, not the mesh bounding-box centre.
+      mesh=new THREE.Mesh(geometry,this.material(colors.pla));g.add(mesh);
     }else if(p.shape==='top-cap'){
       const P=p.profileSize!,fit=p.fit??0,inside=P+fit,wall=(P+20-inside)/2;
       // Hollow, open-front sleeve. The rail end contacts the underside at Y=0.
@@ -208,7 +236,20 @@ export class WorkshopViewer {
     const texture=new THREE.CanvasTexture(canvas);const sprite=new THREE.Sprite(new THREE.SpriteMaterial({map:texture,depthTest:false}));sprite.position.fromArray(position);sprite.scale.set(120,30,1);return sprite;
   }
   select(ids:string[]){this.selected=ids;for(const[id,g]of this.meshes)g.traverse(o=>{if(o instanceof THREE.Mesh&&o.material instanceof THREE.MeshStandardMaterial){o.material.emissive.setHex(ids.includes(id)?0xa86216:0);o.material.emissiveIntensity=.7;}});}
-  setExplode(value:number){this.explode=value;for(const p of this.parts){const g=this.meshes.get(p.id)!;g.position.fromArray(p.position);g.position.x+=Math.sign(p.position[0]||1)*value*p.stage*35;g.position.y+=value*(p.stage-1)*75;g.position.z+=Math.sign(p.position[2]||1)*value*(p.stage-1)*35;}this.labels.visible=value===0&&this.dimensions;this.applyWheelPose();}
+  setExplode(value:number){
+    this.explode=value;
+    for(const p of this.parts){
+      const g=this.meshes.get(p.id)!;
+      g.position.fromArray(p.position);
+      g.position.x+=Math.sign(p.position[0]||1)*value*p.stage*35;
+      g.position.y+=value*(p.stage-1)*75;
+      g.position.z+=Math.sign(p.position[2]||1)*value*(p.stage-1)*35;
+      // Reveal the socket by sliding it upward off its rail-end datum.
+      if(p.capDesign==='centred-v2')g.position.y+=value*(40-hubCapExport.meshes.cap.min[1]);
+    }
+    this.labels.visible=value===0&&this.dimensions;
+    this.applyWheelPose();
+  }
   private dimensions=true;
   showDimensions(value:boolean){this.dimensions=value;this.labels.visible=value&&this.explode===0;}
   showWheel(value:boolean){this.wheel.visible=value;for(const p of this.parts)if(p.movesWithWheel)this.meshes.get(p.id)!.visible=value;}
@@ -221,12 +262,15 @@ export class WorkshopViewer {
     const bounds=new THREE.Box3();for(const id of ids){const obj=this.meshes.get(id);if(obj)bounds.union(new THREE.Box3().setFromObject(obj));}
     if(bounds.isEmpty())return;
     const target=bounds.getCenter(new THREE.Vector3()), span=Math.max(...bounds.getSize(new THREE.Vector3()).toArray(),100);
+    this.inspection={target:target.clone(),distance:span*2};
     this.controls.target.copy(target);this.camera.position.copy(target).add(new THREE.Vector3(1.3,.8,1.7).normalize().multiplyScalar(span*2));this.controls.update();
   }
   view(view:string){
-    const directions:Record<string,number[]>={iso:[1.5,.9,1.4],side:[2,0,0],front:[0,0,2],top:[0,2,.001]};
-    const d=new THREE.Vector3().fromArray(directions[view]??directions.iso).normalize().multiplyScalar(this.span*1.85);
-    this.controls.target.copy(this.center);this.camera.position.copy(this.center).add(d);this.controls.update();
+    const directions:Record<string,number[]>={iso:[1.5,.9,1.4],side:[2,0,0],front:[0,0,2],top:[0,2,.001],bottom:[0,-2,.001]};
+    if(view==='iso')this.inspection=undefined;
+    const target=this.inspection?.target??this.center;
+    const d=new THREE.Vector3().fromArray(directions[view]??directions.iso).normalize().multiplyScalar(this.inspection?.distance??this.span*1.85);
+    this.controls.target.copy(target);this.camera.position.copy(target).add(d);this.controls.update();
   }
   private animate=()=>{this.frame=requestAnimationFrame(this.animate);this.controls.update();this.renderer.render(this.scene,this.camera);};
   dispose(){cancelAnimationFrame(this.frame);this.resize.disconnect();this.controls.dispose();this.renderer.domElement.removeEventListener('pointerdown',this.pointerDown);this.renderer.domElement.removeEventListener('pointerup',this.pointerUp);this.renderer.domElement.removeEventListener('webglcontextlost',this.contextLost);this.clear(this.group);this.clear(this.wheel);this.clear(this.labels);this.renderer.dispose();this.renderer.domElement.remove();}

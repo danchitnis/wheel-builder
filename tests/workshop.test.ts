@@ -81,7 +81,7 @@ test('dial bodies face the operator and clear the cross rail and uprights',()=>{
   for(const profile of Object.keys(profiles) as Profile[])for(const D of [300,650,850]){
     const a=buildAssembly(wheel,{...setup(),profile,rimDiameter:D,mode:'dials'});
     const P=profiles[profile].size;
-    const dials=a.parts.filter(p=>p.shape==='dial');assert.equal(dials.length,2);
+    const dials=a.parts.filter(p=>p.measurementAxis!==undefined && p.kind==='gauge');assert.equal(dials.length,2);
     for(const dial of dials){
       assert.equal(dial.axis,'z');
       assert.ok(dial.position[1]-27.5>2*P,'dial body must clear the cross rail');
@@ -89,7 +89,9 @@ test('dial bodies face the operator and clear the cross rail and uprights',()=>{
     const lateral=dials.find(p=>p.measurementAxis==='x')!;
     assert.ok(lateral.position[2]-11>P/2,'lateral body is ahead of upright');
     const radial=dials.find(p=>p.measurementAxis==='y')!;
-    assert.ok(radial.position[2]-11>-40+12,'radial body clears rear mast');
+    const uprights=a.parts.filter(p=>p.kind==='extrusion'&&p.axis==='y');
+    assert.ok(uprights.every(p=>Math.abs(radial.position[0]-p.position[0])>27+P/2),'radial case sits between uprights');
+    if(profile!=='2020')assert.ok(a.errors.some(e=>e.includes('2020 slot-6 uprights only')));
   }
 });
 test('cradles stay fixed and loose guide is optional, with no custom metal adaptors',()=>{
@@ -102,17 +104,9 @@ test('cradles stay fixed and loose guide is optional, with no custom metal adapt
 test('short measurement brackets attach directly to upright slots and fit the printer',()=>{
   for(const profile of Object.keys(profiles) as Profile[])for(const mode of ['pointers','dials'] as const){
     const a=buildAssembly(wheel,{...setup(),profile,mode,lengths:[1000]});
-    assert.equal(a.parts.filter(p=>p.shape==='rail-mount').length,2);
+    assert.equal(a.parts.filter(p=>p.shape==='rail-mount').length,mode==='dials'?0:2);
     assert.ok(!a.parts.some(p=>p.sku.includes('post')));
     for(const p of a.parts.filter(p=>p.kind==='pla'))assert.ok(p.size.every(n=>n<=180),p.name);
-  }
-});
-test('dial rear lug, fixing and clevis are coincident and supported',()=>{
-  const a=buildAssembly(wheel,{...setup(),mode:'dials'});
-  for(const lug of a.parts.filter(p=>p.shape==='dial-lug')){
-    assert.ok(a.parts.some(p=>p.name==='M5 rear-lug mounting bolt'&&p.position.every((n,i)=>n===lug.position[i])));
-    const bracket=a.parts.find(p=>p.shape==='clevis'&&p.position[0]===lug.position[0])!;
-    assert.equal(bracket.position[2]+19-setup().dialLugOffset,lug.position[2]);
   }
 });
 test('dish feet share reach and span and bridge remains clear of hub',()=>{
@@ -131,10 +125,10 @@ test('dial upgrade replaces pointers and includes mounting hardware',()=>{
   const dial=buildAssembly(wheel,{...setup(),mode:'dials'});
   assert.equal(pointer.parts.filter(p=>p.sku==='pointer-tip').length,2);
   assert.equal(dial.parts.filter(p=>p.sku==='pointer-tip').length,0);
-  assert.equal(dial.parts.filter(p=>p.name==='M5 rear-lug mounting bolt').length,2);
+  assert.equal(dial.parts.filter(p=>(p.name==='M5 rear-lug mounting bolt'||p.radialMeshKey==='Lug M5x16 bolt')).length,2);
   assert.ok(pointer.parts.filter(p=>p.shape==='rail-mount').every(p=>p.sku.includes('pointers')));
   assert.ok(dial.parts.filter(p=>p.shape==='rail-mount').every(p=>p.sku.includes('dials')));
-  assert.equal(dial.parts.filter(p=>p.shape==='dial').length,2);
+  assert.equal(dial.parts.filter(p=>p.measurementAxis!==undefined && p.kind==='gauge').length,2);
 });
 test('rim override and invalid dimensions are explicit; frame offsets are not silently centred',()=>{
   const estimated=buildAssembly(wheel,{...setup(),rimDiameter:null});assert.equal(estimated.estimated,true);
@@ -308,4 +302,76 @@ test('new workshop builds default to the user’s 2020 extrusion',()=>{
   const a=buildAssembly(wheel,{...setup(),profile:'2020'});
   assert.ok(a.parts.filter(p=>p.kind==='extrusion').every(p=>Math.min(...p.size)===20));
   assert.ok(a.notes.some(n=>n.includes('Coplanar H base')));
+});
+
+
+test('lateral dial uses the redesigned Fusion holder and exactly three M5 bolts',()=>{
+  const a=buildAssembly(wheel,{...setup(),profile:'2020',mode:'dials'});
+  const holder=a.parts.find(p=>p.sku==='lateral-dial-bracket')!;
+  assert.equal(holder.meshKey,'Printable holder');
+  assert.deepEqual(holder.size.map(n=>+n.toFixed(5)),[82,82,27]);
+  assert.ok(!a.parts.some(p=>p.sku==='lateral-dials-rail-mount'));
+  assert.equal(a.parts.filter(p=>p.meshKey?.includes('shank')).length,3);
+  const upright=a.parts.filter(p=>p.kind==='extrusion'&&p.axis==='y').find(p=>p.position[0]>0)!;
+  const bolts=a.parts.filter(p=>p.meshKey?.match(/^(Lower|Upper).*shank/));
+  assert.equal(bolts.length,2);
+  assert.equal(bolts[1].position[1]-bolts[0].position[1],18);
+  for(const bolt of bolts)assert.equal(bolt.position[0],upright.position[0]);
+  assert.equal(holder.position[2]-13.5,10); // flat back on 2020 front face
+  assert.ok(!a.errors.some(e=>e.includes('required bolt position')));
+  assert.match(holder.print!.bed,/−Z/);
+});
+
+test('exact holder fits without scaling when the rig reach falls within its slots',()=>{
+  const a=buildAssembly(wheel,{...setup(),profile:'2020',mode:'dials',hubWidth:100});
+  assert.ok(!a.errors.some(e=>e.includes('Exact Fusion')));
+  const dial=a.parts.find(p=>p.meshKey==='Dial case and rear lug')!;
+  assert.equal(dial.position[0]-dial.size[0]/2,a.wheel.offset+a.wheel.width/2);
+  assert.deepEqual(a.parts.find(p=>p.meshKey==='Printable holder')!.size.map(n=>+n.toFixed(5)),[82,82,27]);
+});
+
+
+test('preloaded probe keeps the 20 mm sleeve and retracts the exposed pin by 5 mm',async()=>{
+  const {default:meshes}=await import('../src/components/workshop/fusionHolderMeshes.json',{with:{type:'json'}});
+  const xs=meshes['Dial case and rear lug'].positions.filter((_,i)=>i%3===0);
+  assert.equal(Math.min(...xs),-74);
+  assert.ok(xs.includes(-59));
+  assert.ok(xs.includes(-39));
+  const a=buildAssembly(wheel,{...setup(),profile:'2020',mode:'dials',hubWidth:100});
+  assert.ok(!a.errors.some(e=>e.includes('overruns the rim sidewall')));
+});
+
+
+test('upper mounting bolts clear the lower dial and probe touches front-wheel rim',()=>{
+  const a=buildAssembly({...wheel,rimWidthOuter:28},{...setup(),profile:'2020',mode:'dials',hubWidth:100,projection:3,rimDiameter:406.9});
+  const dial=a.parts.find(p=>p.meshKey==='Dial case and rear lug')!;
+  const lower=a.parts.find(p=>p.meshKey==='Lower M5 washer')!;
+  const upper=a.parts.find(p=>p.meshKey==='Upper M5 washer')!;
+  const upright=a.parts.find(p=>p.kind==='extrusion'&&p.axis==='y'&&p.position[0]>0)!;
+  const caseCenter=dial.position[0]+17.5; // preloaded envelope centre -29.5, case centre -12
+  assert.ok(Math.abs(caseCenter-upright.position[0]-24.5)<1e-8); // centred saddle places the upright beneath the 3 mm hub projection
+  assert.equal(dial.position[0]-dial.size[0]/2,14);
+  assert.equal(lower.position[1]-5-(dial.position[1]+27),11);
+  assert.equal(upper.position[1]-lower.position[1],18);
+  assert.ok(a.parts.find(p=>p.meshKey==='Printable holder')!.position[1]>dial.position[1]);
+});
+
+
+test('symmetric holder accommodates front and rear hubs at mid-travel preload',async()=>{
+  const {default:meshes}=await import('../src/components/workshop/fusionHolderMeshes.json',{with:{type:'json'}});
+  const h=meshes['Printable holder'];
+  assert.ok(Math.abs((h.min[0]+h.max[0])/2+12)<1e-8);
+  for(const hubWidth of [100,135]){
+    const a=buildAssembly({...wheel,rimWidthOuter:28},{...setup(),profile:'2020',mode:'dials',hubWidth,projection:3,rimDiameter:406.9});
+    const dial=a.parts.find(p=>p.meshKey==='Dial case and rear lug')!;
+    const holder=a.parts.find(p=>p.meshKey==='Printable holder')!;
+    const bolt=a.parts.find(p=>p.meshKey==='Lower M5 washer')!;
+    const upright=a.parts.find(p=>p.kind==='extrusion'&&p.axis==='y'&&p.position[0]>0)!;
+    assert.equal(dial.position[0]-dial.size[0]/2,14);
+    assert.ok(Math.abs(holder.position[0]-(dial.position[0]+17.5))<1e-8);
+    assert.equal(bolt.position[0],upright.position[0]);
+    const localBolt=bolt.position[0]-(holder.position[0]+12);
+    assert.ok(localBolt>=-42+5&&localBolt<=18-5);
+    assert.ok(!a.errors.some(e=>e.includes('Exact Fusion')));
+  }
 });

@@ -1,0 +1,25 @@
+{
+  "revision": 4,
+  "engine": "CuraEngine 5.13.0",
+  "layerHeightMm": 0.2,
+  "nominalLineWidthMm": 0.4,
+  "supportEnabled": false,
+  "layerCount": 270,
+  "maximumZMm": 54,
+  "pathTypes": [
+    "FILL",
+    "SKIN",
+    "WALL-INNER",
+    "WALL-OUTER"
+  ],
+  "supportPathCount": 0,
+  "internalRoofAngleAboveHorizontalDegrees": 45,
+  "outerGrowthAngleAboveHorizontalDegrees": 53.59,
+  "horizontalSeatingLedgeMm": 1.5,
+  "physicalPrintTested": false,
+  "note": "Generic validation slice only; use the STL with your own printer/material profile.",
+  "finRootDepthMm": 5,
+  "finTipDepthMm": 3,
+  "finTaperEachSideFromVerticalDegrees": 1.7899,
+  "finSymmetricAboutUpright": true
+}

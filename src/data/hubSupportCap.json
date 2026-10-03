@@ -1,0 +1,33 @@
+{
+  "revision": 4,
+  "name": "2020 centred V hub cap - upright print",
+  "units": "mm",
+  "parameters": {
+    "profile_width": 20,
+    "socket_clearance": 0.3,
+    "skirt_depth": 10,
+    "wall": 3,
+    "slot_width": 6,
+    "key_interference": 0.1,
+    "key_depth": 2,
+    "entry_chamfer": 0.4,
+    "seat_ledge": 1.5,
+    "roof_rise": 8.65,
+    "saddle_rise": 12,
+    "saddle_depth": 3,
+    "cradle_width": 44,
+    "cradle_top": 44,
+    "v_apex": 26,
+    "coupon_depth": 5,
+    "fin_root_depth": 5
+  },
+  "vAngleDegrees": 90,
+  "hubDiameterRange": [
+    6,
+    35
+  ],
+  "workshopDatum": "Upright centre at its top end; X axle, Y up, Z fore/aft. V centred at X=Z=0.",
+  "printOrientation": "Upright, collar opening on bed; workshop Y becomes print Z.",
+  "fitStatus": "Prototype slot-6 tongues: verify profile cross-section and test coupon.",
+  "maxSeatingLedgeMm": 1.5
+}

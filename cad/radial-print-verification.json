@@ -1,0 +1,46 @@
+{
+  "revision": 8,
+  "connectedClosedPrintedSolids": 2,
+  "interferenceChecks": 114,
+  "failures": [],
+  "printOrientation": "Bridge on flat back; dial arm on broad X=47 face, both STLs at Z=0",
+  "supportRequiredByGeometry": false,
+  "slicerVerified": true,
+  "physicalPrintTested": false,
+  "note": "Mesh manifold and overhang checks in radialHolder.test.ts. Nut envelopes are conservative cylinders; actual hardware, stiffness and repeatability require physical verification.",
+  "slice": {
+    "engine": "CuraEngine 5.13.0",
+    "settings": {
+      "machine_width": 200,
+      "machine_depth": 200,
+      "machine_height": 200,
+      "machine_center_is_zero": "false",
+      "center_object": "false",
+      "mesh_position_x": 10,
+      "mesh_position_y": 10,
+      "layer_height": 0.2,
+      "layer_height_0": 0.2,
+      "line_width": 0.4,
+      "wall_line_count": 4,
+      "top_layers": 5,
+      "bottom_layers": 5,
+      "roofing_layer_count": 0,
+      "flooring_layer_count": 0,
+      "infill_sparse_density": 25,
+      "infill_line_distance": 1.6,
+      "material_diameter": 1.75,
+      "support_enable": "false",
+      "adhesion_type": "none"
+    },
+    "layers": 160,
+    "pathTypes": [
+      "FILL",
+      "SKIN",
+      "WALL-INNER",
+      "WALL-OUTER"
+    ],
+    "supportPaths": 0,
+    "maximumZMm": 32,
+    "note": "Generic validation only. Load the STLs into the intended printer/material profile before production."
+  }
+}
