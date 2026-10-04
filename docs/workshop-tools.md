@@ -9,8 +9,9 @@ the untouched wheel snapshot. No workshop control writes to the builder session.
 
 `src/utils/workshop.ts` is the source of truth for member selection, assembly part
 instances, specifications and BOM grouping. Coordinates are mm:
-X is the axle direction, Y is vertical and Z is fore/aft. Each extrusion instance
-uses a member from the available stock set. Missing lengths produce a provisional
+X is the axle direction, Y is vertical and Z is fore/aft. Each stand extrusion instance
+uses a member from the available stock set. The dishing frame uses its fixed
+300 + 100 + 100 mm members. Missing lengths produce a provisional
 assembly with errors, never a stretched member. Missing interface information is
 visible rather than guessed from a hub's nominal spacing.
 
@@ -24,26 +25,27 @@ and printed fit before procurement. Only printed parts are bespoke; use standard
 The stand has two feet, one cross rail and equal uprights. Hollow PLA top caps seat
 on the upright ends; open integral cradles support measured stationary hub-end
 protrusions. The 2020 caps are identical friction-fit V caps; 3030/4040 caps retain
-their side-slot bolts and independently sized round seats. No steel dropouts or clamping skewer
-are needed. A loose optional rod is an alignment aid, not a clamp or wheel retention.
+their side-slot bolts and independently sized round seats. Narrow hubs automatically use a through-hub support rod and matched spacer
+sleeves on the V caps to preserve the bracket minimum spacing. The optional loose
+guide rod on wider hubs remains an alignment aid. Neither rod clamps the hub.
 Measure both diameters and usable protrusion; unsupported ends are flagged.
 
-The vertical extrusion itself supports the measurement heads. Each short printed
-bracket locks directly to an upright slot with two vertically spaced bolts. Pointer
-blocks use M6 screws and captured nuts; their mounting bolts are offset from the
-pointer axes. The dial upgrade replaces the printed brackets and heads, preserving
-the frame. Its clevis ears straddle the indicator's existing rear lug, with a visible
-M5 bolt through the measured lug hole. Both dial faces point toward the operator.
-No parallel printed towers or floating stem mounts are used. All printed envelopes
-are checked against 180 mm, leaving margins on a 200 × 200 mm bed.
+The adjustment pointers use the exact `probe1` body exported from the open Fusion
+Design through MCP: 105 × 15 × 15 mm, 5 mm base, 90 × 5 mm straight slot,
+thick rear flange and native fillets. Both stand probes are identical copies with the thin end to the left and thick flange to the right
+on the front of the same upright. The narrow lateral tip approaches the rim sidewall;
+the radial copy slides farther inward to the wheel centre plane below the rim, using its upper edge.
+There is no separate radial adapter plate. M4 bolts with wide washers clamp the
+native slot to profile-compatible M4 T-nuts. The dial mode retains its own Fusion
+holders. All printed envelopes are checked against the 180 mm print envelope.
 
-The dishing bridge remains independent, with equal-reach feet and a forked probe
+The dishing bridge remains independent, with equal-reach metal feet and the unchanged Probe 1
 referencing the dropout seating face. Its measurement basis follows
 https://www.parktool.com/en-us/blog/repair-help/wheel-dishing-centering.
 
 Most PLA parts have dimensional envelopes, hole/mating clearances, nut capture and
 mounting descriptions. The 2020 V hub cap, fit coupon and radial dial holder have actual
-Fusion solids and printable STL exports in `cad/`; the other envelopes are not printable STL files. Bolt lengths are a
+Fusion solids and printable STL exports in `cad/`, as do Probe 1 and the lateral dial holder; the other envelopes are not printable STL files. Bolt lengths are a
 preliminary stack estimate, not a substitute for supplier engagement dimensions.
 The assembly has not been built or physically certified to any tolerance.
 
@@ -56,7 +58,7 @@ the standalone print guide and the calibration notebook have been removed from
 the page; there are no measurement-entry fields or calibration disclosures.
 
 Settings live in localStorage under `wheel-builder:workshop:v1`. Design revision
-13 and the saved wheel fingerprint invalidate fit overrides from an earlier
+15 and the saved wheel fingerprint invalidate fit overrides from an earlier
 design or a different wheel. Legacy calibration fields remain in the storage
 format for compatibility, but the page does not collect or display them.
 Storage failure leaves the in-memory configuration usable; WebGL failure leaves
@@ -80,91 +82,47 @@ includes fit status and the component list.
 ## Print review
 
 Each PLA instance carries bed orientation, support assessment and accuracy checks,
-shown when selecting the component and included in CSV specifications. The rail
-mount has a flat-bottom ledge and an upward-growing flange. The clevis has a broad
-base under both ears; its horizontal holes require a bridging coupon or drilling.
+shown when selecting the component and included in CSV specifications. Probe 1
+prints on its native flat back; the dial-holder fork cheeks grow upwards.
+Horizontal lug holes require a bridging coupon or drilling.
 The legacy 3030/4040 top-cap noses can need local support; the V2 2020 cap
 prints upright with its 45° cavity roof and sloped outer pedestal.
 No support-free or dimensional-accuracy claim has been physically validated.
 
-Dishing uses three flat drilled carriage plates. M6 adjustment rods run beside the
-extrusion and lock against both faces of each carriage. The two equal rim shoes
-have blind sockets; the central open fork references the hub seating face and
-clears the axle. Print flat contact plates with through-holes vertical, and rim
-shoes contact-face down. Check full assembled reach, not just screw length.
+## Photographed dishing tool
 
-## Dishing layout options
+Only the supplied three-rail mechanism is supported. It uses a 300 mm centre
+rail, two 100 mm arms, four open 135° metal brackets, and the exact Fusion Probe 1
+bolted directly across the centre rail. The two outer brackets are the rim feet;
+there are no printed stops, forked hub shoe, shoe arm or centre adapter.
+The stand's stock list does not resize this fixed dishing frame.
 
-`dishLayout` selects straight or angled. Both have two fixed rim-contact surfaces
-and only one adjustment screw: the central hub-face probe. Straight stops are reusable matched pairs in 20 mm reach steps; the bridge
-position follows the chosen pair, rather than encoding exact wheel geometry. Two identical printed stops incorporate mounting flanges;
-their reach is fixed by geometry and checked on a flat reference.
+The supplied bracket dimensions are 60 mm legs, 18 mm width, 6 mm thickness and
+Ø5.5 mm holes. The preview includes the relieved gusset. Hole centres at 40 mm
+from the bend and the undimensioned cutout are approximate. Two bolts secure
+each inner bracket; one secures each outer foot, leaving its contact-leg hole
+empty. All six bracket bolts use M5 profile-compatible T-nuts. Probe 1 retains
+its M4 wide-washer clamp and unmodified native 5 mm slot.
 
-The angled layout uses one bridge and two full-stock diagonal T-slot arms. The
-user's pictured 60 × 60 × 18 × 6 mm open 135° brackets join both rails using M5
-bolts and matching T-nuts through 5.5 mm holes. Actual hole centres and slot
-engagement require verification. Sliding, open-ended printed rim-stop saddles
-clamp partway along the arms; unused metal extends beyond the rim. Selection
-checks joint/centre clearance, hub clearance, contact travel and end margin,
-without requiring arm ends to coincide with the rim. For the approximately
-406 mm wheel, both three 200 mm members and three 300 mm members fit the model.
-The stop stand-off accounts for rim depth so the continuing rail clears the
-wheel envelope. Confirm actual spoke/rim and workspace clearance physically.
+The 135° included-angle brackets make 45° rail turns. A 45° connector can be used
+with complementary mounting faces; verify the actual faces and contact positions.
+The preview represents the photographed 135° hardware, not a second mechanism.
 
-Print straight stops rear-face down, and saddle contact faces down with the
-rail channel open. Both contact surfaces must have equal reach; fixed geometry
-removes settings, not manufacturing error. Recalibrate after moving any mount.
+Both arm joints slide symmetrically along the centre rail; full 100 mm arm
+lengths are preserved. The reference contacts must fall on the free 60 mm foot
+legs, leaving 5 mm end margins. Out-of-range rims are flagged rather than
+stretching the frame or inventing different stock. Probe reach uses its actual
+7–93 mm bolt-centre travel, with the narrow end towards the hub.
 
-## Shared probe range and adjustment review
+The shared mesh is `src/components/workshop/fusionProbe1Mesh.json`, with the
+native printable body in `cad/probe1.stl`. Its body is always 105 × 15 × 15 mm.
+There is no forked shoe: check actual stationary hub-face, axle and seal clearance.
+Seat both metal feet, set and lock the probe on the first wheel side, and reverse
+without changing any settings. Check at several rim positions to distinguish
+local runout from dish. Confirm foot coplanarity and clamp repeatability physically.
 
-Both designs use the same single lockable M6 centre probe. Probe reach is measured
-from the wheel-facing carriage face to the hub-contact face. The model reserves
-10 mm minimum reach for shoe/clearance and 15 mm of rod for rear nuts and tail.
-Rod length is rounded up to maintain the requested initial setup allowance
-(default ±5 mm). Insufficient retraction is flagged instead of silently resizing
-a manually selected stop pair. The UI, specifications and CSV show range and
-reserve; these are geometric limits, not experimentally verified repeatability.
-
-The same 80 mm stop pair is tested with 130/135 mm hub spacing and 25/28/32 mm
-rim widths. Only the centre probe changes setting. Round-size angled saddle
-stand-offs replace exact rim-depth-dependent prints. Equal contact heights matter;
-a common height change is absorbed by initial probe setting. Unequal heights,
-flexure and joint movement require correction and physical calibration.
-
-Set on side A, lock the centre and compare side B without changing anything.
-If the gauge rocks on the probe, use B as the initial reference and recheck A for
-a central gap. A 2 mm rim offset produces a 4 mm central gap only with both feet
-seated. Travel is for initial setup, not for dialling out the measured error.
-Source: https://www.parktool.com/en-us/blog/repair-help/wheel-dishing-centering.
-Prefer the straight layout when simplicity is the priority: it has fewer structural
-joints. The angled layout trades additional joints for shorter reusable stock.
-
-## Stock selection
-
-Valid stock edits rebuild immediately on input. The angled selector compares every
-feasible bridge/arm combination, minimises bridge + 2 × arm stock length, and
-prefers shorter arms on equal totals. It no longer stops at the shortest feasible
-bridge. The UI reports the selected combination and remaining arm overhang.
-With the current connectors and central carriage, bridge clearance still requires
-194 mm; a list containing only 100/150 mm members is explicitly unsupported.
-No unavailable bridge is retained or invented. Short arms can combine with a
-longer bridge: on the 406.9 mm example, 300 + 150 + 150 and 400 + 100 + 100
-both use 600 mm total stock, while a 200-only list still uses three 200 mm rails.
-
-## Positive end location
-
-The selector also evaluates moving each arm joint so its factory end lies at the
-rim-contact cap. Where feasible, an internal shoulder seats on that end and side
-cheeks register on the profile; the side-slot bolt retains rather than positions
-the cap. Equal stock totals prefer end location. Other combinations keep open
-sliding saddles with overhang. On the 406.9 mm example, a 300 mm bridge and two
-100 mm arms now use end caps, reducing total stock to 500 mm. These newer end-cap
-candidates supersede the earlier sliding-only stock examples above.
-
-A flat pad references the rim; it does not cradle or clamp the wheel. End location
-improves repeatable placement but does not certify accuracy. Check factory end
-squareness, equal assembled pad heights and loaded deflection. The added shoulder
-may need local print support or a separate cheek; slicer validation is required.
+Legacy straight-layout and printed-stop settings are discarded when loading this single model. The UI exposes
+neither the old straight alternative nor its printed-stop reach selector.
 
 ## Coplanar H base
 
@@ -179,26 +137,43 @@ Four corner brackets lie in the horizontal base plane. Their flanges bolt into
 side slots in the crossbar and feet, with bolt centres at P/2 above the bench.
 The four upright brackets remain upright and connect crossbar top slots to
 upright side slots. The previous stacked-joint slot-height requirement no longer
-applies. Check actual connector width, hole position and bench clearance: the
-pictured 19 mm bracket width would leave only 0.5 mm per side when centred on
-20 mm rail height. That is a dimensional observation, not confirmed product fit.
+applies. All eight 90° connectors use the supplied gusseted bracket: 50 × 50 mm
+legs, 18 mm width, 9 mm flanges, and two Ø6 mm clearance holes for M5 hardware.
+Hole centres are 10 mm from each free end and 9 mm across the width. The preview
+includes the diagonal gusset, relieved opening and open central boss; their
+undimensioned contours are approximate. The 18 mm width leaves 1 mm bench
+clearance on a 2020 rail. M5 × 16 bolts are preliminary lengths for the 9 mm
+flanges; select M5 T-nuts compatible with the chosen profile and confirm engagement.
+Crossbar stock must support the full outer bracket legs. Upright spacing is clamped to a hard minimum: 100 mm between inner faces,
+so 120 mm centre-to-centre on 2020 rails. Bracket tips can meet but cannot overlap.
+For a narrower hub, the assembly automatically includes a through-hub support rod
+and two equal-OD metal spacer sleeves. The rod control is checked and locked while
+required; returning to a wider hub restores the optional guide-rod preference.
+Each sleeve has a hub-side counterbore for the existing axle protrusion and a
+smaller through-bore for the rod, and extends across the holder. The unchanged V
+caps carry the sleeves; axle height follows their outside diameter. The hub stays
+centred and the measurement mounts follow the actual upright spacing. Sleeve
+lengths and rod length are listed in the BOM. These adapter dimensions are
+provisional: verify the actual hub bore, stationary end contact, rod stiffness
+and retention before use; do not clamp through the printed holders.
 
 Tests check all three base rails are coplanar, feet meet rather than intersect
 the crossbar, upright bottoms land on its top face, and base bolts enter side
 slots at rail-centre height. Rigidity and repeatability still need physical tests.
 
 
-## Fusion lateral holder V3
+## Fusion lateral holder V5
 
 The workshop renders the redesigned Fusion solid directly, without stretching.
 The 82 × 40 × 8 mm upper plate has two horizontal 65.5 × 5.5 mm slots: bolt
 centres travel from X −42 to 18 mm, at Y 43 and 61 mm above the dial centre.
-A 24 × 8 mm descending web carries the original fork below the mounting plate.
-The full printed envelope is 82 × 82 × 27 mm. The fork retains 6 mm cheeks,
-5.8 mm gap, Ø5.5 mm holes and the original root fillets. Three M5 bolts total.
+A 24 × 8 mm descending web carries one 8 mm mounting ear below the plate.
+The printed envelope is 82 × 82 × 28 mm. The ear has a Ø5.5 mm hole with a
+45° print roof, an R8 free-side fillet and an R2 dial-side fillet. Three M5 bolts total.
 
 For the Hope front 100 mm hub, 28 mm rim and 2020 upright, with provisional
-3 mm hub-seat projection, the dial centre is 24.5 mm right of the upright centre with the centred V2 cap.
+3 mm hub-seat projection, the uprights stop at the 120 mm bracket minimum and the dial centre is
+16 mm right of the upright centre.
 At 5 mm compression its tip touches the rim sidewall. Lower washer-to-case clearance is
 11 mm; the case rear is 30 mm ahead of the upright front. This is a geometric
 fit check, not a stiffness or manufacturing certification. Physical projection,
@@ -209,29 +184,23 @@ The measured relaxed probe has a 20 mm fixed sleeve plus 20 mm exposed pin,
 travel lets the user retract for wheel insertion and add light preload after
 contact. Out-of-range configurations are flagged rather than resized.
 
-Fusion retains the old holder hidden and adds `PRINT - V3 symmetric upper slots lower dial
-fork`. The imported web/plate/fork is a single valid solid; the original fork's
-holes and roots are preserved. The radial holder is now a separate Fusion T-bridge design, described below.
+The V4 fork and rear lug are rotated 90° about the case axis. The lateral
+probe points along X and the lug screw along Y, so the two are perpendicular.
+`cad/correct_lateral_lug.py` updates the open original `probe-dial-lateral`,
+exports the mesh and printable STL, and leaves the assembled design visible.
+The flat mounting plate, pin preload and case position are preserved.
 
 The vertical plate/web outline has 3 mm corner fillets, including the two web
 shoulders. The 8 mm thickness edges, slots, fork cheeks and holes are unchanged.
 Fusion parameter: `holder_outline_radius`.
 
 
-V3 centres the upper plate, slots and web on the fork at X −12 mm. Both slot
-end margins remain 8.25 mm. With 5 mm preload, the front100 and rear135 rigs use
-local slot positions −36.5 and −19 mm respectively (28 mm rim, 3 mm provisional
-hub-seat projection). The dial sits 24.5 mm right of the front upright and 7 mm
-right of the rear upright. Both positions leave adjustment for setup and removal.
-Ten millimetres of indicator travel at 5 mm preload provides nominal ±5 mm;
-actual working excursion should stay inside the end stops. Reposition and
-re-zero for each wheel. This is geometry verification, not stiffness validation.
-
-
 ## Fusion 2020 centred V hub caps — revision 4
 
-The V sits directly above the upright centre. Move the uprights under the hub-end
-projections: upright X = ±(hub seating width/2 + usable projection/2). The 3 mm
+The V sits directly above the upright centre. Upright spacing is the larger of
+the hub seating width plus usable projection and the bracket minimum (120 mm
+for 2020). Narrow hubs use matched spacer sleeves on a through-hub support rod;
+wider hubs seat their stationary ends directly on the V. The 3 mm
 axial contact band must fit entirely under each stationary end. Two copies of the same
 cap support equal-diameter ends; unequal ends are explicitly flagged.
 
@@ -252,7 +221,8 @@ The fin is thicker below its tips; short hub protrusions require a fresh
 hub-shell clearance check, especially below the V contact. V apex is 26 mm above the bar; top is 44 mm. Raising the apex also clears
 the workshop's 32 mm-diameter hub-shell reference for supported end diameters.
 Overall cap envelope is 26.3 × 54 × 44 mm; the 90° V supports diameters 6–35 mm.
-Axle height = rail top + 26 + diameter/(2 sin45°). Check actual hub-shell and flange
+Axle height = rail top + 26 + supported diameter/(2 sin45°), using the sleeve
+outer diameter when a support rod is required. Check actual hub-shell and flange
 clearance, especially for hubs whose flanges extend close to the seating faces.
 
 Use supports OFF. The only horizontal overhang above the bed is the small
@@ -275,7 +245,7 @@ The workshop renders the solid at its actual size with the rail-top centre as
 origin (Fusion X,Y,Z maps to workshop X,Z,−Y in millimetres). The caps form one
 BOM row, quantity two, with no cap bolts or nuts. Exploded view lifts them clear
 of the uprights. The 3030/4040 bolted designs are unchanged. Workshop design
-revision 8 clears earlier cap fit/calibration data.
+revision 15 clears earlier fit/calibration data.
 
 Verification includes watertight positive-volume meshes, shared parameters,
 centred hub contact, 45° minimum downward-face slopes (except the seating ledge
@@ -285,80 +255,60 @@ with support disabled: 270 layers, no support paths. This is a geometry validati
 slice, not printer-specific production G-code. See `cad/print-verification.json`.
 
 
-## Fusion radial dial holder V8 — double-sided M5 pivot
+## Fusion radial dial holder V13 — reinforced single ear
 
-Two ordinary printed parts replace the rail and flexible socket: a slotted T
-bridge and a flat dial arm. The bridge has two fixed fork cheeks, with the arm
-between them. A **single M5 × 25 bolt, two washers and a nut** clamp both flat
-bearing faces to lock tilt. The two cheeks and arm are each 4 mm thick; 0.2 mm
-assembly clearance on each side gives a 12.4 mm open stack. The longer pivot
-bolt is intentional. The three frame fixings and the dial-lug fixing retain
-8 mm stacks and short M5 × 16 bolts.
+One flat-backed print carries the dial against one 8 mm ear. No fitted gap or
+shims are needed. R6 outer and R3 dial-side root fillets reinforce the ear. The transverse M5 × 25 lug bolt also locks
+0–25° tilt. No separate arm or second pivot is needed. The lug screw is
+perpendicular to the measuring pin on both radial and lateral holders.
 
-The whole bridge slides sideways in **three horizontal mounting slots**, like
-the lateral holder. Left bolt centres travel −21 to +16 mm in two slots at
-18 mm vertical pitch; the right bolt travels 108–145 mm in its slot. Both are
-local coordinates on the printed bridge. The dial centre can sit 46–83 mm from
-the left upright. This covers the primary Hope front100 and rear135 hubs, ±5 mm
-wheel offset and 3–20 mm hub-end projection. Changing hub width requires sliding
-the bridge as well as repositioning the right bolt. This replaces the earlier
-fixed-left-hole arrangement so two simple printed pieces suffice. Tighten the
-frame bolts to lock sideways position; the pivot bolt independently locks tilt.
+The pivot is 20.75 mm above the print bed and 40 mm from the mounting line. An R6.75 concave web with R6 outer and R3 dial-side root fillets
+reinforces the single ear. Two R8 concave fillets blend the foot into the crossbar. The two exposed arm-end corners have the user-added R2.5 fillets from Fusion v9. Frame lands remain 8 mm for the three M5 × 16 bolts.
+The print envelope is **180 × 68 × 30.75 mm**. The projecting arm is solid and 8 mm thick throughout. The raised ear and
+its local fillets sit above that arm; there is no recessed 2 mm floor.
 
-The pivot is 4 mm further left than V6, and the dial-fixing hole is 2 mm
-further right within part 2. The dial reference is now local X=62. Assembly
-positioning compensates for this so the probe remains on the wheel centreline.
-R4 concave fillets reinforce both outer fork roots; the supporting foot extends equally 6 mm beyond each outer cheek while leaving the rotating
-arm gap clear. A 10 mm diameter driver envelope clears the lug screw approach,
-both cheeks and pivot hardware throughout the verified 0–25° range. The assembled
-design, including its dial and hardware, remains active in Fusion; the separated
-print layout is only an additional export.
+Left bolt centres travel −21 to +16 mm at 18 mm pitch; right travel is
+108–145 mm. Sliding the bridge places the dial at 46–83 mm from the left upright.
+The workshop checks both Hope hubs, ±5 mm offsets and 3–20 mm end projections,
+retaining the actual upright spacing and reporting fits outside the travel.
+Meshes only translate and rotate. Pointer mode remains available.
 
-The pivot has a 24 mm nominal bearing diameter. The moving arm prints on its
-broad 4 mm face, with the reinforced lug ear growing directly from that face.
-The bridge prints on its flat 8 mm back, with both fork cheeks growing upward.
-Horizontal pivot clearances have 45° roofs; the moving arm's pivot bore prints
-vertically. There are no enclosed unsupported ceilings, snap fits or flexible
-clamping features. Rounded beam openings remove unused material. Total solid
-volume is 45,853.5 mm³, 32.3% below V2. The combined oriented STL occupies
-**180 × 110.4 × 32 mm**. Use the individual STLs if bed margins require separation.
+The fixed reference is Ø54 × 25 mm, 5.2 mm lug and Ø6.85 mm lug hole, with
+inferred 10.25 mm rear offset. The 20 mm sleeve and 15 mm exposed pin show
+5 mm preload. Aim the pin through the axle, tighten the lug bolt, adjust frame
+height for preload and re-zero. Lower the bridge to retract before wheel removal.
 
-The reference dial is unchanged: Ø54 × 25 mm case, 5.2 mm lug, Ø6.85 mm hole
-and inferred 10.25 mm rear offset. Its metal lug bears against a 2.8 mm reinforced
-printed ear for an 8 mm stack. The 20 mm sleeve and 15 mm exposed pin represent
-5 mm preload. No contact-tip attachment is included. Aim the pin through the
-wheel axle centre, tighten the pivot, adjust bridge height for preload, and
-re-zero. Recheck after any hub, lateral-position or angle change.
+Generate with `cad/create_radial_holder.py` through Fusion MCP, injecting
+`RADIAL_SPEC` from `src/data/radialHolder.json` and `OUTPUT_ROOT` as the repository
+path. Open the original `probe-dial-radial` document first. Regeneration updates
+that document, preserving an automatic temporary backup; save it normally to
+create a Fusion version. The existing document supplies the reference dial. `cad/export_radial_holder.py`
+exports the assembled F3D, one millimetre STL and measured workshop meshes.
+`cad/correct_lateral_lug.py` reproduces the matching lateral V5 single-ear correction.
 
-`src/data/radialHolder.json` is the named dimensional specification. Run
-`cad/create_radial_holder.py` through Fusion MCP with `RADIAL_SPEC` injected and
-`OUTPUT_ROOT` set to the repository directory. It imports the checked-in
-`cad/radial-dial-holder.f3d`, copies its measured reference dial, closes that
-temporary import and creates a separate radial design. No open lateral document
-is required, and the saved source assembly is not modified.
-`cad/export_radial_holder.py` exports actual neutral Fusion meshes, oriented
-individual and combined STLs, one assembly STEP and the F3D assembly. The
-combined STL places both printable solids on the same Z=0 bed. Individual STEP
-files, a second print-layout F3D, old design revisions and review screenshots are
-excluded to keep a single current CAD assembly. The workshop uses only
-rigid translations and rotations; it never stretches meshes. Revision 13 clears
-old calibration readings. Pointer mode and lateral geometry remain unchanged.
+Validation uses `cad/verify_radial_holder.py` for one closed solid, perpendicular
+lug/pin axes and 83 interference checks through the tilt and fixing ranges.
+Mesh tests check manifold edges and print overhangs. `cad/slice_radial_holder.py`
+runs a generic 0.2 mm CuraEngine slice without supports; this is not production
+printer G-code. Physical print fit, clamping friction and stiffness need testing.
 
-The workshop computes the tilt needed for the actual rim radius from the probe
-axis and pivot location. The pivot is local Y=−26, Z=20; its axis is horizontal
-across the stand. Travel is checked over 0–25°. Unsupported hub widths, offsets,
-slot travel, base clearance and probe alignment produce explicit fit warnings.
+## Retained CAD files
 
-Validation includes two connected closed Fusion solids; zero interference over
-114 component/hardware checks; manifold STL meshes; overhang-angle checks in
-actual print orientation; both Hope hubs, ±5 mm offsets and 3/20 mm end projection;
-and unchanged mesh dimensions. CuraEngine 5.13.0 also generates a generic
-supports-off validation slice at 0.2 mm layers. The slice is for geometric review,
-not machine-specific production G-code. Physical print fit, tightening torque,
-creep and measurement repeatability still require testing on the actual stand.
+`cad/` retains current printable STL parts, editable F3D assemblies, verification
+reports and scripts needed to reproduce them. Workshop preview meshes live in
+`src/components/workshop/`. The old split radial bridge and C-holder STL files
+and duplicate radial STEP assembly are removed; the exporter produces the native
+assembly and printable part without regenerating the STEP copy. Generated Fusion
+`_XRef_` sidecars and Python caches are ignored. Regeneration backups and validation G-code stay in the
+system temporary directory and are not commit assets; validation slices clean
+up their temporary G-code and logs automatically.
 
-Assembly: place the arm between the fork cheeks, fit the longer M5 pivot bolt
-with washers and nut, and leave it loose. Attach the bridge using its three
-frame slots and centre the dial. Tighten the frame bolts, set tilt and tighten
-the pivot, then set 5 mm preload and re-zero. Retract probes before lifting the
-wheel; lower the bridge in the upright slots to retract the radial probe.
+The physical lateral V4 print failed at a fork ear when fitted over the dial lug.
+V5 removes the second ear and fitted-gap constraint, retaining one 8 mm ear
+with a 28 mm overall projection and R2 top shoulders. Both holders retain the
+original dial position and require physical print and clamp testing.
+
+Root fillets are local: R8 free-side and R2 dial-side on the lateral holder;
+R6 outer and R3 dial-side on the radial holder. A local Ø16 mm circular relief
+around each lug bolt clears washers up to Ø15 mm while retaining a flat seat.
+Both CAD checks verify full support of the outer washer bearing annulus.

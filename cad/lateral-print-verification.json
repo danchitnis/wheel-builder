@@ -1,0 +1,99 @@
+{
+  "revision": 5,
+  "connectedClosedPrintedSolids": 1,
+  "earThicknessMm": 8,
+  "lugWasherDiameterMm": 15,
+  "washerOuterBearingRingFullySupported": true,
+  "outerRootFilletMm": 8,
+  "washerReliefDiameterMm": 16,
+  "dialSideFilletMm": 2,
+  "printEnvelopeMm": [
+    82,
+    82,
+    28
+  ],
+  "interferenceChecks": [
+    {
+      "pair": "holder/dial",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Printable holder/Lug M5x25 shank",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Dial case and rear lug/Lug M5x25 shank",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Printable holder/Lug head washer",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Dial case and rear lug/Lug head washer",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Printable holder/Lug nut washer",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Dial case and rear lug/Lug nut washer",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Printable holder/M5 nut envelope",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Dial case and rear lug/M5 nut envelope",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Printable holder/10 mm driver",
+      "overlapMm3": 0.0
+    },
+    {
+      "pair": "Dial case and rear lug/10 mm driver",
+      "overlapMm3": 0.0
+    }
+  ],
+  "physicalPrintTested": false,
+  "slicerVerified": true,
+  "supportRequiredByGeometry": false,
+  "slice": {
+    "engine": "CuraEngine 5.13.0",
+    "settings": {
+      "machine_width": 200,
+      "machine_depth": 200,
+      "machine_height": 200,
+      "machine_center_is_zero": "false",
+      "center_object": "false",
+      "mesh_position_x": 10,
+      "mesh_position_y": 10,
+      "layer_height": 0.2,
+      "layer_height_0": 0.2,
+      "line_width": 0.4,
+      "wall_line_count": 4,
+      "top_layers": 5,
+      "bottom_layers": 5,
+      "roofing_layer_count": 0,
+      "flooring_layer_count": 0,
+      "infill_sparse_density": 25,
+      "infill_line_distance": 1.6,
+      "material_diameter": 1.75,
+      "support_enable": "false",
+      "adhesion_type": "none"
+    },
+    "layers": 140,
+    "pathTypes": [
+      "FILL",
+      "SKIN",
+      "WALL-INNER",
+      "WALL-OUTER"
+    ],
+    "supportPaths": 0,
+    "maximumZMm": 28.0,
+    "note": "Generic validation only. Load the STLs into the intended printer/material profile before production."
+  }
+}

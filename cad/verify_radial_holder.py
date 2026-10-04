@@ -1,48 +1,49 @@
-"""Fusion geometry checks; inject OUTPUT_ROOT. No physical or slicer validation implied."""
+"""Fusion checks for the one-piece holder; inject OUTPUT_ROOT."""
 import adsk.core, adsk.fusion, json, math
 from pathlib import Path
 
-
 def run(_context: str):
-    d=adsk.fusion.Design.cast(adsk.core.Application.get().activeProduct)
-    bodies={b.name:b for c in d.allComponents for b in c.bRepBodies};temp=adsk.fusion.TemporaryBRepManager.get()
-    prints=['Radial printable bridge','Radial printable C-holder']
-    for n in prints:
-        b=bodies[n];assert b.isSolid and b.lumps.count==1 and b.lumps.item(0).isClosed
-    def moved(name,x,angle):
-        b=temp.copy(bodies[name]);t=adsk.core.Matrix3D.create()
-        t.setToRotation(-math.radians(angle),adsk.core.Vector3D.create(1,0,0),adsk.core.Point3D.create(6.2,-2.6,2));assert temp.transform(b,t)
-        t=adsk.core.Matrix3D.create();t.translation=adsk.core.Vector3D.create((x-62)/10,0,0);assert temp.transform(b,t);return b
-    checks=[];failures=[]
-    def check(a,b,label):
-        a=temp.copy(a);assert temp.booleanOperation(a,b,adsk.fusion.BooleanTypes.IntersectionBooleanType)
-        volume=a.volume*1000
-        row={'pair':label,'overlapMm3':volume};checks.append(row)
-        if volume>1e-5:failures.append(row)
-    for x in [62]:
-        for angle in [0,5,10,15,20,25]:
-            carriage=moved(prints[1],x,angle);dial=moved('Radial dial case and rear lug',x,angle)
-            check(bodies[prints[0]],carriage,f'bridge/C x={x} angle={angle}')
-            check(bodies[prints[0]],dial,f'bridge/dial x={x} angle={angle}')
-            check(carriage,dial,f'C/dial x={x} angle={angle}')
-            for name in ['Lug M5x16 bolt','Lug M5 head','Lug M5 nut envelope','Pivot M5x25 bolt','Pivot M5 head','Pivot M5 nut envelope']:
-                check(carriage,moved(name,x,angle),f'C/{name} x={x} angle={angle}')
-    for x in [108,118.5,134.5,145]:
-        for name in ['Right M5x16 bolt','Right M5 head','Right M5 washer']:
-            b=temp.copy(bodies[name]);t=adsk.core.Matrix3D.create();t.translation=adsk.core.Vector3D.create((x-125)/10,0,0);temp.transform(b,t)
-            check(bodies[prints[0]],b,f'bridge/{name} x={x}')
-    for x in [-21,0,16]:
-        for name in ['Left lower M5x16 bolt','Left upper M5x16 bolt','Left lower M5 head','Left upper M5 head','Left lower M5 washer','Left upper M5 washer']:
-            b=temp.copy(bodies[name]);t=adsk.core.Matrix3D.create();t.translation=adsk.core.Vector3D.create(x/10,0,0);temp.transform(b,t)
-            check(bodies[prints[0]],b,f'bridge/{name} x={x}')
-    # A 10 mm driver envelope approaches the lug screw from behind without
-    # touching either pivot cheek, the arm, dial or pivot hardware.
-    for angle in [0,5,10,15,20,25]:
-        tool=temp.createCylinderOrCone(adsk.core.Point3D.create(6.2,-10,2.975),.5,adsk.core.Point3D.create(6.2,-1.14,2.975),.5)
-        t=adsk.core.Matrix3D.create();t.setToRotation(-math.radians(angle),adsk.core.Vector3D.create(1,0,0),adsk.core.Point3D.create(6.2,-2.6,2));temp.transform(tool,t)
-        for name in [prints[0],'Pivot M5x25 bolt','Pivot M5 nut envelope']:
-            check(bodies[name],tool,f'{name}/10 mm driver at {angle} degrees')
-        for name in [prints[1],'Radial dial case and rear lug']:
-            check(moved(name,62,angle),tool,f'{name}/10 mm driver at {angle} degrees')
-    report={'revision':8,'connectedClosedPrintedSolids':2,'interferenceChecks':len(checks),'failures':failures,'printOrientation':'Bridge on flat back; dial arm on broad X=47 face, both STLs at Z=0','supportRequiredByGeometry':'See mesh normal test','slicerVerified':False,'physicalPrintTested':False,'note':'Mesh manifold and overhang checks in radialHolder.test.ts. Nut envelopes are conservative cylinders; actual hardware, stiffness and repeatability require physical verification.'}
-    (Path(OUTPUT_ROOT)/'cad/radial-print-verification.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));assert not failures
+ doc=next(v for v in adsk.core.Application.get().documents if v.name=='probe-dial-radial' and v.dataFile)
+ d=adsk.fusion.Design.cast(doc.products.itemByProductType('DesignProductType'))
+ bodies={b.name:b for c in d.allComponents for b in c.bRepBodies};temp=adsk.fusion.TemporaryBRepManager.get();B=adsk.fusion.BooleanTypes
+ holder=bodies['Radial printable bridge'];assert holder.isSolid and holder.lumps.count==1 and holder.lumps.item(0).isClosed
+ assert len([c for c in d.allComponents if c.name.startswith('PRINT -')])==1
+ root_fillets=[adsk.core.Cylinder.cast(f.geometry) for f in holder.faces if adsk.core.Cylinder.cast(f.geometry) and abs(adsk.core.Cylinder.cast(f.geometry).radius-.8)<1e-6 and abs(adsk.core.Cylinder.cast(f.geometry).axis.z)>.99 and any(abs(adsk.core.Cylinder.cast(f.geometry).origin.x-x)<1e-6 for x in [3.54,7.54])]
+ assert len(root_fillets)==2, 'Both R8 bridge-root fillets must be present'
+ # The projecting arm must retain eight millimetres of solid material up to the rounded end corners.
+ arm=temp.createBox(adsk.core.OrientedBoundingBox3D.create(adsk.core.Point3D.create(5.54,-1.025,.4),adsk.core.Vector3D.create(1,0,0),adsk.core.Vector3D.create(0,1,0),2.4,3.55,.8))
+ arm_volume=arm.volume
+ assert temp.booleanOperation(arm,holder,B.IntersectionBooleanType)
+ assert abs(arm.volume-arm_volume)<1e-8, 'Projecting arm has a recess or reduced thickness'
+ end_fillets=[adsk.core.Cylinder.cast(f.geometry) for f in holder.faces if adsk.core.Cylinder.cast(f.geometry) and abs(adsk.core.Cylinder.cast(f.geometry).radius-.25)<1e-6 and abs(adsk.core.Cylinder.cast(f.geometry).axis.z)>.99]
+ assert len(end_fillets)==2, 'Both user-added R2.5 arm-end fillets must be present'
+ dial=bodies['Radial dial case and rear lug']
+ cylinders=[adsk.core.Cylinder.cast(f.geometry) for f in dial.faces if adsk.core.Cylinder.cast(f.geometry)]
+ lug=next(c for c in cylinders if abs(c.radius-.3425)<1e-6);pin=next(c for c in cylinders if abs(c.radius-.2)<1e-6)
+ assert abs(lug.axis.dotProduct(pin.axis))<1e-8
+ ring=temp.createCylinderOrCone(adsk.core.Point3D.create(5.14,0,2.075),.75,adsk.core.Point3D.create(5.141,0,2.075),.75)
+ bore=temp.createCylinderOrCone(adsk.core.Point3D.create(5.14,0,2.075),.4,adsk.core.Point3D.create(5.141,0,2.075),.4)
+ assert temp.booleanOperation(ring,bore,B.DifferenceBooleanType);expected=ring.volume
+ assert temp.booleanOperation(ring,holder,B.IntersectionBooleanType);assert abs(ring.volume-expected)<1e-8
+ checks=[];failures=[]
+ def check(a,b,label):
+  a=temp.copy(a);assert temp.booleanOperation(a,b,B.IntersectionBooleanType)
+  row={'pair':label,'overlapMm3':a.volume*1000};checks.append(row)
+  if row['overlapMm3']>1e-5:failures.append(row)
+ for angle in [0,5,10,15,20,25]:
+  b=temp.copy(dial);t=adsk.core.Matrix3D.create();t.setToRotation(-math.radians(angle),adsk.core.Vector3D.create(1,0,0),adsk.core.Point3D.create(6.2,0,2.075));assert temp.transform(b,t)
+  check(holder,b,f'holder/dial at {angle} degrees')
+  for name,hardware in bodies.items():
+   if name.startswith('Lug '):check(b,hardware,f'dial/{name} at {angle} degrees')
+  tool=temp.createCylinderOrCone(adsk.core.Point3D.create(-4,0,2.075),.5,adsk.core.Point3D.create(4.54,0,2.075),.5)
+  check(holder,tool,'holder/10 mm lug driver');check(b,tool,f'dial/10 mm lug driver at {angle}')
+ for name,b in bodies.items():
+  if name.startswith('Lug '):check(holder,b,'holder/'+name)
+ for x in [108,118.5,134.5,145]:
+  for name in ['Right M5x16 bolt','Right M5 head','Right M5 washer']:
+   b=temp.copy(bodies[name]);t=adsk.core.Matrix3D.create();t.translation=adsk.core.Vector3D.create((x-125)/10,0,0);temp.transform(b,t);check(holder,b,f'{name} at {x}')
+ for x in [-21,0,16]:
+  for name in ['Left lower M5x16 bolt','Left upper M5x16 bolt','Left lower M5 head','Left upper M5 head','Left lower M5 washer','Left upper M5 washer']:
+   b=temp.copy(bodies[name]);t=adsk.core.Matrix3D.create();t.translation=adsk.core.Vector3D.create(x/10,0,0);temp.transform(b,t);check(holder,b,f'{name} at {x}')
+ report={'revision':13,'armEndCornerRadiusMm':2.5,'solidProjectingArmThicknessMm':8,'lugWasherDiameterMm':15,'washerOuterBearingRingFullySupported':True,'connectedClosedPrintedSolids':1,'bridgeRootFillets':{'count':len(root_fillets),'radiusMm':8},'lugAxis':lug.axis.asArray(),'probeAxis':pin.axis.asArray(),'lugProbeDotProduct':lug.axis.dotProduct(pin.axis),'interferenceChecks':len(checks),'failures':failures,'printOrientation':'Single flat Z=0 bed face; single mounting ear upright','supportRequiredByGeometry':'See mesh normal test','slicerVerified':False,'physicalPrintTested':False,'note':'Direct dial-lug bolt provides angle adjustment. Physical bolt fit, friction and stiffness require verification.'}
+ (Path(OUTPUT_ROOT)/'cad/radial-print-verification.json').write_text(json.dumps(report,indent=2)+'\n');print(json.dumps(report));assert not failures

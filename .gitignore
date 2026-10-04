@@ -113,3 +113,8 @@ dist/
 
 .wrangler/
 wrangler.jsonc
+
+# Generated CAD sidecars and Python caches
+cad/_XRef_/
+__pycache__/
+*.py[cod]

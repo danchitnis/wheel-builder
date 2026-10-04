@@ -29,7 +29,7 @@ export async function initWorkshop() {
   if(transferred.error){el('import-error').hidden=false;el('import-error').textContent=transferred.error+' A saved or default wheel has been loaded.';}
   function fill(){
     select('profile').value=settings.profile;input('stock').value=settings.lengths.join(', ');
-    select('dish-stop').value=settings.dishStopReach?.toString()??'';input('dish-allowance').value=String(settings.dishAllowance);select('dish-layout').value=settings.dishLayout;select('measurement').value=settings.mode;select('axle').value=settings.axle;
+    input('dish-allowance').value=String(settings.dishAllowance);select('measurement').value=settings.mode;select('axle').value=settings.axle;
     input('hub-width').value=settings.hubWidth?.toString()??'';
     input('rim-diameter').value=settings.rimDiameter?.toString()??'';
     input('fit').value=String(settings.fit);
@@ -55,20 +55,25 @@ export async function initWorkshop() {
     reversed=false;input('lift-wheel').checked=false;el('reverse-wheel').setAttribute('aria-pressed','false');viewer?.setWheelPose(false,false);
     el('stand-explainer').hidden=settings.tool!=='stand';
     el('dish-explainer').hidden=settings.tool!=='dish';
-    el('dish-layout-control').hidden=settings.tool!=='dish';
-    el('dish-range-controls').hidden=settings.tool!=='dish';el('dish-stop-control').hidden=settings.dishLayout!=='straight';
-    el('dish-stock-result').hidden=settings.tool!=='dish'||settings.dishLayout!=='angled';
-    el('dish-stock-result').textContent=assembly.notes.find(n=>n.startsWith('Stock choice:'))??'No feasible bridge/arm combination from the entered stock list. See fit details below.';
-    if(assembly.probe){const r=assembly.probe;el('probe-range').textContent=`${settings.dishLayout==='straight'?r.stopReach+' mm matched stops. ':''}Probe reach ${r.nominal.toFixed(1)} mm at setup; usable ${r.min}–${r.max} mm. Reserve ${r.inward.toFixed(1)} mm inward / ${r.outward.toFixed(1)} mm outward; target ±${r.allowance} mm.`;}
+    el('dish-model-details').hidden=settings.tool!=='dish';
+    el('dish-range-controls').hidden=settings.tool!=='dish';
+    el('stand-stock-control').hidden=settings.tool==='dish';el('stand-stock-help').hidden=settings.tool==='dish';
+    el('dish-stock-result').hidden=settings.tool!=='dish';
+    el('dish-stock-result').textContent='Fixed stock: 300 mm + 100 mm + 100 mm (500 mm total).';
+    if(assembly.probe){const r=assembly.probe;el('probe-range').textContent=`Probe 1 reach ${r.nominal.toFixed(1)} mm; usable ${r.min}–${r.max} mm. Reserve ${r.inward.toFixed(1)} mm inward / ${r.outward.toFixed(1)} mm outward.`;}
     input('lift-wheel').title='Retract the probes before lifting or reversing the wheel.';
     el('dial-settings').hidden=settings.mode!=='dials'||settings.tool!=='stand';
-    if(invalidStock)assembly.errors.unshift('Enter one or more whole stock lengths (100–2000 mm), separated by commas. Preview retains the last valid stock list.');
+    if(invalidStock&&settings.tool==='stand')assembly.errors.unshift('Enter one or more whole stock lengths (100–2000 mm), separated by commas. Preview retains the last valid stock list.');
+    const rodRequired=assembly.hubSupport?.rodRequired===true;
+    input('guide-rod').checked=rodRequired||settings.guideRod;
+    input('guide-rod').disabled=rodRequired;
+    el('guide-rod-label').textContent=rodRequired?'Support rod + matched spacers required (minimum upright spacing)':'Optional loose guide rod (no clamping)';
     rows=billOfMaterials(assembly.parts);
     el('assembly-title').textContent=assembly.title;
     document.querySelectorAll<HTMLButtonElement>('[data-tool]').forEach(b=>b.setAttribute('aria-pressed',String(b.dataset.tool===settings.tool)));
     select('measurement').disabled=settings.tool==='dish';
     const p=profiles[settings.profile];
-    el('profile-note').textContent=`${p.family} · ${p.bolt} hardware. Verify actual supplier slot dimensions; ${settings.profile} alone is not a connector standard.`;
+    el('profile-note').textContent=`${p.family} · M5 hardware for pictured connectors; ${p.bolt} for other profile fixings. Verify actual supplier slot dimensions; ${settings.profile} alone is not a connector standard.`;
     el('diameter-note').textContent=`${assembly.wheel.diameter.toFixed(1)} mm ${assembly.estimated?'estimated from ERD + twice rim depth; measure before ordering.':'user-measured outside diameter.'}`;
     const status=el('fit-status');status.replaceChildren();status.classList.toggle('invalid',assembly.errors.length>0);
     const strong=document.createElement('strong');strong.textContent=assembly.errors.length?'Fit needs attention — preview is provisional.':'Envelope and stock checks passed — physical fit and calibration still required.';status.append(strong);
@@ -87,12 +92,12 @@ export async function initWorkshop() {
   }
   fill();render();
   const numberOrNull=(id:string)=>input(id).value.trim()===''?null:input(id).valueAsNumber;
-  for(const id of ['dish-stop','dish-allowance','dish-layout','profile','stock','measurement','axle','hub-width','rim-diameter','fit','seat-left','seat-right','projection','guide-rod','lug-hole','lug-thickness','lug-offset']){
+  for(const id of ['dish-allowance','profile','stock','measurement','axle','hub-width','rim-diameter','fit','seat-left','seat-right','projection','guide-rod','lug-hole','lug-thickness','lug-offset']){
     el(id).addEventListener(id==='stock'?'input':'change',()=>{
       const lengths=parseStock(input('stock').value);invalidStock=!lengths;
       settings={...settings,profile:select('profile').value as WorkshopSettings['profile'],lengths:lengths??settings.lengths,
-        dishStopReach:select('dish-stop').value?Number(select('dish-stop').value):null,dishAllowance:input('dish-allowance').valueAsNumber,dishLayout:select('dish-layout').value as WorkshopSettings['dishLayout'],mode:select('measurement').value as WorkshopSettings['mode'],axle:select('axle').value as WorkshopSettings['axle'],
-        seatLeft:numberOrNull('seat-left'),seatRight:numberOrNull('seat-right'),projection:numberOrNull('projection'),guideRod:input('guide-rod').checked,dialLugHole:input('lug-hole').valueAsNumber,dialLugThickness:input('lug-thickness').valueAsNumber,dialLugOffset:input('lug-offset').valueAsNumber,hubWidth:numberOrNull('hub-width'),rimDiameter:numberOrNull('rim-diameter'),fit:input('fit').valueAsNumber};
+        dishAllowance:input('dish-allowance').valueAsNumber,mode:select('measurement').value as WorkshopSettings['mode'],axle:select('axle').value as WorkshopSettings['axle'],
+        seatLeft:numberOrNull('seat-left'),seatRight:numberOrNull('seat-right'),projection:numberOrNull('projection'),guideRod:input('guide-rod').disabled?settings.guideRod:input('guide-rod').checked,dialLugHole:input('lug-hole').valueAsNumber,dialLugThickness:input('lug-thickness').valueAsNumber,dialLugOffset:input('lug-offset').valueAsNumber,hubWidth:numberOrNull('hub-width'),rimDiameter:numberOrNull('rim-diameter'),fit:input('fit').valueAsNumber};
       render(true);if(!invalidStock)save();
     });
   }
@@ -101,7 +106,7 @@ export async function initWorkshop() {
   }));
   document.querySelectorAll<HTMLButtonElement>('[data-view]').forEach(button=>button.addEventListener('click',()=>viewer?.view(button.dataset.view!)));
   document.querySelectorAll<HTMLButtonElement>('[data-focus]').forEach(button=>button.addEventListener('click',()=>{
-    const focus=button.dataset.focus==='measurement-mount'?(settings.mode==='dials'?'lateral-dial-bracket':'lateral-holder'):button.dataset.focus==='radial-mount'?(settings.mode==='dials'?'radial-dial-bracket':'radial-holder'):button.dataset.focus!;const row=rows.find(r=>r.sku.startsWith(focus));if(row){choose(row.sku);viewer?.focusParts(focus==='radial-dial-bracket'?rows.filter(r=>r.sku==='radial-dial-bracket'||r.sku==='radial-dial-c-holder'||r.sku==='dial-radial').flatMap(r=>r.ids):row.ids);el('viewer').scrollIntoView({block:'center',behavior:'smooth'});}
+    const focus=button.dataset.focus==='measurement-mount'?(settings.mode==='dials'?'lateral-dial-bracket':'probe1'):button.dataset.focus==='radial-mount'?(settings.mode==='dials'?'radial-dial-bracket':'probe1'):button.dataset.focus!;const row=rows.find(r=>r.sku.startsWith(focus));if(row){choose(row.sku);viewer?.focusParts(focus==='probe1'?assembly.parts.filter(p=>p.probeRole===(settings.tool==='dish'?'dish':button.dataset.focus==='radial-mount'?'radial':'lateral')).map(p=>p.id):focus==='radial-dial-bracket'?rows.filter(r=>r.sku==='radial-dial-bracket'||r.sku==='dial-radial').flatMap(r=>r.ids):row.ids);el('viewer').scrollIntoView({block:'center',behavior:'smooth'});}
   }));
   input('lift-wheel').addEventListener('change',()=>viewer?.setWheelPose(input('lift-wheel').checked,reversed));
   el('reverse-wheel').addEventListener('click',()=>{reversed=!reversed;input('lift-wheel').checked=true;el('reverse-wheel').setAttribute('aria-pressed',String(reversed));viewer?.setWheelPose(true,reversed);});

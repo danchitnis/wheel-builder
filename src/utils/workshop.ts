@@ -1,3 +1,4 @@
+import probe1Export from '../components/workshop/fusionProbe1Mesh.json' with { type: 'json' };
 import fusionHolderMeshes from '../components/workshop/fusionHolderMeshes.json' with { type: 'json' };
 import radialExport from '../components/workshop/fusionRadialHolderMeshes.json' with { type: 'json' };
 import radialSpec from '../data/radialHolder.json' with { type: 'json' };
@@ -5,6 +6,7 @@ import hubCapSpec from '../data/hubSupportCap.json' with { type: 'json' };
 import hubCapExport from '../components/workshop/fusionHubCapMeshes.json' with { type: 'json' };
 import { parseConfiguration, restoreConfiguration, serializeConfiguration, BUILD_SESSION_KEY, type BuildConfiguration, type BuildStorage } from './buildConfiguration.ts';
 
+export const cornerBracketDimensions = { leg:50, width:18, thickness:9, holeOffset:40, bore:6 } as const;
 export type Vec3 = [number, number, number];
 export const radialHolderDimensions = radialSpec.parameters;
 export const hubCapDimensions = {
@@ -25,7 +27,7 @@ export interface WorkshopSettings {
   version: 1; profile: Profile; lengths: number[]; axle: Axle;
   hubWidth: number | null; rimDiameter: number | null;
   seatLeft: number | null; seatRight: number | null; projection: number | null; guideRod: boolean; dialLugHole: number; dialLugThickness: number; dialLugOffset: number;
-  dishStopReach: number | null; dishAllowance: number; dishLayout: 'straight' | 'angled'; mode: 'pointers' | 'dials'; fit: number; tool: ToolKind;
+  dishAllowance: number; mode: 'pointers' | 'dials'; fit: number; tool: ToolKind;
   observations: string; readings: string; reverseA: string; reverseB: string; dishGap: string;
 }
 export const WORKSHOP_KEY = 'wheel-builder:workshop:v1';
@@ -38,7 +40,7 @@ export function inferAxle(spacing: string): { axle: Axle; hubWidth: number | nul
 }
 export function workshopDefaults(config: BuildConfiguration): WorkshopSettings {
   return { version: 1, profile: '2020', lengths: [300,400,500,600,700,800,900,1000],
-    ...inferAxle(config.spacing), seatLeft:null, seatRight:null, projection:null, guideRod:false, dialLugHole:6.85, dialLugThickness:5.2, dialLugOffset:10.25, rimDiameter: null, dishStopReach:null, dishAllowance:5, dishLayout:'straight', mode: 'pointers', fit: 0.3, tool: 'stand',
+    ...inferAxle(config.spacing), seatLeft:null, seatRight:null, projection:null, guideRod:false, dialLugHole:6.85, dialLugThickness:5.2, dialLugOffset:10.25, rimDiameter: null, dishAllowance:5, mode: 'pointers', fit: 0.3, tool: 'stand',
     observations: '', readings: '', reverseA: '', reverseB: '', dishGap: '' };
 }
 // Fit overrides belong to a wheel snapshot. A different wheel must not inherit them.
@@ -48,14 +50,13 @@ export function loadWorkshop(raw: string | null, config: BuildConfiguration): Wo
     const saved = JSON.parse(raw ?? 'null');
     if (!saved || saved.version !== 1 || !saved.settings) return defaults;
     const v = saved.settings;
-    const same = saved.design === 13 && saved.wheel === serializeConfiguration(config, false);
+    const same = saved.design === 15 && saved.wheel === serializeConfiguration(config, false);
     const n = (x: unknown, lo: number, hi: number) => typeof x === 'number' && Number.isFinite(x) && x >= lo && x <= hi;
     return { ...defaults,
       profile: Object.hasOwn(profiles, v.profile) ? v.profile : defaults.profile,
       lengths: Array.isArray(v.lengths) && v.lengths.length > 0 && v.lengths.length <= 50 && v.lengths.every((x: unknown) => n(x, 100, 2000) && Number.isInteger(x)) ? [...new Set<number>(v.lengths)].sort((a,b)=>a-b) : defaults.lengths,
       dialLugHole:6.85, dialLugThickness:5.2, dialLugOffset:10.25,
-      dishStopReach:n(v.dishStopReach,40,160)&&v.dishStopReach%20===0?v.dishStopReach:null, dishAllowance:n(v.dishAllowance,1,15)?v.dishAllowance:5,
-      dishLayout:v.dishLayout==='angled'?'angled':'straight',
+      dishAllowance:n(v.dishAllowance,1,15)?v.dishAllowance:5,
       mode: v.mode === 'dials' ? 'dials' : 'pointers', tool: v.tool === 'dish' ? 'dish' : 'stand',
       fit: n(v.fit, 0, 1) ? v.fit : defaults.fit,
       ...(same ? { axle: ['', 'qr9', 'qr10', '12', '15', '20'].includes(v.axle) ? v.axle : defaults.axle,
@@ -67,7 +68,7 @@ export function loadWorkshop(raw: string | null, config: BuildConfiguration): Wo
   } catch { return defaults; }
 }
 export function workshopSnapshot(settings: WorkshopSettings, config: BuildConfiguration) {
-  return JSON.stringify({ version: 1, design: 13, wheel: serializeConfiguration(config, false), settings });
+  return JSON.stringify({ version: 1, design: 15, wheel: serializeConfiguration(config, false), settings });
 }
 export function resolveWorkshopWheel(fragment: string, storage: () => BuildStorage) {
   const restored = restoreConfiguration(fragment, storage);
@@ -93,27 +94,25 @@ export function repeatability(raw: string) {
   return { count: values.length, spread, passes: spread <= 0.2 + 1e-9 };
 }
 export function reversal(a: number, b: number) { return { jigBias: (a+b)/2, wheelOffset: (a-b)/2 }; }
-// Reach is measured from the carriage front face to the hub-contact face.
-// Reserve 10 mm for the shoe/clearance and 15 mm at the rod rear for nuts/tail.
-export function dishingProbeRange(nominal:number,rodLength:number){
-  const min=10,max=rodLength-15;
-  return {nominal,min,max,inward:nominal-min,outward:max-nominal};
-}
 export function dishOffset(gap: number) { return gap / 2; }
 
 export interface Part {
   id: string; sku: string; name: string; kind: 'extrusion' | 'pla' | 'metal' | 'gauge' | 'hardware';
+  probeRole?: 'lateral'|'radial'|'dish'; probeBolt?:number;
   meshKey?: keyof typeof fusionHolderMeshes;
   radialMeshKey?: keyof typeof radialExport.meshes;
   capDesign?: 'centred-v2';
-  shape: 'fusion-mesh' | 'box' | 'cylinder' | 'ring' | 'angle' | 'top-cap' | 'rail-mount' | 'clamp' | 'dial' | 'clevis' | 'dial-lug' | 'dish-plate' | 'fork' | 'angle-foot' | 'photo-bracket' | 'contact-cap' | 'fixed-stop'; bore?: number; size: Vec3; position: Vec3; axis?: 'x' | 'y' | 'z';
+  shape: 'probe1' | 'fusion-mesh' | 'box' | 'cylinder' | 'ring' | 'hub-spacer' | 'angle' | 'top-cap' | 'photo-bracket'; bore?: number; size: Vec3; position: Vec3; axis?: 'x' | 'y' | 'z';
   stock?: number; spec: string; stage: number;
-  rotation?: Vec3; profileSize?: number; fit?: number; seatHeight?: number; mountBore?: number; nose?: number;
-  lugWidth?: number; lugOffset?: number;
-  endLocated?:boolean; angleReach?:number; angleSign?:number; holes?: {x:number;y:number;r:number}[]; print?: {bed:string; supports:string; accuracy:string}; mountTarget?: Vec3; mountSide?: number;
+  rotation?: Vec3; profileSize?: number; fit?: number; seatHeight?: number; nose?: number;
+  counterbore?:number; counterboreDepth?:number;
+  bendLegs?: [[number,number],[number,number]];
+  print?: {bed:string; supports:string; accuracy:string};
   movesWithWheel?: boolean; measurementAxis?: 'x' | 'y';
 }
 export interface Assembly {
+  dishing?: {bridgeLength:number;armLength:number;jointHalfSpan:number;contactAlongFoot:number;connectorAngle:135};
+  hubSupport?: { minimumUprightSpacing:number; uprightSpacing:number; rodRequired:boolean; spacerLength:number; spacerDiameter:number };
   radialMount?: { uprightSpan:number; leftBolt:number; bridgeShift:number; rightBolt:number; desiredDialX:number; dialX:number; origin:Vec3; tip:Vec3; direction:Vec3; tiltDegrees:number; alignmentErrorDegrees:number };
   probe?: {nominal:number;min:number;max:number;inward:number;outward:number;allowance:number;rodLength:number;stopReach:number}; parts: Part[]; errors: string[]; notes: string[]; steps: string[];
   wheel: { diameter: number; width: number; depth: number; hubWidth: number; axleDiameter: number; center: Vec3; spokes: number; left: number; right: number; flangeL: number; flangeR: number; offset: number };
@@ -155,7 +154,7 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
   }
   if (!valid(s.hubWidth, 70, 250)) errors.push('Confirm the distance between hub dropout seating faces (70–250 mm).');
   if (!Number.isFinite(s.fit) || s.fit < 0 || s.fit > 1) errors.push('Printer diametral fit allowance must be 0–1 mm.');
-  if (!s.lengths.length || s.lengths.some(n=>!Number.isInteger(n) || n<100 || n>2000)) errors.push('Stock lengths must be whole millimetres between 100 and 2000.');
+  if (s.tool==='stand' && (!s.lengths.length || s.lengths.some(n=>!Number.isInteger(n) || n<100 || n>2000))) errors.push('Stock lengths must be whole millimetres between 100 and 2000.');
   if(s.mode==='dials' && (Math.abs(s.dialLugHole-6.85)>.01||Math.abs(s.dialLugThickness-5.2)>.01||Math.abs(s.dialLugOffset-10.25)>.01))errors.push('Both Fusion holders require the fixed reference rear lug dimensions: 5.20 mm thickness, Ø6.85 mm hole and 10.25 mm rear offset.');
   const diameter = valid(D,250,850) ? D : 650, R=diameter/2;
   const W=valid(s.hubWidth,70,250)?s.hubWidth:135;
@@ -171,7 +170,7 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
     title:s.tool==='stand'?'Truing stand':'Dishing gauge',
     wheel:{diameter,width:rw,depth,hubWidth:W,axleDiameter:axleD,center:[0,0,0],spokes:config.spokeCount ?? 32,
       left:valid(config.centerToLeft,1,200)?config.centerToLeft:30,right:valid(config.centerToRight,1,200)?config.centerToRight:20,flangeL:valid(config.flangePcdLeft,1,200)?config.flangePcdLeft:55,flangeR:valid(config.flangePcdRight,1,200)?config.flangePcdRight:55,offset} };
-  notes.push(`${s.profile}: ${p.family}; use matching ${p.bolt} T-nuts and brackets. Slot sections in the preview are schematic; check your supplier’s profile drawing.`,
+  notes.push(`${s.profile}: ${p.family}; use profile-compatible T-nuts. The pictured 90° connectors use M5 hardware for every profile. Slot sections in the preview are schematic; check your supplier’s profile drawing.`,
     'Bare wheel only: remove tyre, cassette and rotor. All extrusion members are purchased at the listed lengths; no extrusion cutting or end tapping.',
     `PLA clearance: ${fit.toFixed(2)} mm added to nominal hole diameter / mating width, excluding the fixed Fusion 2020 cap socket and slot tongues. Print a fit coupon first. Use through-bolts and captured metal nuts; do not tap PLA.`,
     'Printed fixtures: 5 perimeters, 40% infill as a starting point. The 2020 friction cap has 3 mm collar walls, a 1.5 mm seating ledge and a sloped hollow pedestal; other fixture envelopes use 6 mm walls. Verify under light measurement load; keep away from heat.',
@@ -214,13 +213,18 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
       }
     }
   }
-  function m6Rod(name:string,len:number,pos:Vec3,axis:Part['axis'],sku:string,stage=3) {
-    add(sku,name,'metal',[6,len,6],pos,`M6 × ${len} mm purchased threaded rod / fully threaded bolt; metal nut guides. Do not cut extrusion.`,stage,'cylinder',axis);
-    for (const delta of [-8,8]) {
-      const pt:Vec3=[...pos];pt[{x:0,y:1,z:2}[axis!]]+=delta;
-      add('m6-locknut','M6 adjustment / lock nut','hardware',[10,5,10],pt,'Captured steel hex nut or jam nut; lock adjustment without loading rim.',stage,'cylinder',axis);
-      add('m6-washer','M6 flat washer','hardware',[12,1,12],pt,'Distribute nut pressure onto fixture.',stage,'cylinder',axis);
-    }
+  function probe1(role:'lateral'|'radial'|'dish',position:Vec3,rotation:Vec3,q:number) {
+    const mesh=probe1Export.mesh;
+    add('probe1','PLA Fusion Probe 1 · common adjustment pointer','pla',mesh.max.map((v,i)=>v-mesh.min[i]) as Vec3,position,
+      'Exact unscaled Fusion probe1 solid: 105 × 15 × 15 mm, 5 mm base, 90 × 5 mm straight slot and thick rear flange. The narrow X=100 mm end faces the wheel; the thick end stays to the right. Same part for lateral, radial and dishing use. Slide and lock with an M4 bolt and washer; allowable bolt centres X 7–93 mm. Print flat native Z=0 face on the bed; verify slot fit.',3,'probe1');
+    Object.assign(a.parts[a.parts.length-1],{rotation,probeRole:role,probeBolt:q});
+    if(q<7||q>93)errors.push(`Probe 1 ${role} mounting position ${q.toFixed(1)} mm exceeds its fixed 7–93 mm slot travel; reposition the mount. The CAD part is not stretched.`);
+  }
+  function probeClamp(pos:Vec3,axis:'y'|'z',intoSlot:boolean) {
+    add('probe1-m4-bolt', 'M4 × 20 Probe 1 clamp bolt','hardware',[4,20,4],pos,'M4 clears the native 5 mm slot. Clamp with a wide washer; verify thread engagement.',3,'cylinder',axis);
+    const ai=axis==='y'?1:2,washer:Vec3=[...pos],nut:Vec3=[...pos];washer[ai]+=3;nut[ai]-=8;
+    add('probe1-m4-washer','M4 wide Probe 1 washer','hardware',[9,1,9],washer,'9 mm OD washer spans both sides of the 5 mm slot.',3,'cylinder',axis);
+    add(intoSlot?'probe1-tnut-'+s.profile:'probe1-m4-nut',intoSlot?`${p.family} M4 Probe 1 T-nut`:'M4 Probe 1 captive nut','hardware',axis==='z'?[7,7,4]:[7,4,7],nut,intoSlot?'M4 internal thread, compatible with selected extrusion slot.':'Captured metal M4 nut behind the probe adapter plate.',3);
   }
   if (s.tool==='stand') {
     const frictionCap=s.profile==='2020';
@@ -231,61 +235,68 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
     const nose=frictionCap?hubCapDimensions.saddle_depth:Math.min(6,projection);
     if(!valid(s.seatLeft,6,35)||!valid(s.seatRight,6,35)||!valid(s.projection,3,20))errors.push('Confirm both hub-end diameters and at least 3 mm usable projection before printing the cradles. Nominal seats are shown provisionally.');
     if(frictionCap && Math.abs(seatLeft-seatRight)>1e-6) errors.push('Identical 2020 V caps on equal uprights require equal hub-end diameters for a level axle. Unequal ends cannot be compensated by these caps; preview is provisional.');
-    const ux = frictionCap ? W/2 + projection/2 : W/2 + nose + P/2;
+    const directUx = frictionCap ? W/2 + projection/2 : W/2 + nose + P/2;
+    const minimumUprightSpacing=P+2*cornerBracketDimensions.leg;
+    const ux=Math.max(directUx,minimumUprightSpacing/2);
+    const rodRequired=ux>directUx+1e-6;
+    const rodD=qr?5:axleD===12?10:axleD===15?12:16;
+    const supportD=rodRequired?Math.max(seatLeft+4,seatRight+4,rodD+4):Math.max(seatLeft,seatRight);
+    const supportX=frictionCap?ux:ux-P/2-nose/2;
+    const spacerStart=W/2;
+    const spacerEnd=Math.max(supportX+(frictionCap?hubCapDimensions.fin_root_depth:nose)/2+2,spacerStart+projection+2);
+    const spacerLength=rodRequired?spacerEnd-spacerStart:0;
+    a.hubSupport={minimumUprightSpacing,uprightSpacing:2*ux,rodRequired,spacerLength,spacerDiameter:supportD};
+    notes.push(`Upright centres cannot be closer than ${minimumUprightSpacing} mm: two 50 mm inner bracket legs plus the ${P} mm profile. Current spacing: ${2*ux} mm.`,
+      rodRequired?`Narrow hub: automatically fit a through-hub support rod and two equal ${spacerLength.toFixed(2)} mm-long, Ø${supportD} mm spacer sleeves. The sleeves rest on the holders; the hub remains centred. Confirm rod fit and stiffness and sleeve contact with the stationary axle ends before use.`:'The stationary hub ends sit directly on the holders.');
     notes.push(`Coplanar H base: all three base rails sit at Y = ${P/2} mm with their bottoms on the same surface. The crossbar ends butt against the inner faces of the two feet. Both uprights sit on its top face at Y = ${P} mm.`,
       'Base corner brackets are turned into the horizontal plane and bolt into SIDE slots in both rails. They do not bridge a stacked height difference. Upright brackets still bolt into a top slot and an upright side slot.',
-      'The supplied 27 × 27 × 19 mm bracket photo does not dimension the slot position or flange thickness. Its 19 mm width must clear the bench when rotated on a 20 mm rail, and both slot holes and nuts must match. The schematic brackets are not confirmation of that product’s fit.');
+      'Pictured 90° gusseted connectors: 50 × 50 × 18 mm, 9 mm flanges, two Ø6 mm holes for M5 bolts. Hole centres are 10 mm from the free ends and centred across the 18 mm width. Base brackets leave 1 mm bench clearance on 2020 rails. The undimensioned gusset opening is illustrative.');
     // Both uprights use the SAME stock member; axle height is a consequence of
     // the top-end datum, never an independently adjustable slider setting.
     const uprightLength = stockLength(R+140, s.lengths);
     const top = P + (uprightLength ?? R+140);
     const seatBottom = top+10;
-    const yAxle = frictionCap?top+hubCapDimensions.seatCenterHeight(Math.max(seatLeft,seatRight)):seatBottom+Math.max(seatLeft,seatRight)/2;
-    const rimBottom = yAxle-R;
+    const yAxle = frictionCap?top+hubCapDimensions.seatCenterHeight(supportD):seatBottom+supportD/2;
     a.wheel.center=[0,yAxle,0];
-    const crossLength=stock('Cross rail',2*ux+3*P+20,'x',[0,P/2,0]);
-    const footX=(crossLength??(2*ux+3*P+20))/2+P/2;
+    const crossRequired=Math.max(2*ux+3*P+20,2*ux+P+2*cornerBracketDimensions.leg);
+    const crossLength=stock('Cross rail',crossRequired,'x',[0,P/2,0]);
+    const footX=(crossLength??crossRequired)/2+P/2;
 
     // A bracket's origin is its INSIDE corner. Local +X runs away from the
     // vertical face; local +Y goes up. Rotation mirrors both flanges together.
     function angle(corner:Vec3, axis:'x'|'z', sign:number) {
       const yaw = axis==='x' ? (sign>0?0:Math.PI) : (sign>0?-Math.PI/2:Math.PI/2);
-      add(`angle-${P}`,`${P} mm two-flange angle bracket`,'metal',[P,P,P],corner,
-        `Two perpendicular 4 mm flanges, ${p.family}. Bottom flange sits on the horizontal rail; upright flange touches the adjoining rail face. Two ${p.bolt} bolts through visible holes. The upright starts on the crossbar top; the bracket fixes its base without a printed spacer. Hole centres here specify required alignment, not a verified vendor drawing.`,1,'angle');
-      const part=a.parts[a.parts.length-1];part.rotation=[0,yaw,0];part.bore=Number(p.bolt.slice(1))+.5;
-      const q=P/2, d=Number(p.bolt.slice(1));
+      add('angle-gusset-50','50 mm gusseted 90° bracket','metal',[50,50,18],corner,
+        `Pictured 50 × 50 × 18 mm gusseted connector; 9 mm flanges, two Ø6 mm holes centred 10 mm from the free ends. M5 bolts and ${p.family} M5 T-nuts. Undimensioned gusset opening is approximate.`,1,'angle');
+      const part=a.parts[a.parts.length-1];part.rotation=[0,yaw,0];part.bore=6;
+      const q=cornerBracketDimensions.holeOffset, d=5;
       // Position actual bolt stacks against each flange, not the bracket box centre.
       for(const horizontal of [true,false]) {
-        const pt:Vec3=[...corner];pt[axis==='x'?0:2]+=sign*(horizontal?q:2);
-        pt[1]+=horizontal?2:q;
+        const pt:Vec3=[...corner];pt[axis==='x'?0:2]+=sign*(horizontal?q:4);
+        pt[1]+=horizontal?4:q;
         const boltAxis=horizontal?'y':axis;
-        add(`angle-bolt-${p.bolt}`,`${p.bolt} × 12 bracket bolt`,'hardware',[d,12,d],pt,'Through angle flange into matching slot T-nut; verify supplier engagement.',1,'cylinder',boltAxis);
+        add(`angle-bolt-M5`,`M5 × 16 bracket bolt`,'hardware',[d,16,d],pt,'Through angle flange into matching slot T-nut; verify supplier engagement.',1,'cylinder',boltAxis);
         const washer:Vec3=[...pt],nut:Vec3=[...pt];
         const ai=horizontal?1:(axis==='x'?0:2),direction=horizontal?1:sign;
-        washer[ai]+=direction*3;nut[ai]-=direction*5;
-        add(`angle-washer-${p.bolt}`,`${p.bolt} bracket washer`,'hardware',[d*2,1,d*2],washer,'Flat washer on outer bracket flange.',1,'cylinder',boltAxis);
+        washer[ai]+=direction*5.5;nut[ai]-=direction*7;
+        add(`angle-washer-M5`,`M5 bracket washer`,'hardware',[d*2,1,d*2],washer,'Flat washer on outer bracket flange.',1,'cylinder',boltAxis);
         const nutSize:Vec3=horizontal?[P*.6,4,p.slot+2]:axis==='x'?[4,P*.6,p.slot+2]:[p.slot+2,P*.6,4];
-        add(`angle-tnut-${s.profile}`,`${p.family} ${p.bolt} bracket T-nut`,'hardware',nutSize,nut,'Seated inside the adjoining extrusion slot.',1);
+        add(`angle-tnut-${s.profile}`,`${p.family} M5 bracket T-nut`,'hardware',nutSize,nut,'Seated inside the adjoining extrusion slot.',1);
       }
     }
     function baseAngle(sign:number,front:number){
-      const corner:Vec3=[sign*(footX-P/2),P/2,front*P/2],q=P/2,d=Number(p.bolt.slice(1));
-      add(`angle-base-${P}`,`${P} mm H-base side-slot corner bracket`,'metal',[P,P,P],corner,
-        `Bracket lies in the base plane with its width vertical. Both flanges meet vertical rail faces; two ${p.bolt} bolts enter SIDE-slot T-nuts. Bottom/top of schematic bracket align with the ${P} mm rail. Verify actual bracket width clears the bench.`,1,'angle');
-      Object.assign(a.parts[a.parts.length-1],{rotation:[-sign*front*Math.PI/2,0,sign>0?Math.PI:0],bore:d+.5});
+      const corner:Vec3=[sign*(footX-P/2),P/2,front*P/2],q=cornerBracketDimensions.holeOffset,d=5;
+      add('angle-base-gusset-50','50 mm gusseted 90° H-base bracket','metal',[50,50,18],corner,
+        `Pictured 50 × 50 × 18 mm gusseted connector; 9 mm flanges, two Ø6 mm holes centred 10 mm from the free ends. Width vertical, centred on the side slots; ${(P-18)/2} mm bench clearance. M5 bolts and ${p.family} M5 T-nuts. Undimensioned gusset opening is approximate.`,1,'angle');
+      Object.assign(a.parts[a.parts.length-1],{rotation:[-sign*front*Math.PI/2,0,sign>0?Math.PI:0],bore:6});
       for(const leg of [0,1]){
-        const pos:Vec3=leg?[corner[0]-sign*2,P/2,corner[2]+front*q]:[corner[0]-sign*q,P/2,corner[2]+front*2];
+        const pos:Vec3=leg?[corner[0]-sign*4,P/2,corner[2]+front*q]:[corner[0]-sign*q,P/2,corner[2]+front*4];
         const axis=leg?'x':'z',ai=leg?0:2,normal=leg?-sign:front;
-        add(`base-bolt-${p.bolt}`,`${p.bolt} × 12 H-base bracket bolt`,'hardware',[d,12,d],pos,'Through corner bracket into the adjoining rail side slot; confirm engagement with actual flange thickness.',1,'cylinder',axis);
-        const washer:Vec3=[...pos],nut:Vec3=[...pos];washer[ai]+=normal*3;nut[ai]-=normal*5;
-        add(`base-washer-${p.bolt}`,`${p.bolt} H-base washer`,'hardware',[d*2,1,d*2],washer,'Flat washer outside bracket flange.',1,'cylinder',axis);
-        add(`base-tnut-${s.profile}`,`${p.family} ${p.bolt} H-base T-nut`,'hardware',leg?[4,p.slot+2,P*.6]:[P*.6,p.slot+2,4],nut,'Matching T-nut inside the side slot; not an end-tapped connection.',1);
+        add(`base-bolt-M5`,`M5 × 16 H-base bracket bolt`,'hardware',[d,16,d],pos,'Through corner bracket into the adjoining rail side slot; confirm engagement with actual flange thickness.',1,'cylinder',axis);
+        const washer:Vec3=[...pos],nut:Vec3=[...pos];washer[ai]+=normal*5.5;nut[ai]-=normal*7;
+        add(`base-washer-M5`,`M5 H-base washer`,'hardware',[d*2,1,d*2],washer,'Flat washer outside bracket flange.',1,'cylinder',axis);
+        add(`base-tnut-${s.profile}`,`${p.family} M5 H-base T-nut`,'hardware',leg?[4,p.slot+2,P*.6]:[P*.6,p.slot+2,4],nut,'Matching T-nut inside the side slot; not an end-tapped connection.',1);
       }
-    }
-    function throughBolt(pos:Vec3,length:number,axis:'x'|'y'|'z',name='M5 fixture through-bolt') {
-      add(`m5-through-${length}`,name,'hardware',[5,length,5],pos,'M5 steel bolt through clearance hole into a captured metal nut; do not tap PLA.',2,'cylinder',axis);
-      const n:Vec3=[...pos];n[{x:0,y:1,z:2}[axis]]-=length/2-2;
-      add('m5-nut','M5 captured nut','hardware',[8,4,8],n,'Captured steel hex nut.',2,'cylinder',axis);
     }
     for(const sign of [-1,1]) {
       stock('Base foot',Math.max(300,R+60),'z',[sign*footX,P/2,0]);
@@ -295,14 +306,14 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
       for(const front of [-1,1])baseAngle(sign,front);
       for(const side of [-1,1])angle([sign*ux+side*P/2,P,0],'x',side);
 
-      const seatD=sign<0?seatLeft:seatRight;
+      const seatD=rodRequired?supportD:sign<0?seatLeft:seatRight;
       if(frictionCap) {
         const mesh=hubCapExport.meshes.cap;
         add('top-cap-2020-v2','PLA 2020 friction-fit V hub cap (identical pair)','pla',mesh.max.map((v,i)=>v-mesh.min[i]) as Vec3,[sign*ux,top,0],
-          'Fusion V2 solid, unscaled. Top-centred upward-open 90° V carries the hub directly over the bar. Centred fin tapers symmetrically from 5 mm root to 3 mm tips; both faces slope inward equally (1.79° from vertical). Check hub-shell clearance with short protrusions: the fin is thicker than 3 mm below its tips. 44 mm width, apex 26 mm above rail end. Move uprights under the hub ends. Short 10 mm collar with 20.3 mm clearance socket; four 6.1 mm-wide tongues engage slot-6 openings, nominal 0.1 mm interference. 45° internal roof closes progressively, with only a 1.5 mm seating ledge. Sloped saddle sides grow at 53.6° above horizontal. Print upright in one piece with supports OFF; test the 5 mm slot coupon first. Print the same cap twice. No cap bolts or T-nuts; slot fit is independent of general hole clearance.',2,'top-cap');
+          'Fusion V2 solid, unscaled. Top-centred upward-open 90° V carries the hub directly over the bar. Centred fin tapers symmetrically from 5 mm root to 3 mm tips; both faces slope inward equally (1.79° from vertical). Check hub-shell clearance with short protrusions: the fin is thicker than 3 mm below its tips. 44 mm width, apex 26 mm above rail end. Keep uprights at or above the bracket minimum spacing; seat spacer sleeves in the V when a support rod is required. Short 10 mm collar with 20.3 mm clearance socket; four 6.1 mm-wide tongues engage slot-6 openings, nominal 0.1 mm interference. 45° internal roof closes progressively, with only a 1.5 mm seating ledge. Sloped saddle sides grow at 53.6° above horizontal. Print upright in one piece with supports OFF; test the 5 mm slot coupon first. Print the same cap twice. No cap bolts or T-nuts; slot fit is independent of general hole clearance.',2,'top-cap');
         Object.assign(a.parts[a.parts.length-1],{capDesign:'centred-v2',profileSize:P,seatHeight:hubCapDimensions.seatCenterHeight(seatD)-seatD/2,nose,rotation:[0,sign<0?Math.PI:0,0]});
       } else {
-      add('top-cap-'+(sign<0?'left':'right'),'PLA '+(sign<0?'left':'right')+' top cap with integral cradle','pla',[P+6+nose,69,P+20],[sign*(W/2+nose),top,0],
+      add('top-cap-'+(sign<0?'left':'right'),'PLA '+(sign<0?'left':'right')+' top cap with integral cradle','pla',[P+6+nose,69,P+20],[sign*(ux-P/2),top,0],
         `Hollow rail socket ${P+fit} × ${P+fit} mm; 6 mm top shoulder sets datum. Integral ${nose} mm-deep nose supports the stationary ${seatD} mm protrusion in an upward-open rounded indent. Two front/rear side-slot fixing pairs retain the cap. No custom metal components.`,2,'top-cap');
       Object.assign(a.parts[a.parts.length-1],{bore:seatD+fit,profileSize:P,fit,seatHeight:yAxle-top-seatD/2,nose,rotation:[0,sign<0?Math.PI:0,0]});
       for(const front of [-1,1])for(const dy of [-12,-30]) {
@@ -317,18 +328,25 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
     for(const sign of [-1,1]) {
       const d=sign<0?seatLeft:seatRight;
       add('existing-end-'+sign,'Existing stationary hub-end protrusion','metal',[d,projection,d],[sign*(W/2+projection/2),yAxle,0],
-        'Part of your hub, not a purchase. This stationary protrusion rests in the printed indent while the shell rotates on its bearings.',2,'cylinder','x');
+        rodRequired?'Part of your hub, not a purchase. The support rod passes through the axle bore; a counterbored spacer sleeve fits over each stationary end.':'Part of your hub, not a purchase. This stationary protrusion rests in the printed indent while the shell rotates on its bearings.',2,'cylinder','x');
       a.parts[a.parts.length-1].movesWithWheel=true;
     }
-    if(s.guideRod) {
-      const rodD=qr?5:axleD===12?10:axleD===15?12:16,length=Math.ceil((W+2*P+40)/50)*50;
-      add('loose-guide-rod','Optional loose smooth guide rod','metal',[rodD,length,rodD],[0,yAxle,0],
+    if(rodRequired) {
+      for(const sign of [-1,1]) {
+        add('hub-support-spacer','Matched metal hub-support spacer sleeve','metal',[spacerLength,supportD,supportD],[sign*(spacerStart+spacerLength/2),yAxle,0],
+          `Length ${spacerLength.toFixed(2)} mm, OD ${supportD} mm, bore ${rodD+.5} mm. Counterbore Ø${(sign<0?seatLeft:seatRight)+.5} mm × ${projection} mm deep at the hub end accepts the existing protrusion. One each side: seat against the stationary hub end face, span the holder and carry the through-hub rod. Equal outside diameters keep the axle level. Confirm actual bore fit and end contact; no contact with seals or rotating shell.`,2,'hub-spacer','x');
+        Object.assign(a.parts[a.parts.length-1],{bore:rodD+.5,counterbore:(sign<0?seatLeft:seatRight)+.5,counterboreDepth:projection,rotation:[0,sign<0?Math.PI:0,0],movesWithWheel:true});
+      }
+    }
+    if(s.guideRod||rodRequired) {
+      const length=Math.ceil(Math.max(W+2*P+40,2*spacerEnd+20)/50)*50;
+      add(rodRequired?'hub-support-rod':'loose-guide-rod',rodRequired?'Through-hub support rod / skewer':'Optional loose smooth guide rod','metal',[rodD,length,rodD],[0,yAxle,0],
+        rodRequired?`Required for this hub spacing: Ø${rodD} × ${length} mm rod through the hub and both spacer sleeves. Sleeves sit on the holders. Verify bore fit, bending stiffness and retention with the actual hub; a loose guide rod alone is not a verified load-bearing support. Do not apply bearing preload through the printed holders.`:
         `Standard ${rodD} × ${length} mm smooth rod, only if it freely fits the measured hub bore. No nuts, collars or clamping. Cradles carry the wheel; rod is an alignment aid.`,2,'cylinder','x');
       a.parts[a.parts.length-1].movesWithWheel=true;
     }
     const lateralZ=P/2+(s.mode==='dials'?42.5:45);
     const contactY=yAxle-Math.sqrt(Math.max(1,(R-depth/2)**2-lateralZ**2));
-    const lateralX=offset+rw/2+34;
     for(const lateral of [true,false]) {
       const role=lateral?'lateral':'radial', axis=lateral?'x':'y';
       if(lateral && s.mode==='dials') {
@@ -346,15 +364,15 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
           const size=mesh.min.map((v,i)=>mesh.max[i]-v) as Vec3;
           const position=center.map((v,i)=>v+origin[i]+(slotHardware&&i===0?mountX-55:0)) as Vec3;
           const sku=holder?'lateral-dial-bracket':dial?'dial-lateral':`lateral-${key.toLowerCase().replaceAll(/[^a-z0-9]+/g,'-')}`;
-          const spec=holder?'Fusion holder: 82 × 40 × 8 mm upper plate; two 65.5 × 5.5 mm horizontal slots at 18 mm pitch, 60 mm usable travel. Plate and slots are symmetrical about the dial fork centreline. Slots sit 43 and 61 mm above the dial centre. A descending 24 × 8 mm web connects to the lower fork. Integral 6 mm fork cheeks, 5.8 mm gap, Ø5.5 mm lug holes and CAD root fillets. R3 corner fillets round the vertical plate/web outline only; 8.25 mm material remains beyond each slot end. Two M5 × 16 upright bolts and one M5 × 25 lug bolt. Upper mounting plate and descending web are 8 mm; fork cheeks remain 6 mm. Confirm bolt engagement and bottoming with the actual T-nuts.':
+          const spec=holder?'Fusion holder: 82 × 40 × 8 mm upper plate; two 65.5 × 5.5 mm horizontal slots at 18 mm pitch, 60 mm usable travel. Plate and slots are symmetrical about the dial ear centreline. Slots sit 43 and 61 mm above the dial centre. A descending 24 × 8 mm web connects to the lower mounting ear. Transverse lug screw perpendicular to the probe pin. One 8 mm mounting ear with Ø5.5 mm clearance, a local R8 outer-root fillet, R2 dial-side fillet and a flat Ø16 mm seat for washers up to Ø15 mm. Ear projection is 28 mm to clear the larger washer. R3 corner fillets round the vertical plate/web outline only; 8.25 mm material remains beyond each slot end. Two M5 × 16 upright bolts and one M5 × 25 lug bolt. Upper mounting plate and descending web are 8 mm; the mounting ear is 8 mm. Confirm bolt engagement and bottoming with the actual T-nuts.':
             isDial?'Fusion KATSU reference: Ø54 × 25 mm case, 5.20 mm lug, Ø6.85 mm hole, inferred 10.25 mm rear offset. Relaxed probe reach is measured at 40 mm from the case: 20 mm fixed sleeve plus 20 mm exposed moving pin. Shown with 5 mm preload, leaving 15 mm exposed pin. Rounded lug geometry remains an assumption for physical fit verification. Face points toward the operator.':
-            'Fusion hardware reference. Three M5 bolts total for this lateral holder; matching T-nuts, washers, nut and two 0.30 mm lug shims. Verify purchased hardware engagement.';
-          add(sku,holder?'PLA lateral upper-slot holder · Fusion V3':dial?'Lateral dial · face toward operator':key==='Lug M5x25 shank'?'M5 rear-lug mounting bolt':key,
-            holder?'pla':isDial?'gauge':'hardware',size,position,spec,3,'fusion-mesh',dial?'z':slotHardware?'z':'x');
+            'Fusion hardware reference. Three M5 bolts total for this lateral holder; matching T-nuts, washers and nut. Verify purchased hardware engagement.';
+          add(sku,holder?'PLA lateral upper-slot holder · Fusion V5':dial?'Lateral dial · face toward operator':key==='Lug M5x25 shank'?'M5 rear-lug mounting bolt':key,
+            holder?'pla':isDial?'gauge':'hardware',size,position,spec,3,'fusion-mesh',dial?'z':slotHardware?'z':'y');
           a.parts[a.parts.length-1].meshKey=key as keyof typeof fusionHolderMeshes;
           if(dial)a.parts[a.parts.length-1].measurementAxis='x';
         }
-        notes.push(`Dial centre is ${(origin[0]-12-ux).toFixed(1)} mm relative to the right upright centre (positive = right). The lower bolt washer clears the case top by 11 mm; the case rear clears the upright front by 30 mm.`, `Lateral holder uses the redesigned Fusion V3 solid, with ${mountX.toFixed(1)} mm slot position (−42–18 mm bolt-centre range). Loosen its two upright M5 bolts for 60 mm horizontal travel. The integrated fork uses one M5 lug bolt. The dial fork is below both mounting bolts. The measured 40 mm relaxed probe is shown compressed by 5 mm (35 mm case-to-tip, 15 mm exposed pin), touching the rim sidewall. This leaves nominal 5 mm travel in either direction; keep clearance from both travel limits. Reposition and re-zero when changing hubs. Geometry is never stretched to fit.`);
+        notes.push(`Dial centre is ${(origin[0]-12-ux).toFixed(1)} mm relative to the right upright centre (positive = right). The lower bolt washer clears the case top by 11 mm; the case rear clears the upright front by 30 mm.`, `Lateral holder uses the redesigned Fusion V5 solid, with ${mountX.toFixed(1)} mm slot position (−42–18 mm bolt-centre range). Loosen its two upright M5 bolts for 60 mm horizontal travel. The integrated ear uses one M5 lug bolt. The dial ear is below both mounting bolts. The measured 40 mm relaxed probe is shown compressed by 5 mm (35 mm case-to-tip, 15 mm exposed pin), touching the rim sidewall. This leaves nominal 5 mm travel in either direction; keep clearance from both travel limits. Reposition and re-zero when changing hubs. Geometry is never stretched to fit.`);
         if(desiredMountX < -42||desiredMountX > 18)errors.push(`Exact Fusion lateral holder cannot reach the shown rim within its slots: required bolt position ${desiredMountX.toFixed(1)} mm, available −42–18 mm. Shown at 5 mm compression at the nearest limit; ${desiredMountX < -42?`the tip overruns the rim sidewall by ${(-42-desiredMountX).toFixed(1)} mm`:`the tip is ${(desiredMountX-18).toFixed(1)} mm short of the rim`}. Probe travel is only 10 mm; contact is not a valid fit. Verify upright-to-rim reach before printing.`);
         if(s.profile!=='2020')notes.push('The Fusion lateral holder retains M5 hardware. Larger-profile uprights require compatible M5-thread T-nuts; the normal profile bolt size does not fit its Ø5.5 mm slots.');
         continue;
@@ -378,16 +396,16 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
         const alignmentErrorDegrees=Math.abs(Math.atan2(probeZ,yAxle-radialY)-tilt)*180/Math.PI;
         a.radialMount={uprightSpan:span,leftBolt,bridgeShift,rightBolt,desiredDialX,dialX,origin,tip:[origin[0]+d.dial_reference_x,radialY,probeZ],direction:[0,cs,-sn],tiltDegrees:tilt*180/Math.PI,alignmentErrorDegrees};
         for(const [key,mesh] of Object.entries(radialExport.meshes)) {
-          const bridge=key==='Radial printable bridge', carriage=key==='Radial printable C-holder', holder=bridge||carriage, dial=key==='Radial dial case and rear lug';
+          const bridge=key==='Radial printable bridge', holder=bridge, dial=key==='Radial dial case and rear lug';
           const rotating=mesh.motion.includes('tilt');
           const shiftX=key.startsWith('Left ')?leftBolt:key.startsWith('Right ')?rightBolt-125:0;
           const size=mesh.min.map((v,i)=>mesh.max[i]-v) as Vec3;
           const centre=mesh.min.map((v,i)=>(v+mesh.max[i])/2) as Vec3;
           const position:Vec3=[centre[0]+origin[0]+shiftX,origin[1]+(rotating?d.pivot_y+(centre[1]-d.pivot_y)*cs+(centre[2]-d.pivot_z)*sn:centre[1]),origin[2]+(rotating?d.pivot_z-(centre[1]-d.pivot_y)*sn+(centre[2]-d.pivot_z)*cs:centre[2])];
-          const spec=bridge?'Flat slotted T bridge like the lateral holder. Two left horizontal M5 slots at 18 mm pitch and one right horizontal slot set sideways position; all frame lands are 8 mm thick. Two 4 mm fork cheeks have R4 outer root fillets and equal 6 mm foot margins. The pivot sits 4 mm further left and the lug screw 2 mm further right for driver access; the dial stays centred. Rounded openings remove unused material.':carriage?'Simple flat pivoting dial arm. A 4 mm arm sits between two 4 mm fork cheeks; one M5 × 25 pivot bolt clamps both faces. The open stack is 12.4 mm including 0.2 mm side clearances, with 0–25° tilt. The frame slots independently set sideways position. Reinforced 2.8 mm lug ear plus the 5.2 mm metal lug also gives an 8 mm fixing stack. Print on the broad arm face; tighten the pivot to prevent angular slip.':dial?'Same fixed measured reference as lateral: Ø54 × 25 mm case, 5.20 mm lug, Ø6.85 mm lug hole. 20 mm sleeve and 15 mm exposed pin at 5 mm preload. C-holder tilt points the pin through the wheel centre, normal to the rim; face toward operator.':key.includes('head')?'Included head of the corresponding bolt, shown separately as a CAD reference.':key.includes('T-nut')?'M5 slot-6 T-nut envelope; confirm engagement in the actual upright.':'Radial M5 reference hardware; tighten against the flat bearing faces without crushing the plastic. Check actual nut and washer dimensions.';
-          const sku=bridge?'radial-dial-bracket':carriage?'radial-dial-c-holder':dial?'dial-radial':`radial-${key.toLowerCase().replaceAll(/[^a-z0-9]+/g,'-')}`;
-          add(sku,bridge?'PLA radial slotted bridge · Fusion V8':carriage?'PLA radial pivoting dial arm · Fusion V8':dial?'Radial dial · adjustable normal to rim':key,
-            holder?'pla':dial?'gauge':'hardware',size,position,spec,3,'fusion-mesh',key.startsWith('Pivot ')?'x':key.startsWith('Lug ')?'y':'z');
+          const spec=bridge?'One-piece slotted T bridge with a solid 8 mm projecting arm beneath the raised dial-lug ear. Three M5 × 16 frame bolts clamp 8 mm lands. One 8 mm ear supports the lug directly, with a local R6 outer-root fillet and R3 dial-side fillet; no fitted fork gap or shims. The transverse M5 × 25 lug bolt also sets the 0–25° dial angle; tighten it after aiming the pin at the axle. R8 side junction fillets reinforce the solid web; a flat Ø16 mm seat clears washers up to Ø15 mm.':dial?'Same fixed measured reference as lateral: Ø54 × 25 mm case, 5.20 mm lug, Ø6.85 mm lug hole. 20 mm sleeve and 15 mm exposed pin at 5 mm preload. Lug-bolt tilt points the pin through the wheel centre, normal to the rim; face toward operator.':key.includes('head')?'Included head of the corresponding bolt, shown separately as a CAD reference.':key.includes('T-nut')?'M5 slot-6 T-nut envelope; confirm engagement in the actual upright.':'Radial M5 reference hardware; tighten against the flat bearing faces without crushing the plastic. Check actual nut and washer dimensions.';
+          const sku=bridge?'radial-dial-bracket':dial?'dial-radial':`radial-${key.toLowerCase().replaceAll(/[^a-z0-9]+/g,'-')}`;
+          add(sku,bridge?'PLA radial slotted bridge · Fusion V13':dial?'Radial dial · adjustable normal to rim':key,
+            holder?'pla':dial?'gauge':'hardware',size,position,spec,3,'fusion-mesh',key.startsWith('Pivot ')||key.startsWith('Lug ')?'x':'z');
           const part=a.parts[a.parts.length-1];part.radialMeshKey=key as keyof typeof radialExport.meshes;
           if(rotating)part.rotation=[-tilt,0,0];
           if(dial)part.measurementAxis='y';
@@ -398,198 +416,110 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
         if(Math.abs(offset)>d.offset_allowance)errors.push(`Fusion radial dial offset exceeds the verified ±${d.offset_allowance} mm allowance.`);
         if(desiredRightBolt<d.right_slot_min||desiredRightBolt>d.right_slot_max)errors.push(`Fusion radial right fixing cannot reach the upright: required local bolt position ${desiredRightBolt.toFixed(1)} mm, available ${d.right_slot_min}–${d.right_slot_max} mm. Bolt shown at nearest slot limit; not a valid fit.`);
         if(desiredDialX<d.dial_slot_min||desiredDialX>d.dial_slot_max)errors.push(`Fusion radial dial cannot centre beneath the rim: required ${desiredDialX.toFixed(1)} mm from left upright, available ${d.dial_slot_min}–${d.dial_slot_max} mm. Shown at nearest limit; not a valid contact.`);
-        if(origin[1]+radialExport.meshes['Radial printable bridge'].min[1]<2*P)errors.push('Fusion radial bridge overlaps the base-bracket zone; choose longer upright stock.');
+        if(origin[1]+radialExport.meshes['Radial printable bridge'].min[1]<P+cornerBracketDimensions.leg)errors.push('Fusion radial bridge overlaps the base-bracket zone; choose longer upright stock.');
         if(dialX-d.dial_diameter/2<P/2||dialX+d.dial_diameter/2>span-P/2)errors.push('Fusion radial dial case reaches an upright; confirm rim offset and hub spacing.');
-        notes.push(`Radial: two printed parts, 8 mm frame fixing lands and M5 × 16 frame bolts. Left slot ${leftBolt.toFixed(1)} mm (−21–16 mm), right slot ${rightBolt.toFixed(1)} mm (108–145 mm), dial centre ${dialX.toFixed(1)} mm from the left upright (46–83 mm), tilt ${(tilt*180/Math.PI).toFixed(2)}° (0–25°). Frame slots set lateral position; the separate M5 × 25 pivot bolt locks tilt; exported meshes only translate and rotate.`,
-          `The bridge prints on its flat back; the dial arm prints on its broad flat side. Both exported orientations have 45° or steeper roofs for supports-off printing. Rounded openings reduce solid volume by ${radialExport.metadata.volumeReductionPercent.toFixed(1)}% against V2; actual filament and time depend on slicing. The radial holder uses four M5 × 16 bolts (three frame and one lug) and one longer M5 × 25 pivot bolt. Frame and lug fixing stacks remain 8 mm before washers. Re-zero after tightening. No contact-tip attachment is included. Lower the three frame fixings to retract before wheel removal. Physical stiffness and print fit remain unverified.`);
+        notes.push(`Radial: one printed part, 8 mm frame fixing lands and M5 × 16 frame bolts. Left slot ${leftBolt.toFixed(1)} mm (−21–16 mm), right slot ${rightBolt.toFixed(1)} mm (108–145 mm), dial centre ${dialX.toFixed(1)} mm from the left upright (46–83 mm), tilt ${(tilt*180/Math.PI).toFixed(2)}° (0–25°). Frame slots set lateral position; the M5 × 25 dial-lug bolt locks tilt; exported meshes only translate and rotate.`,
+          `The single bridge prints on its flat back. The horizontal lug holes have 45° roofs for supports-off printing. Rounded openings reduce solid volume by ${radialExport.metadata.volumeReductionPercent.toFixed(1)}% against V2; actual filament and time depend on slicing. The radial holder uses three M5 × 16 frame bolts and one M5 × 25 dial-lug bolt. Frame lands remain 8 mm; the ear and lug stack is 13.2 mm before outer washers. Re-zero after tightening. No contact-tip attachment is included. Lower the three frame fixings to retract before wheel removal. Physical stiffness and print fit remain unverified.`);
         continue;
       }
 
-      const pos:Vec3=lateral?[lateralX,contactY,lateralZ]:[offset,rimBottom-34,0];
-      // Pointer blocks and rear-lug clevises use different short rail brackets.
-      const body:Vec3=lateral?[pos[0]+43,pos[1],lateralZ]:[pos[0],pos[1]-43,0];
-      const postX=s.mode==='dials'?body[0]:pos[0];
-      const postZ=s.mode==='dials'?body[2]-40:pos[2];
-      const headBottom=s.mode==='dials'?body[1]-20:pos[1]-16;
-      const side=lateral?1:-1, railZ=side*(P/2+6);
-      const origin:Vec3=[ux,headBottom-6,railZ];
-      const reach:Vec3=[postX-ux,0,postZ-railZ];
-      add(`${role}-${s.mode}-rail-mount`,`PLA ${role} ${s.mode==='dials'?'dial':'pointer'} upright bracket`,'pla',
-        [Math.abs(reach[0])+40,48,Math.abs(reach[2])+40],origin,
-        `Slides directly on the ${lateral?'front':'rear'} slot of the right upright. Two ${p.bolt} bolts, 18 mm vertical pitch, lock height. Short 12 mm-thick horizontal support reaches the ${s.mode==='dials'?'rear-lug clevis':'pointer nut block'}; no freestanding printed post. Print with the broad horizontal ledge underside on the bed; the upright flange grows upwards from it. Check deflection with a known shim.`,3,'rail-mount');
-      Object.assign(a.parts[a.parts.length-1],{mountTarget:reach,mountSide:side,bore:Number(p.bolt.slice(1))+.5});
-      for(const dy of [14,32])bolt([ux,origin[1]+dy,railZ],3,'z',20,side);
-      if(origin[1]-24<2*P)errors.push(`${role} bracket overlaps the upright base bracket; choose longer upright stock.`);
-      if(s.mode==='pointers') {
-      add(`${role}-holder`, `PLA ${role} pointer nut block`,'pla',[40,32,40],pos,
-        'M6 pointer passes through two captured metal nuts on its own axis. Two separate M5 mounting screws are 14 mm off that axis; neither crosses the pointer.',3,'clamp',axis);
-      Object.assign(a.parts[a.parts.length-1],{bore:6+fit});
-      // These fixings used to cross the horizontal pointer. Offset in Z for
-      // the lateral head and in X for the radial head to maintain clearance.
-      for(const sign of [-1,1]) {
-        const mount:Vec3=lateral?[pos[0],pos[1]-12,pos[2]+sign*14]:[pos[0]+sign*14,pos[1]-12,pos[2]];
-        throughBolt(mount,30,'y','M5 × 30 offset head mounting bolt');
-      }
-        m6Rod(lateral?'Lateral pointer screw':'Radial pointer screw',60,pos,axis,`${role}-pointer`);
-        add('pointer-tip','Rounded PLA pointer tip','pla',[6,6,6],lateral?[offset+rw/2+1,contactY,lateralZ]:[offset,rimBottom-1,0],
-          'Rounded cap on M6 pointer. Set gap with feeler gauge; retract before lifting the wheel.',3,'cylinder',axis);
-      }else {
-        add(`dial-${role}`,`${lateral?'Lateral':'Radial'} dial · face toward operator`,'gauge',[55,22,55],body,
-          'Standard 8 mm stem dial indicator, 0.01 mm graduation, 10 mm travel. Face points toward +Z operator side. Display is illustrative.',3,'dial','z');
-        a.parts[a.parts.length-1].measurementAxis=axis;
-        add('dial-stem','Dial stem and plunger (included)','gauge',[8,50,8],lateral?[pos[0]-9,pos[1],lateralZ]:[pos[0],pos[1]+9,0],
-          'Included stem and contact tip; adjust the mounting position to give light preload without deflecting the rim.',3,'cylinder',axis);
-        const lugHole=Number.isFinite(s.dialLugHole)?s.dialLugHole:6.5;
-        const lugWidth=Number.isFinite(s.dialLugThickness)?s.dialLugThickness:6;
-        const lugOffset=Number.isFinite(s.dialLugOffset)?s.dialLugOffset:8;
-        add('dial-lug','Indicator rear lug (included with dial)','gauge',[lugWidth,18,lugOffset+10],[body[0],body[1],body[2]-11-lugOffset],
-          `Existing rear lug of purchased indicator: ${lugHole} mm hole, ${lugWidth} mm thickness; hole centre ${lugOffset} mm behind the case rear face. Confirm these dimensions on your dial. No separate custom metal component.`,3,'dial-lug','x');
-        a.parts[a.parts.length-1].bore=lugHole;
-        add(`${role}-dial-bracket`,`PLA ${role} rear-lug clevis`,'pla',[40,40,60],[body[0],body[1],body[2]-30],
-          `Printed bracket is bolted to the short upright-slot support to the indicator's rear lug. Two 6 mm ears straddle the ${lugWidth} mm lug with +${fit} mm clearance per side. A standard M5 bolt passes through BOTH ears and the existing lug hole. Two M5 base screws secure clevis to upright bracket, away from all plunger travel.`,3,'clevis');
-        Object.assign(a.parts[a.parts.length-1],{bore:5.5,lugWidth:lugWidth+2*fit,lugOffset});
-        const length=Math.ceil((lugWidth+2*fit+12+10)/5)*5;
-        throughBolt([body[0],body[1],body[2]-11-lugOffset],length,'x','M5 rear-lug mounting bolt');
-        for(const dx of [-14,14])throughBolt([body[0]+dx,body[1]-25,postZ],30,'y','M5 clevis-to-bracket fixing bolt');
-
+      if(lateral){
+        const z=P/2+2.5,y=yAxle-Math.sqrt(Math.max(1,(R-depth/2)**2-z*z));
+        const origin:Vec3=[offset+rw/2+101,y,P/2];
+        probe1('lateral',origin,[0,0,Math.PI],origin[0]-ux);
+        probeClamp([ux,y,P/2+2.5],'z',true);
+      }else{
+        // Same orientation and direct upright clamp as the lateral probe.
+        // The thin end reaches the wheel centre plane; its upper edge gauges radial runout.
+        const z=P/2,y=yAxle-Math.sqrt(Math.max(1,R*R-z*z))-1;
+        const origin:Vec3=[offset+100,y-7.5,z];
+        probe1('radial',origin,[0,0,Math.PI],origin[0]-ux);
+        probeClamp([ux,origin[1],P/2+2.5],'z',true);
+        if(origin[1]-7.5<P+cornerBracketDimensions.leg)errors.push('Radial Probe 1 overlaps the base bracket zone; use longer uprights.');
       }
     }
     notes.push(
-      frictionCap?`Two identical top-centred Fusion V caps seat on equal ${uprightLength??'unavailable'} mm uprights. Axle height is rail top + 26 mm + hub-end radius / sin(45°): ${yAxle.toFixed(2)} mm for the larger entered end. Equal end diameters are required for a level axle. Four tongues locate in the slots. Load passes through the centred pedestal and seating ledge into the rail end. Upright centres follow the middle of each usable hub-end projection; check the supplier section and test the coupon.`:`Both top caps seat on equal ${uprightLength??'unavailable'} mm uprights. Their printed cradle depths compensate for the entered left/right protrusion diameters, giving axle height ${yAxle.toFixed(2)} mm.`,
+      frictionCap?`Two identical top-centred Fusion V caps seat on equal ${uprightLength??'unavailable'} mm uprights. Axle height is rail top + 26 mm + supported end or sleeve radius / sin(45°): ${yAxle.toFixed(2)} mm for the supported diameter. Equal end diameters are required for a level axle. Four tongues locate in the slots. Load passes through the centred pedestal and seating ledge into the rail end. Upright centres respect the bracket minimum; narrow hubs use matched sleeves on a through-hub rod; check the supplier section and test the coupon.`:`Both top caps seat on equal ${uprightLength??'unavailable'} mm uprights. Their printed cradle depths compensate for the entered left/right protrusion diameters, giving axle height ${yAxle.toFixed(2)} mm.`,
       'Measure the diameter and usable projection of BOTH stationary hub ends. Cradles must support those ends, not bearing seals or rotating hub shell. If either end has no usable protrusion, this seating arrangement is not compatible.',
-      'The wheel rotates on its hub bearings; the protruding ends stay stationary in the PLA indents. There is no QR cam, clamping nut, steel dropout, custom shaft collar or metal adaptor sleeve.',
-      'Optional smooth rod: slide loosely through the hub bore without nuts, tightening or bearing preload. It is only a guide, not the load-bearing axle or positive wheel retention. Remove it before reversing if it impedes lifting.',
-      'Pointer brackets attach directly to upright slots. The lateral Fusion dial holder mounts on the right front slot; the radial Fusion T bridge spans both front slots, with two left horizontal slots and a slotted right fixing.',
+      rodRequired?'The hub rotates on its bearings around the stationary axle; the required through-hub rod and matched sleeves bridge the extra holder spacing.': 'The wheel rotates on its hub bearings; the protruding ends stay stationary in the PLA indents. There is no QR cam, clamping nut, steel dropout, custom shaft collar or metal adaptor sleeve.',
+      rodRequired?'Rod and spacer sleeves are required at this spacing and cannot be disabled. Verify fit and support stiffness before calibration.':'Optional smooth rod: slide loosely through the hub bore without nuts, tightening or bearing preload. It is only a guide, not the load-bearing axle or positive wheel retention. Remove it before reversing if it impedes lifting.',
+      'Probe 1 mounts directly on the front upright for lateral measurement and another identical, unrotated copy on the same upright for radial measurement. The lateral Fusion dial holder mounts on the right front slot; the radial Fusion T bridge spans both front slots, with two left horizontal slots and a slotted right fixing.',
       'Dial upgrade: keep the extrusion frame and hub cradles. Print the one-piece lateral holder and the two radial parts. The radial assembly uses three M5 × 16 frame bolts, one M5 × 25 pivot bolt and one M5 × 16 lug bolt; the lateral holder retains its three M5 bolts. Both dials use the same fixed reference dimensions. Reposition, tighten and recalibrate.',
       'Printed sections have a maximum 180 mm envelope, allowing a 10 mm margin on a 200 × 200 mm bed. No long printed measurement posts are required. Printer Z clearance and brim settings still need checking.',
       'Calibrate in the actual unclamped condition: compare seat heights, reseat three times, reverse the wheel and use very light probe contact. PLA wear, joint compliance and hub bearing play can limit repeatability; a loose rod does not cancel them.'
     );
     a.steps=[
       'Lay both feet and the crossbar flat as an H. Butt each crossbar end against a foot’s inner face and secure both side-slot corner brackets. Fit the equal-length uprights on the middle crossbar, then square and tighten their base brackets.',
-      frictionCap?'Measure both stationary hub-end diameters (6–35 mm, equal on both sides) and at least 3 mm usable projection. Print the 5 mm four-slot coupon first and tune tongue width if needed. Print two identical caps upright with supports OFF. Slide their tongues into the slots until the seating ledges meet the rail ends. Move the uprights under the middle of each hub-end projection and drop the hub into the top V seats.':'Measure both hub-end protrusion diameters and their minimum usable length. Print the matched cradle caps; seat their shoulders fully on the upright ends and retain with side-slot bolts.',
-      'Lower the stationary hub ends into the open PLA indents. Check that the hub shell and seals are clear and the wheel spins on its bearings. No wheel clamping is required.',
-      'Optionally insert a loose smooth rod through the hub bore. Do not tighten nuts against the hub or supports. Retract probes, lift, reverse and reseat without moving the caps.',
-      'Print the radial bridge flat on its back and the dial arm flat on its broad side. Fit the three frame bolts through the horizontal slots, slide the bridge to centre the dial, then lock those bolts. Put the flat 4 mm dial arm between the two 4 mm fork cheeks and fit one M5 × 25 pivot bolt, washers and nut. Loosen that bolt to aim the probe through the axle centre, then tighten both flat cheek faces against the arm. Clamp the 5.2 mm dial lug to its 2.8 mm reinforced ear. Set bridge height for 5 mm preload and re-zero. Sideways adjustment and angle have separate locks; no snap fits or flexible clamps are used.',
-      'Fit M6 pointer screws and captured nuts. Head-mount bolts sit beside the pointer, not through it. For dials bolt the actual rear mounting lug between the printed clevis ears, with faces toward the operator. No stem clamp is used. Check joint rigidity and reseating repeatability.'
+      frictionCap?'Measure both stationary hub-end diameters (6–35 mm, equal on both sides) and at least 3 mm usable projection. Print the 5 mm four-slot coupon first and tune tongue width if needed. Print two identical caps upright with supports OFF. Slide their tongues into the slots until the seating ledges meet the rail ends. Respect the minimum upright spacing. For a narrow hub, install the through-hub rod and matched spacer sleeves, then seat the sleeves in the V holders; otherwise seat the hub ends directly.':'Measure both hub-end protrusion diameters and their minimum usable length. Print the matched cradle caps; seat their shoulders fully on the upright ends and retain with side-slot bolts.',
+      rodRequired?'Insert the rod through the hub, fit one counterbored spacer sleeve over each stationary end and lower both sleeves into the holders. Check that the hub is centred and spins freely.':'Lower the stationary hub ends into the open PLA indents. Check that the hub shell and seals are clear and the wheel spins on its bearings. No wheel clamping is required.',
+      rodRequired?'Keep the required rod and both sleeves with the wheel when lifting and reversing. Recheck seating and zero after each reversal.':'Optionally insert a loose smooth rod through the hub bore. Do not tighten nuts against the hub or supports. Retract probes, lift, reverse and reseat without moving the caps.',
+      'Print the one-piece radial holder flat on its back. Centre it using the three frame slots and tighten the frame bolts. Bolt the dial lug against the single ear using the M5 × 25 bolt, washers and nut. Aim the pin through the axle centre, tighten the lug bolt, set 5 mm preload and re-zero.',
+      'Fit identical Probe 1 parts for both pointers. Slide their native slots under M4 washers, set a light gap, and lock the clamps. For dials bolt the actual rear mounting lug against the single printed mounting ear, with faces toward the operator. No stem clamp is used. Check joint rigidity and reseating repeatability.'
     ];
   } else {
     a.wheel.center=[0,R+60,0];
-    // Bridge is outside the widest hub face; feet reach back to the same rim side.
-    const angled=s.dishLayout==='angled';
-    const cy=a.wheel.center[1],contactPlane=rw/2+offset;
-    const rodZ=P/2+14;
-    const halfSpan=angled?R-depth/2:Math.sqrt((R-depth/2)**2-rodZ**2);
-    // Rim stops slide along continuous arms; stock can extend past the rim.
-    // Keep the metal outside the wheel until the overhang is beyond its OD.
-    const contactStandOff=Math.ceil((depth/2+10)/10)*10;
+    // One photographed design: a 300 mm rail, two 100 mm arms, four
+    // 135-degree brackets and an unchanged Probe 1 clamped directly to the rail.
+    const cy=a.wheel.center[1],contactPlane=rw/2+offset,c=Math.SQRT1_2;
+    const bridgeLength=300,armLength=100,footLength=60;
+    const halfSpan=R-depth/2;
+    const jointHalfSpan=Math.max(60,Math.min(bridgeLength/2-P*c,halfSpan-(armLength+2*P)*c-footLength/2));
+    const contactAlongFoot=halfSpan-jointHalfSpan-(armLength+2*P)*c;
+    a.dishing={bridgeLength,armLength,jointHalfSpan,contactAlongFoot,connectorAngle:135};
+    if(contactAlongFoot<5||contactAlongFoot>55)errors.push('The fixed 300 mm centre rail and 100 mm arms cannot place both metal feet on this rim. The photo model keeps its real lengths; it is not stretched to fit.');
+    const rootX=contactPlane+armLength*c,bx=rootX+P/2;
+    function rail(length:number,pos:Vec3,rotation?:Vec3){
+      add(`dish-rail-${s.profile}-${length}`,`${s.profile} dishing extrusion · ${length} mm`,'extrusion',[P,length,P],pos,
+        `Photographed dishing frame: ${length} mm uncut member, ${p.family}. Fixed 300 + 100 + 100 mm configuration, independent of stand stock.`,1,'box','y',length);
+      a.parts[a.parts.length-1].rotation=rotation;
+    }
+    rail(bridgeLength,[bx,cy,0]);
+    function bend(sku:string,name:string,origin:Vec3,legs:[[number,number],[number,number]],attached:number){
+      const points=legs.flatMap(d=>[[0,0],[d[0]*60,d[1]*60]]);
+      const dims:Vec3=[Math.max(...points.map(v=>v[0]))-Math.min(...points.map(v=>v[0]))+12,Math.max(...points.map(v=>v[1]))-Math.min(...points.map(v=>v[1]))+12,18];
+      add(sku,name,'metal',dims,origin,'Pictured open 135° bracket: two 60 mm legs, 18 mm width, 6 mm thickness, Ø5.5 mm holes. M5 bolt and profile-compatible T-nut in each attached leg. Hole centres shown 40 mm from the bend are provisional. Relieved gusset follows the photo approximately. Outer free legs are the metal rim contacts.',2,'photo-bracket');
+      a.parts[a.parts.length-1].bendLegs=legs;
+      const sum=[legs[0][0]+legs[1][0],legs[0][1]+legs[1][1]];
+      for(let i=0;i<attached;i++){
+        const d=legs[i],raw=[-d[1],d[0]],flip=raw[0]*sum[0]+raw[1]*sum[1]>=0?1:-1,n=[raw[0]*flip,raw[1]*flip];
+        const point:Vec3=[origin[0]+d[0]*40+n[0]*3,origin[1]+d[1]*40+n[1]*3,0];
+        add('dish-bracket-m5','M5 × 16 dishing bracket bolt','hardware',[5,16,5],point,'Through Ø5.5 mm bracket hole into an M5 T-nut. Six occupied holes total; the two free foot holes remain empty.',2,'cylinder','x');
+        a.parts[a.parts.length-1].rotation=[0,0,Math.atan2(n[1],n[0])];
+        add('dish-bracket-tnut-'+s.profile,`${p.family} M5 dishing bracket T-nut`,'hardware',[4,10,p.slot+2],[point[0]-n[0]*6,point[1]-n[1]*6,0],'M5 thread matching the chosen extrusion family.',2);
+        a.parts[a.parts.length-1].rotation=[0,0,Math.atan2(n[1],n[0])];
+      }
+    }
+    for(const sign of [-1,1]){
+      const root:Vec3=[rootX,cy+sign*jointHalfSpan,0];
+      const dir:[number,number]=[-c,sign*c];
+      // Both square arm ends retain their stock length; offset to the two
+      // adjoining faces leaves the gussets in the open corners, not in the rails.
+      rail(armLength,[rootX-(P+armLength)*c/2,root[1]+sign*(3*P+armLength)*c/2,0],[0,0,sign>0?Math.PI/4:3*Math.PI/4]);
+      bend('dish-joint-bracket','135° centre-to-arm bracket',root,[[0,-sign],dir],2);
+      const end:Vec3=[contactPlane,root[1]+sign*(armLength+2*P)*c,0];
+      bend('dish-foot','135° metal rim-contact foot',end,[[c,-sign*c],[0,sign]],1);
+    }
     const allowance=valid(s.dishAllowance,1,15)?s.dishAllowance:5;
-    if(!valid(s.dishAllowance,1,15))errors.push('Dishing setup allowance must be 1–15 mm.');
-    const stopReach=s.dishStopReach??Math.max(40,Math.ceil((W/2-contactPlane+18+allowance)/20)*20);
-    if(!valid(stopReach,40,160)||stopReach%20!==0)errors.push('Choose a matched stop reach from 40 to 160 mm in 20 mm steps.');
-    const minProjection=Math.max(35,W/2+18+allowance-contactPlane-P/Math.sqrt(2)-contactStandOff);
-    let selection:{bridge:number;arm:number;mount:number;travel:number;endLocated:boolean}|undefined;
-    const candidates:{bridge:number;arm:number;mount:number;travel:number;endLocated:boolean}[]=[];
-    for(const bridgeLength of [...s.lengths].sort((a,b)=>a-b)){
-      const mount=Math.min(bridgeLength/2-12,halfSpan-minProjection);
-      if(mount<82)continue;
-      const travel=(halfSpan-mount)*Math.sqrt(2);
-      for(const arm of s.lengths)if(arm>=travel+25)candidates.push({bridge:bridgeLength,arm,mount,travel,endLocated:false});
-      for(const arm of s.lengths){
-        const endMount=halfSpan-arm/Math.sqrt(2);
-        if(endMount>=82&&endMount<=bridgeLength/2-12&&arm/Math.sqrt(2)>=minProjection)candidates.push({bridge:bridgeLength,arm,mount:endMount,travel:arm,endLocated:true});
-      }
-    }
-    // Minimise all three stock members, not just the first feasible bridge.
-    // Equal totals favour shorter arms, which avoids unnecessary overhang.
-    candidates.sort((a,b)=>(a.bridge+2*a.arm)-(b.bridge+2*b.arm)||a.arm-b.arm||Number(b.endLocated)-Number(a.endLocated)||a.bridge-b.bridge);
-    selection=candidates[0];
-    const armLength=selection?.arm??null;
-    const armProjection=(armLength??0)/Math.sqrt(2);
-    const mountHalfSpan=selection?.mount??82;
-    const contactProjection=halfSpan-mountHalfSpan;
-    const bx=angled?contactPlane+contactStandOff+P/Math.sqrt(2)+contactProjection+P/2:contactPlane+stopReach+P/2;
-    const plateX=bx-P/2-4;
-    const nominalReach=plateX-4-W/2;
-    const probeLength=Math.max(60,Math.ceil((nominalReach+allowance+15)/10)*10);
-    a.probe={...dishingProbeRange(nominalReach,probeLength),allowance,rodLength:probeLength,stopReach};
-    if(a.probe.inward<allowance||a.probe.outward<allowance)errors.push(`Central probe lacks ±${allowance} mm setup reserve. ${angled?'Increase bridge clearance or change stock selection.':'Choose a taller matched stop pair; do not adjust one rim stop independently.'}`);
-    notes.push(`Central probe reach from carriage front face: nominal ${nominalReach.toFixed(1)} mm; usable ${a.probe.min}–${a.probe.max} mm with a ${probeLength} mm M6 rod. Reserve ${a.probe.inward.toFixed(1)} mm inward and ${a.probe.outward.toFixed(1)} mm outward. Requested setup variation ±${allowance} mm. Limits are geometric, not certified accuracy.`,
-      'The fixed rim contacts are a matched reference, not a prediction of wheel dish. Adjust the centre on the first side, lock both metal nuts, then reverse without changing any setting. If it rocks on the probe, reset from the opposite side to obtain a central gap with both feet seated.',
-      'A 2 mm rim offset gives a 4 mm central gap only when both feet remain seated. Do not dial out that gap on the checking side. Probe travel permits initial setup; it is not consumed while measuring the locked gap. Re-zero after adjusting the wheel.',
-      'Common stop-height error changes the initial probe setting. Unequal stops, bent rails, loose joints, local rim runout and changing hand pressure require mechanical correction; more independent adjusters would add drift sources.');
-    if(angled&&!selection)errors.push('No available stock combination fits. The current 60 mm connectors and centre carriage require a bridge at least 194 mm long (82 mm each side plus 12 mm end margins). Arms must either end at a seated contact cap or leave 25 mm beyond a sliding contact and maintain hub clearance. Shorter lengths can be used as arms with a suitable longer bridge; no unlisted 200 mm member is substituted.');
-    if(angled&&selection)notes.push(`Stock choice: ${selection.bridge} mm bridge + 2 × ${selection.arm} mm arms = ${selection.bridge+2*selection.arm} mm total. Compared ${candidates.length} feasible combinations from the entered list; lowest total stock wins, with shorter arms breaking ties. ${selection.endLocated?'Positive end-locating caps seat on both factory rail ends.':'Sliding saddles clamp along the arms.'} Rim-stop position ${selection.travel.toFixed(1)} mm along each arm; ${(selection.arm-selection.travel).toFixed(1)} mm remains beyond the contact.`);
-    if(angled)notes.push('Continuous diagonal rails extend beyond the rim. Sliding printed stops set the contact positions; clamp both after wheel-size setup. The stops do not require rails cut to the wheel diameter. Metal overhang clears the wheel envelope in this model; check the actual rim, spokes and surroundings.',
-      'The pictured 60 × 60 × 18 × 6 mm open 135° brackets join two extrusion slots with M5 hardware. Verify actual hole positions and slot engagement.');
-    const bridge=angled&&!selection?null:stock('Dishing bridge',angled?selection!.bridge:diameter+2*P+40,'y',[bx,cy,0]);
-    if(bridge && bridge>1000) notes.push('Long dishing bridge: support gently and verify that hand pressure does not change the reading.');
-    const plateDepth=rodZ+30,plateZ=(rodZ-10)/2;
-    function carriage(sku:string,name:string,y:number,probe=true){
-      add(sku,name,'pla',[8,40,plateDepth],[plateX,y,plateZ],
-        `Flat 8 mm PLA plate on the wheel-facing bridge slot. Two ${p.bolt} slot bolts at Y ±12 mm. ${probe?`M6 probe bore at Z ${rodZ} mm clears the extrusion edge; two external metal nuts lock the screw against the plate.`:'Fixed angled foot bolts to the outer wing. No rim adjustment screw.'}`,2,'dish-plate','x');
-      a.parts[a.parts.length-1].holes=[{x:plateZ,y:-12,r:(Number(p.bolt.slice(1))+.5)/2},{x:plateZ,y:12,r:(Number(p.bolt.slice(1))+.5)/2},{x:plateZ-rodZ,y:0,r:(6+fit)/2}];
-      if(!probe)a.parts[a.parts.length-1].holes!.pop();
-      for(const dy of [-12,12])bolt([plateX,y+dy,0],2,'x',20,-1);
-    }
-    function screw(sku:string,name:string,contactX:number,y:number){
-      const len=probeLength;
-      add(sku,name,'metal',[6,len,6],[contactX+len/2,y,rodZ],
-        `Standard M6 × ${len} mm threaded screw; usable reach ${a.probe!.min}–${a.probe!.max} mm from carriage front to hub face. Runs through the printed plate beside the bridge, never through the extrusion. Front end enters the printed contact shoe; two nuts at the carriage lock reach.`,2,'cylinder','x');
-      for(const x of [plateX-7,plateX+7])add('dish-m6-nut','M6 dishing lock nut','hardware',[10,5,10],[x,y,rodZ],'Standard metal nut: pair clamps opposite carriage faces. No hanging counterweight.',2,'cylinder','x');
-    }
-    for(const sign of [-1,1]) {
-      const fy=cy+sign*halfSpan,contactX=rw/2+offset;
-      if(angled){
-        if(!armLength)continue;
-        const my=cy+sign*mountHalfSpan, rootX=bx-P/2;
-        const angle=sign>0?Math.PI/4:3*Math.PI/4;
-        const startX=rootX-P/(2*Math.sqrt(2));
-        stock('Diagonal dishing arm',armLength,'y',[startX-armProjection/2,my+sign*armProjection/2,0],2);
-        const arm=a.parts[a.parts.length-1];arm.rotation=[0,0,angle];
-        arm.spec+=' Diagonal arm at 45°. Full stock length; metal carries the reach. Join to bridge with the pictured 135° bracket and matching M5 T-nuts.';
-        add('dish-foot','Pictured 135° rail-to-rail bracket · 60 × 60 × 18 × 6 mm','metal',[49,109,18],[rootX,my,0],
-          'Two 60 mm legs join the bridge slot to the diagonal arm slot. 18 mm width, 6 mm thickness, Ø5.5 mm holes. Hole centres shown at 40 mm are provisional; verify actual bracket dimensions and both slot engagements. M5 hardware on both legs.',2,'photo-bracket');
-        a.parts[a.parts.length-1].angleSign=sign;
-        for(const leg of [0,1]){
-          const point:Vec3=leg?[rootX-40/Math.sqrt(2),my+sign*40/Math.sqrt(2),0]:[rootX-3,my-sign*40,0];
-          add('photo-bracket-m5','M5 × 16 rail-joint bolt','hardware',[5,16,5],point,'Through a bracket hole into a profile-compatible M5 T-nut; confirm engagement. Two bolts per connector, one in each rail.',2,'cylinder','x');
-          if(leg)a.parts[a.parts.length-1].rotation=[0,0,sign*Math.PI/4];
-          const normal:Vec3=leg?[1/Math.sqrt(2),sign/Math.sqrt(2),0]:[1,0,0];
-          add('photo-bracket-tnut-'+s.profile,`${p.family} M5 rail-joint T-nut`,'hardware',[4,12,p.slot+2],[point[0]+normal[0]*6,point[1]+normal[1]*6,0],`${p.family}, M5 internal thread. One inside each joined rail.`,2);
-          if(leg)a.parts[a.parts.length-1].rotation=[0,0,sign*Math.PI/4];
-        }
-        const capDepth=P/Math.sqrt(2)+contactStandOff;
-        add('angled-rim-cap',selection!.endLocated?'PLA end-locating rim-contact cap':'PLA sliding rim-stop saddle','pla',[capDepth,30,P+6],[contactX+capDepth/2,fy,0],
-          selection!.endLocated?`Positive internal shoulder seats on the square-cut metal arm end; two side cheeks register against the extrusion. The side-slot bolt retains the cap rather than setting its depth. Flat rim contact, no V-groove or grip on the rim. Match both assembled contact heights; factory end squareness and PLA compression still affect results.`:`Open-backed sliding stop on the continuous metal arm: ${capDepth.toFixed(2)} mm X envelope, ${contactStandOff.toFixed(2)} mm contact stand-off. Open ends let the rail pass through. Position ${selection!.travel.toFixed(1)} mm along the arm; ${(armLength-selection!.travel).toFixed(1)} mm continues beyond it. Match both contact faces on a flat reference. Lock the saddle to a side-slot T-nut after setting rim span; it is not adjusted while comparing wheel sides.`,2,'contact-cap');
-        Object.assign(a.parts[a.parts.length-1],{endLocated:selection!.endLocated,profileSize:P,angleSign:sign});
-        bolt([contactX+capDepth-10,fy, P/2+3],2,'z',16);
-        continue;
-      }
-      const stopReach=bx-P/2-contactX;
-      add('dish-foot','PLA fixed-height rim stop','pla',[stopReach,56,30],[contactX+stopReach/2,fy,0],
-        `Reusable matched stop pair, ${stopReach.toFixed(0)} mm nominal reach (20 mm size steps), from the close-set bridge to the rim. Flat contact face at X ${contactX.toFixed(2)} mm. No adjustment screw. A small rear mounting flange locks its position along the bridge; check both complete stop heights on a flat reference.`,2,'fixed-stop');
-      for(const dy of [-22,22])bolt([plateX,fy+dy,0],2,'x',20,-1);
-    }
-    carriage('dish-center','PLA flat centre carriage',cy);
-    const shoeX=W/2+4;
-    screw('dish-probe','M6 central hub-face probe',shoeX,cy);
-    add('probe-fork','PLA open hub-face reference shoe','pla',[8,40,2*(rodZ+10)],[shoeX,cy,0],
-      `Flat fork with ${axleD+2} mm upward-open axle clearance. The inner X face contacts the hub dropout seating face at X ${W/2} mm. M6 screw ends in a rear-access nut pocket in the right-hand ear at Z ${rodZ} mm, with a captured nut on its outer face. Confirm that both lands touch the stationary hub face and clear seals.`,3,'fork','x');
-    Object.assign(a.parts[a.parts.length-1],{bore:axleD+2,holes:[{x:-rodZ,y:0,r:(10+fit)/2}]});
-    add('fork-captured-nut','M6 hub-shoe captured nut','hardware',[10,5,10],[shoeX+1.5,cy,rodZ],'M6 nut in a rear-access 5 mm-deep pocket. Screw ends inside the shoe; its front contact face remains plastic.',3,'cylinder','x');
-    notes.push(angled?'45° layout: two full-stock metal extrusion arms carry the reach. Sliding printed saddles provide equal fixed rim contacts; there are no rim adjustment screws. Only the central hub probe adjusts during measurement. Check matched contact lands on a flat reference; printing error is not cancelled by removing adjusters. The bridge uses the shortest available length covering the inboard mounts; longer stock is allowed.':'Straight layout: use a reusable matched pair of stops in 20 mm reach steps. The central probe absorbs ordinary hub/rim variation; the stops are not printed to the exact dish of this wheel. Only the short central M6 probe adjusts; no outer screws or unnecessary common stand-off.',
-      angled?'Print the open-backed saddles contact face down; keep both ends open for the rail to pass through. The metal brackets and diagonal extrusion arms supply the 45° geometry and reach. Print the centre fork on its broad X face. Verify both contact lands against a flat reference before using the gauge.':'All dishing plates and the open reference fork print flat on their broad X face. Their through-holes run vertically in this print orientation. Print the matched fixed rim stops together on their rear mounting faces, with the contact columns growing upwards. No support is intended for these parts; inspect the slicer preview and verify actual hub-face contact.');
+    const q=W/2+100-bx,reach=100-q;
+    a.probe={nominal:reach,min:7,max:93,inward:reach-7,outward:93-reach,allowance,rodLength:105,stopReach:0};
+    probe1('dish',[W/2+100,cy,P/2],[0,0,Math.PI],q);
+    probeClamp([bx,cy,P/2+2.5],'z',true);
+    if(a.probe.inward<allowance||a.probe.outward<allowance)errors.push(`Probe 1 lacks ±${allowance} mm reserve at this hub spacing. Its 105 mm body and native slot remain unchanged.`);
+    notes.push('Photographed dishing model only: 300 mm centre rail + 2 × 100 mm angled arms; four metal bend brackets, six M5 bracket bolts, and one unchanged Probe 1 with its direct M4 slot clamp. No printed rim stops, contact shoe or centre adapter.',
+      'The preview uses the supplied 135° included-angle brackets, producing 45° rail turns. A 45° bracket can be used for the complementary mounting arrangement; confirm its mounting faces and matched foot positions. This is the same three-rail mechanism, not a second straight design.',
+      `Rim contact is on the free metal foot legs, ${contactAlongFoot.toFixed(1)} mm from each outer bend. Set both arm joints equally along the centre rail and lock them. The 60 mm foot legs and gussets are schematic around the dimensions supplied; verify actual hole centres.`,
+      'Probe 1 bolts directly across the centre rail as in the photos. Its narrow end references the stationary hub face; verify axle and seal clearance on the real hub. Slide its existing slot and lock the M4 washer. Do not adjust it while comparing wheel sides.');
     a.steps=[
-      angled?'Join two equal full-stock diagonal extrusion arms to the bridge with the pictured 135° brackets. Each bracket bolts into both rails with M5 T-nuts. Position the sliding rim stops along the arms and lock them; unused rail extends past each contact. Only the centre probe remains adjustable.':'Fit two sliding feet to the uncut bridge and set their centres across the rim diameter. Keep bridge clear of both the hub and axle projection.',
-      angled?'Check both fixed contact lands against a flat reference. If unequal, correct the printed parts before use; do not compensate by tilting the gauge.':'On a flat reference, check both fixed stop heights and lock their mounting positions. Correct any unequal printed heights before use; check first-layer distortion.',
-      'Place both pads on one side of the rim at marked opposite locations. Adjust the forked central probe to the hub dropout seating face and lock it.',
-      'Move the gauge to the other side without changing its settings. Seat both rim pads lightly and measure the central gap; if the gauge rocks, reverse the setup side.',
-      'Repeat at several marked rim diameters to distinguish dish from local runout. A symmetric wheel has matching contact on both sides; account for intentional frame offset separately.'
+      'Use one 300 mm centre rail and two 100 mm arms. Fit the two inner 135° brackets and set the arm joints symmetrically along the centre rail.',
+      'Attach one 135° bracket to the outer end of each arm. Leave each outward leg free to serve as a metal rim-contact foot. Verify that both contact faces are coplanar.',
+      'Bolt the unchanged Probe 1 directly through its existing slot to the centre rail with an M4 bolt, wide washer and matching T-nut.',
+      'Seat both metal feet on one rim side, slide the narrow probe end to the stationary hub face and lock it. Reverse the tool without changing the setting; compare the central gap.',
+      'Repeat at several rim positions. If the gauge rocks, establish the reference from the opposite side; check seals, axle clearance, joint rigidity and equal foot contact.'
     ];
   }
   for(const part of a.parts.filter(p=>p.kind==='pla')) {
-    if(part.radialMeshKey==='Radial printable bridge'||part.radialMeshKey==='Radial printable C-holder') {
-      part.print={bed:part.radialMeshKey==='Radial printable bridge'?'Flat mounting back on bed; STL at Z=0':'Broad 4 mm pivot-arm face on bed; STL rotates X=47 down to Z=0',supports:'Supports OFF. Both parts grow from continuous flat bed faces. Horizontal bores have 45° roofs in their exported orientations; the pivot arm has a vertical round pivot hole.',accuracy:'Combined print envelope 180 × 110.4 × 32 mm. Generic Cura validation uses 0.2 mm layers with no supports. Frame and lug grips are 8 mm; the double-sided pivot uses a longer M5 × 25; confirm actual bolt fit and clamping after printing.'};
+    if(part.radialMeshKey==='Radial printable bridge') {
+      part.print={bed:'Flat mounting back on bed; STL at Z=0',supports:'Supports OFF. One connected solid; horizontal lug holes have 45° roofs.',accuracy:'Print envelope 180 × 68 × 30.75 mm. Three frame bolts clamp 8 mm lands; the direct lug ear uses one M5 × 25. Verify friction and fit after printing.'};
       part.spec+=` PRINT: ${part.print.bed}. ${part.print.supports} ${part.print.accuracy}`;
       continue;
     }
@@ -598,8 +528,8 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
       part.spec+=` PRINT: ${part.print.bed}. ${part.print.supports} ${part.print.accuracy}`;
       continue;
     }
-    const bed=part.sku==='lateral-dial-bracket'?'Flat mounting back (−Z) on bed; fork cheeks grow upwards':part.shape==='fixed-stop'?'Broad rear mounting face on bed; integral flange and contact column grow upwards':part.shape==='contact-cap'?'Flat rim-contact X face down; open rail recess upwards, side cheeks grow from the contact face':part.shape==='angle-foot'?'Broad Z face flat on bed; diagonal web and contact land print together, with no overhang':part.shape==='rail-mount'?'Broad ledge underside (−Y) on bed; flange grows upwards':part.shape==='clevis'?'Flat base underside (−Y) on bed; ears grow upwards':part.shape==='top-cap'?'Outer back face on bed; rail socket faces up':part.shape==='clamp'?`Face normal to the ${part.axis?.toUpperCase()} pointer bore on bed; bore vertical`:part.shape==='fork'?'Hub-contact X face down; open axle slot and rear nut pocket face upwards':part.shape==='dish-plate'?'Broad X face on bed; all three through-holes vertical':part.sku==='foot-pad'?'Rim-contact X face down; blind screw socket upwards':'Largest flat face on bed; through-hole axes vertical where present';
-    const supports=part.endLocated?'The internal rail-end shoulder may require local support or a separately printed cheek. Check the slicer; keep support scars away from the locating shoulder and rim-contact face.':part.shape==='top-cap'?'Local support may be needed under the cradle nose. Current integral cap is NOT claimed support-free; keep support away from the rail-end datum and seat.':(part.shape==='clevis'||part.sku==='lateral-dial-bracket')?'No external support intended. Horizontal 5.5 mm lug holes need a bridge test; drill to final clearance if needed.':'No support intended in the stated orientation; confirm every layer in the slicer before printing.';
+    const bed=part.shape==='probe1'?'Native Fusion Z=0 flat back on bed; rear flange upwards':part.sku==='lateral-dial-bracket'?'Flat mounting back (−Z) on bed; single mounting ear grows upwards':part.shape==='top-cap'?'Outer back face on bed; rail socket faces up':'Largest flat face on bed; through-hole axes vertical where present';
+    const supports=part.shape==='top-cap'?'Local support may be needed under the cradle nose. Current integral cap is NOT claimed support-free; keep support away from the rail-end datum and seat.':part.sku==='lateral-dial-bracket'?'No external support intended. Horizontal 5.5 mm lug holes need a bridge test; drill to final clearance if needed.':'No support intended in the stated orientation; confirm every layer in the slicer before printing.';
     const accuracy=part.shape==='top-cap'?'Check both seating heights and rail shoulders with a reference; remove elephant foot without changing the datum.':'Print a hole/fit coupon, compensate first-layer expansion, and measure mating faces. Drill clearance holes only; preserve contact faces. Check after tightening.';
     part.print={bed,supports,accuracy};part.spec+=` PRINT: ${bed}. ${supports} ${accuracy}`;
   }

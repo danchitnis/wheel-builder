@@ -1,8 +1,6 @@
-"""Fusion MCP: inject RADIAL_SPEC and OUTPUT_ROOT (repository directory).
-The checked-in radial assembly supplies the measured dial without local CAD state.
-Two printable components, neutral coordinates.
-Flat bridge Z=0; dial arm prints on its broad X=47 face.
-A double-sided M5 fork pivot sets tilt; three frame slots set lateral position.
+"""Fusion MCP: inject RADIAL_SPEC and OUTPUT_ROOT.
+One flat-backed printed bridge; the corrected dial-lug bolt is also the angle pivot.
+The open original radial Fusion document supplies the reference dial.
 """
 import adsk.core, adsk.fusion, json, math
 from pathlib import Path
@@ -10,23 +8,52 @@ from pathlib import Path
 
 def run(_context: str):
     app=adsk.core.Application.get()
-    archive=Path(OUTPUT_ROOT)/'cad/radial-dial-holder.f3d'
-    assert archive.is_file(), 'Missing measured dial source: '+str(archive)
-    source=app.importManager.importToNewDocument(app.importManager.createFusionArchiveImportOptions(str(archive)))
-    assert source, 'Could not import the saved radial assembly'
+    source=next((v for v in app.documents if v.name=='probe-dial-radial' and v.dataFile),None)
+    assert source, 'Open the original probe-dial-radial design'
     source_design=adsk.fusion.Design.cast(source.products.itemByProductType('DesignProductType'))
     temp=adsk.fusion.TemporaryBRepManager.get()
     dial=temp.copy(next(b for c in source_design.allComponents for b in c.bRepBodies if b.name=='Radial dial case and rear lug'))
     source_dial_x=source_design.userParameters.itemByName('dial_reference_x').value
-    source.close(False)
-    doc=app.documents.add(adsk.core.DocumentTypes.FusionDesignDocumentType); doc.name=RADIAL_SPEC['name']+' V'+str(RADIAL_SPEC['revision'])+' - assembled with dial'
+    source_rear=source_design.userParameters.itemByName('case_rear').value
+    normalize=adsk.core.Matrix3D.create();normalize.translation=adsk.core.Vector3D.create(0,0,4-source_rear);assert temp.transform(dial,normalize)
+    # Upgrade earlier archives whose rear-lug bore was parallel to the pin.
+    bore=next(adsk.core.Cylinder.cast(f.geometry) for f in dial.faces if adsk.core.Cylinder.cast(f.geometry) and abs(adsk.core.Cylinder.cast(f.geometry).radius-.3425)<1e-6)
+    if abs(bore.axis.y)>.9:
+        B=adsk.fusion.BooleanTypes
+        def box(z0,z1):
+            return temp.createBox(adsk.core.OrientedBoundingBox3D.create(adsk.core.Point3D.create(0,0,(z0+z1)/20),adsk.core.Vector3D.create(1,0,0),adsk.core.Vector3D.create(0,1,0),100,100,(z1-z0)/10))
+        lug=temp.copy(dial)
+        assert temp.booleanOperation(lug,box(-1000,40),B.IntersectionBooleanType)
+        assert temp.booleanOperation(dial,box(40,1000),B.IntersectionBooleanType)
+        rotate=adsk.core.Matrix3D.create();rotate.setToRotation(math.pi/2,adsk.core.Vector3D.create(0,0,1),adsk.core.Point3D.create(source_dial_x,0,0))
+        assert temp.transform(lug,rotate)
+        assert temp.booleanOperation(dial,lug,B.UnionBooleanType)
+    cutoff=temp.createBox(adsk.core.OrientedBoundingBox3D.create(adsk.core.Point3D.create(0,-48.65,0),adsk.core.Vector3D.create(1,0,0),adsk.core.Vector3D.create(0,1,0),100,102.7,100))
+    assert temp.booleanOperation(dial,cutoff,adsk.fusion.BooleanTypes.IntersectionBooleanType)
+    for y0,y1,r in [(27,47,4),(47,62,2)]:
+        stem=temp.createCylinderOrCone(adsk.core.Point3D.create(source_dial_x,y0/10,5.25),r/10,adsk.core.Point3D.create(source_dial_x,y1/10,5.25),r/10)
+        assert temp.booleanOperation(dial,stem,adsk.fusion.BooleanTypes.UnionBooleanType)
+
+    doc=next((v for v in app.documents if v.name=='probe-dial-radial' and v.dataFile),None)
+    assert doc, 'Open the original probe-dial-radial Fusion document before regenerating'
+    doc.activate();existing=adsk.fusion.Design.cast(app.activeProduct)
+    # Preserve any unsaved original edits before replacing generated geometry.
+    import tempfile,time
+    backup=Path(tempfile.gettempdir())/('probe-dial-radial-before-regeneration-'+str(time.time_ns())+'.f3d')
+    assert existing.exportManager.execute(existing.exportManager.createFusionArchiveExportOptions(str(backup)))
+    for occurrence in list(existing.rootComponent.occurrences):assert occurrence.deleteMe()
+    while existing.userParameters.count:
+        old=existing.userParameters.count
+        for parameter in list(existing.userParameters):
+            if parameter.isValid:parameter.deleteMe()
+        assert existing.userParameters.count<old, 'Referenced parameters remain'
     d=adsk.fusion.Design.cast(app.activeProduct); d.designType=adsk.fusion.DesignTypes.ParametricDesignType
     d.designIntent=adsk.fusion.DesignIntentTypes.HybridDesignIntentType
     root=d.rootComponent; p=RADIAL_SPEC['parameters']; val=adsk.core.ValueInput.createByString
     pt=lambda x,y,z=0:adsk.core.Point3D.create(x/10,y/10,z/10)
     for k,v in p.items():
         unit='deg' if k.startswith('angle_') and k!='angle_radius' else 'mm'
-        d.userParameters.add(k,val(str(v)+' '+unit),unit,'Radial V8; regenerate sketches from shared specification')
+        d.userParameters.add(k,val(str(v)+' '+unit),unit,'Radial V13; regenerate sketches from shared specification')
     F=adsk.fusion.FeatureOperations
     def component(name):
         c=root.occurrences.addNewComponent(adsk.core.Matrix3D.create()).component; c.name=name; return c
@@ -66,55 +93,70 @@ def run(_context: str):
         points=hull([v for y,z in centres for v in teardrop(y,z,p['bolt_clearance']/2)])
         polygon(c,'yZ',x,[(x,y,z) for y,z in points],h,F.CutFeatureOperation,name)
     bridge=component('PRINT - slotted radial bridge')
-    polygon(bridge,'xY',0,[(-28,-78,0),(21,-78,0),(21,-72,0),(152,-72,0),(152,-48,0),(21,-48,0),(21,-42,0),(-28,-42,0)],8,F.NewBodyFeatureOperation,'Flat 8 mm slotted mounting plate')
+    polygon(bridge,'xY',0,[(-28,-58,0),(21,-58,0),(21,-52,0),(152,-52,0),(152,-28,0),(21,-28,0),(21,-22,0),(-28,-22,0)],8,F.NewBodyFeatureOperation,'Flat 8 mm slotted mounting plate')
     edges=adsk.core.ObjectCollection.create()
     for e in bridge.bRepBodies.item(0).edges:
         b=e.boundingBox
         if abs(b.maxPoint.x-b.minPoint.x)<1e-7 and abs(b.maxPoint.y-b.minPoint.y)<1e-7:edges.add(e)
     fi=bridge.features.filletFeatures.createInput();fi.edgeSetInputs.addConstantRadiusEdgeSet(edges,val('3 mm'),False);bridge.features.filletFeatures.add(fi)
-    cy=p['pivot_y'];cz=p['pivot_z'];radius=p['pivot_radius'];fixed=p['pivot_fixed_x'];tab=p['pivot_tab_thickness']
-    # Two fixed cheeks flank the moving arm; a single longer M5 clamps both faces.
-    rect(bridge,fixed-p['pivot_foot_margin'],-54,p['pivot_moving_x']+2*tab+p['pivot_gap']+p['pivot_foot_margin'],-14,0,8,F.JoinFeatureOperation,'Symmetric fork foot - 6 mm outside each cheek')
-    moving_right=p['pivot_moving_x']+tab+p['pivot_gap']
-    for x in [fixed,moving_right]:
-        face=[(x,-54,0),(x,cy+radius,0),(x,cy+radius,cz)]
-        face += [(x,cy+radius*math.cos(math.radians(a)),cz+radius*math.sin(math.radians(a))) for a in range(2,181,2)]
-        face += [(x,-54,8)]
-        polygon(bridge,'yZ',x,face,tab,F.JoinFeatureOperation,'4 mm fixed fork cheek with flat bearing face')
-        shaftcut(bridge,x,tab,[(cy,cz)],'M5 pivot clearance with 45 degree print roof')
-    # Concave fillets strengthen the two outer fork roots; keep the inner gap clear.
-    root_edges=adsk.core.ObjectCollection.create()
+    cy=p['pivot_y'];cz=p['pivot_z'];radius=10
+    tab=p['ear_thickness'];left=p['dial_reference_x']-p['lug_thickness']/2-tab
+    right=left+tab
+    rect(bridge,left-p['pivot_foot_margin'],-34,right+p['pivot_foot_margin'],10,0,p['foot_thickness'],F.JoinFeatureOperation,'Solid 8 mm projecting arm')
+    for x in [left]:
+        sk=bridge.sketches.add(plane(bridge,'yZ',x));sk.name='Solid web to rounded lug seat'
+        point=lambda y,z:sk.modelToSketchSpace(pt(x,y,z))
+        lines=sk.sketchCurves.sketchLines;arcs=sk.sketchCurves.sketchArcs
+        lines.addByTwoPoints(point(-34,0),point(10,0));lines.addByTwoPoints(point(10,0),point(10,cz))
+        arcs.addByThreePoints(point(10,cz),point(0,cz+10),point(-10,cz))
+        r=p['ramp_radius'];yc=-10-r
+        lines.addByTwoPoints(point(-10,cz),point(yc,cz-r))
+        lines.addByTwoPoints(point(yc,cz-r),point(-34,8));lines.addByTwoPoints(point(-34,8),point(-34,0))
+        bridge.features.extrudeFeatures.addSimple(sk.profiles.item(0),val(str(tab)+' mm'),F.JoinFeatureOperation);sk.isVisible=False
+        shaftcut(bridge,x,tab,[(cy,cz)],'M5 lug clearance with 45 degree print roof')
+    # Apply separate local root radii, never propagate around the support outline.
+    for x,r,name in [(left,6,'R6 load-bearing root'),(right,3,'R3 dial clearance root')]:
+        edges=adsk.core.ObjectCollection.create()
+        for e in bridge.bRepBodies.item(0).edges:
+            b=e.boundingBox
+            if abs(b.minPoint.z-p['foot_thickness']/10)<1e-6 and abs(b.maxPoint.z-p['foot_thickness']/10)<1e-6 and abs(b.maxPoint.x-b.minPoint.x)<1e-6 and abs(b.minPoint.x-x/10)<1e-6 and b.maxPoint.y-b.minPoint.y>1:edges.add(e)
+        assert edges.count==1
+        f=bridge.features.filletFeatures.createInput();f.edgeSetInputs.addConstantRadiusEdgeSet(edges,val(str(r)+' mm'),False)
+        bridge.features.filletFeatures.add(f).name=name
+    sk=bridge.sketches.add(plane(bridge,'yZ',left));sk.name='Local 16 mm washer clearance'
+    sk.sketchCurves.sketchCircles.addByCenterRadius(sk.modelToSketchSpace(pt(left,cy,cz)),.8)
+    normal=sk.sketchToModelSpace(adsk.core.Point3D.create(0,0,1));origin=sk.sketchToModelSpace(adsk.core.Point3D.create(0,0,0))
+    bridge.features.extrudeFeatures.addSimple(sk.profiles.item(0),val(str(-9 if normal.x>origin.x else 9)+' mm'),F.CutFeatureOperation).name='Washer-only circular relief; preserve ear face'
+    sk.isVisible=False
+    # Concave plan fillets reinforce both foot-to-crossbar junctions without raising the bed.
+    edges=adsk.core.ObjectCollection.create()
     for e in bridge.bRepBodies.item(0).edges:
         b=e.boundingBox
-        if abs(b.minPoint.z-.8)<1e-6 and abs(b.maxPoint.z-.8)<1e-6 and abs(b.maxPoint.x-b.minPoint.x)<1e-6 and any(abs(b.minPoint.x-x/10)<1e-6 for x in [fixed,moving_right+tab]) and b.maxPoint.y-b.minPoint.y>1:
-            root_edges.add(e)
-    assert root_edges.count==2,root_edges.count
-    f=bridge.features.filletFeatures.createInput();f.edgeSetInputs.addConstantRadiusEdgeSet(root_edges,val('pivot_root_radius'),False)
-    bridge.features.filletFeatures.add(f).name='R4 reinforcement fillets on both outer pivot roots'
-    for y in [-69,-51]:capsule(bridge,p['left_slot_min'],p['left_slot_max'],y,2.75,0,8,'Left horizontal mounting slot')
-    capsule(bridge,p['right_slot_min'],p['right_slot_max'],-60,2.75,0,8,'Right horizontal mounting slot')
-    for a,b in [(28,33),(65,94)]:capsule(bridge,a,b,-60,5,0,8,'Rounded relief between continuous beam ribs')
+        if abs(b.minPoint.y+2.8)<1e-6 and abs(b.maxPoint.y+2.8)<1e-6 and abs(b.maxPoint.x-b.minPoint.x)<1e-6 and b.maxPoint.z-b.minPoint.z>.19 and any(abs(b.minPoint.x-x/10)<1e-6 for x in [left-p['pivot_foot_margin'],right+p['pivot_foot_margin']]):edges.add(e)
+    assert edges.count==2
+    f=bridge.features.filletFeatures.createInput();f.edgeSetInputs.addConstantRadiusEdgeSet(edges,val('bridge_root_radius'),False)
+    bridge.features.filletFeatures.add(f).name='R8 side junction fillets'
+    for y in [-49,-31]:capsule(bridge,p['left_slot_min'],p['left_slot_max'],y,2.75,0,8,'Left horizontal mounting slot')
+    capsule(bridge,p['right_slot_min'],p['right_slot_max'],-40,2.75,0,8,'Right horizontal mounting slot')
+    for a,b in [(28,33),(80,94)]:capsule(bridge,a,b,-40,5,0,8,'Rounded beam relief')
+    # User-added Fusion v9 fillets: round only the two exposed arm-end corners.
+    edges=adsk.core.ObjectCollection.create()
+    for e in bridge.bRepBodies.item(0).edges:
+        b=e.boundingBox
+        if (abs(b.minPoint.y-1)<1e-6 and abs(b.maxPoint.y-1)<1e-6
+            and abs(b.maxPoint.x-b.minPoint.x)<1e-6
+            and abs(b.minPoint.z)<1e-6 and abs(b.maxPoint.z-.8)<1e-6
+            and any(abs(b.minPoint.x-x/10)<1e-6 for x in [left-p['pivot_foot_margin'],right+p['pivot_foot_margin']])):
+            edges.add(e)
+    assert edges.count==2, 'Expected both arm-end vertical corners'
+    f=bridge.features.filletFeatures.createInput()
+    f.edgeSetInputs.addConstantRadiusEdgeSet(edges,val('2.5 mm'),True)
+    bridge.features.filletFeatures.add(f).name='Arm-end corners R2.5 (Fusion v9 user edit)'
     bridge.bRepBodies.item(0).name='Radial printable bridge'
-    carriage=component('PRINT - flat pivoting dial arm')
-    moving=p['pivot_moving_x']
-    circle=[(cy+radius*math.cos(math.radians(a)),cz+radius*math.sin(math.radians(a))) for a in range(0,360,2)]
-    outline=hull(circle+[(-8.9,18),(-2.6,18),(-2.6,38.5),(-8.9,38.5)])
-    polygon(carriage,'yZ',moving,[(moving,y,z) for y,z in outline],tab,F.NewBodyFeatureOperation,'4 mm flat dial arm with round pivot bearing')
-    sk=carriage.sketches.add(plane(carriage,'yZ',moving));sk.sketchCurves.sketchCircles.addByCenterRadius(sk.modelToSketchSpace(pt(moving,cy,cz)),.275)
-    carriage.features.extrudeFeatures.addSimple(sk.profiles.item(0),val('4 mm'),F.CutFeatureOperation);sk.isVisible=False
-    sk=carriage.sketches.add(plane(carriage,'yZ',moving));sk.sketchCurves.sketchCircles.addByCenterRadius(sk.modelToSketchSpace(pt(moving,-12,25)),.2)
-    carriage.features.extrudeFeatures.addSimple(sk.profiles.item(0),val('4 mm'),F.CutFeatureOperation);sk.isVisible=False
-    # Both projections grow from the broad arm face, so there are no floating layers.
-    rect(carriage,moving,-5.4,71,-2.6,18,20.5,F.JoinFeatureOperation,'2.8 mm lug mounting ear - 8 mm stack with metal lug')
-    rect(carriage,moving,-8.9,71,-5.4,18,6,F.JoinFeatureOperation,'Lug root reinforcement below washer')
-    # The arm prints +X up: roof points toward +X, not toward assembly +Z.
-    points=teardrop(29.75,p['dial_reference_x'],2.75)
-    polygon(carriage,'xZ',-5.4,[(v,-5.4,u) for u,v in points],2.8,F.CutFeatureOperation,'M5 lug clearance - print roof toward +X')
-    carriage.bRepBodies.item(0).name='Radial printable C-holder'
-    for c in [bridge,carriage]:assert c.bRepBodies.count==1 and c.bRepBodies.item(0).isSolid
-    # The saved reference already has the upward probe orientation and preload.
-    t=adsk.core.Matrix3D.create();t.translation=adsk.core.Vector3D.create(p['dial_reference_x']/10-source_dial_x,0,0)
+    assert bridge.bRepBodies.count==1 and bridge.bRepBodies.item(0).isSolid
+    # The reference dial already points upward; only its rear lug was corrected.
+    t=adsk.core.Matrix3D.create();t.translation=adsk.core.Vector3D.create(p['dial_reference_x']/10-source_dial_x,0,(p['case_rear']-40)/10)
     assert temp.transform(dial,t)
     ref=component('REF - same measured KATSU dial');base=ref.features.baseFeatures.add();base.startEdit();ref.bRepBodies.add(dial,base);base.finishEdit();ref.bRepBodies.item(0).name='Radial dial case and rear lug'
     d.computeAll();d.activateRootComponent();app.activeViewport.fit()
-    print(json.dumps({'document':doc.name,'solids':[{ 'name':c.bRepBodies.item(0).name,'volumeMm3':c.bRepBodies.item(0).volume*1000} for c in [bridge,carriage]],'warnings':[t.name+': '+t.errorOrWarningMessage for t in d.timeline if t.healthState!=adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState]}))
+    print(json.dumps({'document':doc.name,'solids':[{ 'name':c.bRepBodies.item(0).name,'volumeMm3':c.bRepBodies.item(0).volume*1000} for c in [bridge]],'warnings':[t.name+': '+t.errorOrWarningMessage for t in d.timeline if t.healthState!=adsk.fusion.FeatureHealthStates.HealthyFeatureHealthState]}))

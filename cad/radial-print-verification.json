@@ -1,13 +1,32 @@
 {
-  "revision": 8,
-  "connectedClosedPrintedSolids": 2,
-  "interferenceChecks": 114,
+  "revision": 13,
+  "armEndCornerRadiusMm": 2.5,
+  "solidProjectingArmThicknessMm": 8,
+  "lugWasherDiameterMm": 15,
+  "washerOuterBearingRingFullySupported": true,
+  "connectedClosedPrintedSolids": 1,
+  "bridgeRootFillets": {
+    "count": 2,
+    "radiusMm": 8
+  },
+  "lugAxis": [
+    1.0,
+    0.0,
+    0.0
+  ],
+  "probeAxis": [
+    0.0,
+    1.0,
+    0.0
+  ],
+  "lugProbeDotProduct": 0.0,
+  "interferenceChecks": 83,
   "failures": [],
-  "printOrientation": "Bridge on flat back; dial arm on broad X=47 face, both STLs at Z=0",
+  "printOrientation": "Single flat Z=0 bed face; single mounting ear upright",
   "supportRequiredByGeometry": false,
   "slicerVerified": true,
   "physicalPrintTested": false,
-  "note": "Mesh manifold and overhang checks in radialHolder.test.ts. Nut envelopes are conservative cylinders; actual hardware, stiffness and repeatability require physical verification.",
+  "note": "Direct dial-lug bolt provides angle adjustment. Physical bolt fit, friction and stiffness require verification.",
   "slice": {
     "engine": "CuraEngine 5.13.0",
     "settings": {
@@ -32,7 +51,7 @@
       "support_enable": "false",
       "adhesion_type": "none"
     },
-    "layers": 160,
+    "layers": 154,
     "pathTypes": [
       "FILL",
       "SKIN",
@@ -40,7 +59,7 @@
       "WALL-OUTER"
     ],
     "supportPaths": 0,
-    "maximumZMm": 32,
+    "maximumZMm": 30.8,
     "note": "Generic validation only. Load the STLs into the intended printer/material profile before production."
   }
 }

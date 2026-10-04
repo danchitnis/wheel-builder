@@ -1,9 +1,10 @@
+import probe1Export from './fusionProbe1Mesh.json';
 import * as THREE from 'three';
 import fusionHolderMeshes from './fusionHolderMeshes.json';
 import radialExport from './fusionRadialHolderMeshes.json';
 import hubCapExport from './fusionHubCapMeshes.json';
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js';
-import type { Assembly, Part } from '../../utils/workshop';
+import { cornerBracketDimensions, type Assembly, type Part } from '../../utils/workshop';
 
 const colors = { extrusion:0xa8b6c8, pla:0x16b8b1, metal:0x8796a8, hardware:0xa4adba, gauge:0xf6bd60 };
 export class WorkshopViewer {
@@ -83,9 +84,12 @@ export class WorkshopViewer {
   }
   private part(p:Part){
     const g=new THREE.Group();g.userData.partId=p.id;
-    let mesh:THREE.Mesh;
+    let mesh!:THREE.Mesh;
     const block=(dims:number[],pos:number[])=>{const m=this.box(dims,colors[p.kind]);m.position.fromArray(pos);g.add(m);return m;};
-    if(p.shape==='fusion-mesh' && (p.meshKey||p.radialMeshKey)){
+    if(p.shape==='probe1'){
+      const geometry=new THREE.BufferGeometry();geometry.setAttribute('position',new THREE.Float32BufferAttribute(probe1Export.mesh.positions,3));geometry.setIndex(probe1Export.mesh.indices);geometry.computeVertexNormals();
+      mesh=new THREE.Mesh(geometry,this.material(p.probeRole==='dish'?0xe5e9e2:colors.pla));g.add(mesh);
+    }else if(p.shape==='fusion-mesh' && (p.meshKey||p.radialMeshKey)){
       const source=p.radialMeshKey?radialExport.meshes[p.radialMeshKey]:fusionHolderMeshes[p.meshKey!];
       const geometry=new THREE.BufferGeometry();
       geometry.setAttribute('position',new THREE.Float32BufferAttribute(source.positions,3));
@@ -102,9 +106,17 @@ export class WorkshopViewer {
         face.position.set(p.dial_reference_x-(source.min[0]+source.max[0])/2,-(source.min[1]+source.max[1])/2,p.case_rear+p.carriage_back+p.dial_thickness+.05-(source.min[2]+source.max[2])/2);g.add(face);
       }
     }else if(p.shape==='angle'){
-      const L=p.size[0],q=L/2,r=(p.bore??7)/2;
-      mesh=new THREE.Mesh(this.drilledPlate(L,L,4,[{x:q-L/2,y:0,r}],'y'),this.material(colors.metal));mesh.position.set(L/2,2,0);g.add(mesh);
-      const upright=new THREE.Mesh(this.drilledPlate(L,L,4,[{x:0,y:q-L/2,r}],'x'),this.material(colors.metal));upright.position.set(2,L/2,0);g.add(upright);
+      const {leg:L,width:W,thickness:T,holeOffset:q,bore}=cornerBracketDimensions;
+      const material=this.material(0x44484c),r=bore/2;
+      mesh=new THREE.Mesh(this.drilledPlate(L,W,T,[{x:q-L/2,y:0,r}],'y'),material);mesh.position.set(L/2,T/2,0);g.add(mesh);
+      const upright=new THREE.Mesh(this.drilledPlate(W,L-T,T,[{x:0,y:q-(L+T)/2,r}],'x'),material);upright.position.set(T/2,(L+T)/2,0);g.add(upright);
+      // The supplier dimensions define the flanges and holes; this relieved
+      // diagonal gusset and its open central boss follow the photo approximately.
+      const web=new THREE.Shape();web.moveTo(T,T);web.lineTo(29,T);web.lineTo(T,29);web.closePath();
+      const opening=new THREE.Path();opening.moveTo(12,12);opening.lineTo(12,25);opening.quadraticCurveTo(12,26,13,25);opening.lineTo(25,13);opening.quadraticCurveTo(26,12,25,12);opening.closePath();web.holes.push(opening);
+      const webGeometry=new THREE.ExtrudeGeometry(web,{depth:W,bevelEnabled:false,curveSegments:16});webGeometry.translate(0,0,-W/2);g.add(new THREE.Mesh(webGeometry,material));
+      const boss=new THREE.Shape();boss.absarc(17,17,5.5,Math.PI*.8,Math.PI*2.3,false);boss.absarc(17,17,2.5,Math.PI*2.3,Math.PI*.8,true);boss.closePath();
+      const bossGeometry=new THREE.ExtrudeGeometry(boss,{depth:W,bevelEnabled:false,curveSegments:20});bossGeometry.translate(0,0,-W/2);g.add(new THREE.Mesh(bossGeometry,material));
     }else if(p.shape==='top-cap' && p.capDesign==='centred-v2'){
       const source=hubCapExport.meshes.cap;
       const geometry=new THREE.BufferGeometry();
@@ -128,66 +140,36 @@ export class WorkshopViewer {
       const shape=new THREE.Shape();shape.moveTo(-half,0);shape.lineTo(half,0);shape.lineTo(half,29);shape.lineTo(r,29);shape.lineTo(r,cy);shape.absarc(0,cy,r,0,-Math.PI,true);shape.lineTo(-r,29);shape.lineTo(-half,29);shape.closePath();
       const geom=new THREE.ExtrudeGeometry(shape,{depth:p.nose??5,bevelEnabled:false,curveSegments:24});geom.rotateY(Math.PI/2);geom.translate(-(p.nose??5),0,0);
       g.add(new THREE.Mesh(geom,this.material(colors.pla)));
-    }else if(p.shape==='rail-mount'){
-      const [x,,z]=p.mountTarget!,side=p.mountSide??1;
-      mesh=new THREE.Mesh(this.drilledPlate(40,48,12,[{x:0,y:-4,r:(p.bore??6.5)/2},{x:0,y:14,r:(p.bore??6.5)/2}]),this.material(colors.pla));mesh.position.y=18;g.add(mesh);
-      // Short horizontal ledge, then fore/aft reach, all at one height.
-      block([Math.abs(x)+40,12,40],[x/2,0,side*14]);
-      block([40,12,Math.abs(z-side*14)+40],[x,0,(z+side*14)/2]);
-    }else if(p.shape==='clamp'){
-      const axis=p.axis??'y';
-      mesh=new THREE.Mesh(this.drilledPlate(40,axis==='x'?32:40,axis==='x'?40:32,[{x:0,y:0,r:(p.bore??6)/2}],axis),this.material(colors.pla));g.add(mesh);
-    }else if(p.shape==='dial-lug'){
-      mesh=new THREE.Mesh(this.drilledPlate(p.size[2],18,p.size[0],[{x:0,y:0,r:(p.bore??6.5)/2}],'x'),this.material(colors.gauge));g.add(mesh);
-    }else if(p.shape==='clevis'){
-      const gap=p.lugWidth??6.6,z=19-(p.lugOffset??8);
-      mesh=block([40,8,60],[0,-16,0]);
-      for(const sign of [-1,1]){
-        const ear=new THREE.Mesh(this.drilledPlate(18,24,6,[{x:0,y:0,r:2.75}],'x'),this.material(colors.pla));ear.position.set(sign*(gap/2+3),0,z);g.add(ear);
-        block([6,8,Math.abs(z+10)+18],[sign*(gap/2+3),-12,(z-10)/2]);
-      }
-    }else if(p.sku==='foot-pad'){
-      mesh=block([3,20,20],[-1.5,0,0]);
-      const socket=new THREE.Mesh(this.drilledPlate(20,20,3,[{x:0,y:0,r:3.15}],'x'),this.material(colors.pla));socket.position.x=1.5;g.add(socket);
-    }else if(p.shape==='fixed-stop'){
-      mesh=block([p.size[0],30,30],[0,0,0]);
-      const flange=new THREE.Mesh(this.drilledPlate(30,56,8,[{x:0,y:-22,r:4.5},{x:0,y:22,r:4.5}],'x'),this.material(colors.pla));flange.position.x=p.size[0]/2-4;g.add(flange);
-    }else if(p.shape==='contact-cap'){
-      mesh=block([6,8,p.size[2]],[-p.size[0]/2+3,0,0]);
-      for(const sign of [-1,1])block([p.size[0],p.size[1],3],[0,0,sign*(p.size[2]/2-1.5)]);
-      if(p.endLocated){const P=p.profileSize!,sign=p.angleSign??1,standOff=p.size[0]-P/Math.sqrt(2);const seat=block([P,3,P],[standOff/2-1.5/Math.sqrt(2),sign*1.5/Math.sqrt(2),0]);seat.rotation.z=sign>0?Math.PI/4:3*Math.PI/4;}
     }else if(p.shape==='photo-bracket'){
-      const sign=p.angleSign??1;
-      mesh=new THREE.Mesh(this.drilledPlate(18,60,6,[{x:0,y:-sign*10,r:2.75}],'x'),this.material(0x555d67));mesh.position.set(-3,-sign*30,0);g.add(mesh);
-      const leg=new THREE.Mesh(this.drilledPlate(18,60,6,[{x:0,y:sign*10,r:2.75}],'x'),this.material(0x555d67));leg.rotation.z=sign*Math.PI/4;leg.position.set(-30/Math.sqrt(2),sign*30/Math.sqrt(2),0);g.add(leg);
-    }else if(p.shape==='angle-foot'){
-      const reach=p.angleReach!,sign=p.angleSign!;
-      const shape=new THREE.Shape();shape.moveTo(24,-12);shape.lineTo(24,12);shape.lineTo(-reach,sign*reach+12);shape.lineTo(-reach,sign*reach-12);shape.closePath();
-      for(const y of [-7,7]){const hole=new THREE.Path();hole.absarc(0,y,2.75,0,Math.PI*2,true);shape.holes.push(hole);}
-      const geom=new THREE.ExtrudeGeometry(shape,{depth:12,bevelEnabled:false});geom.translate(0,0,-6);
-      mesh=new THREE.Mesh(geom,this.material(colors.pla));g.add(mesh);
-    }else if(p.shape==='dish-plate'){
-      mesh=new THREE.Mesh(this.drilledPlate(p.size[2],p.size[1],p.size[0],p.holes??[],'x'),this.material(colors.pla));g.add(mesh);
-    }else if(p.shape==='fork'){
-      const w=p.size[2]/2,h=p.size[1]/2,r=(p.bore??12)/2;
-      const shape=new THREE.Shape();shape.moveTo(-w,-h);shape.lineTo(w,-h);shape.lineTo(w,h);shape.lineTo(r,h);shape.lineTo(r,0);shape.absarc(0,0,r,0,-Math.PI,true);shape.lineTo(-r,h);shape.lineTo(-w,h);shape.closePath();
-      const front=new THREE.ExtrudeGeometry(shape,{depth:3,bevelEnabled:false,curveSegments:24});front.translate(0,0,-p.size[0]/2);front.rotateY(Math.PI/2);g.add(new THREE.Mesh(front,this.material(colors.pla)));
-      for(const hole of p.holes??[]){const path=new THREE.Path();path.absarc(hole.x,hole.y,hole.r,0,Math.PI*2,true);shape.holes.push(path);}
-      const geom=new THREE.ExtrudeGeometry(shape,{depth:5,bevelEnabled:false,curveSegments:24});geom.translate(0,0,-p.size[0]/2+3);geom.rotateY(Math.PI/2);
-      mesh=new THREE.Mesh(geom,this.material(colors.pla));g.add(mesh);
-    }else if(p.shape==='dial'){
-      mesh=this.cylinder(27.5,22,colors.gauge,'z');g.add(mesh);
-      const face=this.dialFace();face.position.z=11.2;g.add(face);
-    }else
-    if(p.kind==='extrusion'){
+      const legs=p.bendLegs!,material=this.material(0x44484c);
+      const sum=[legs[0][0]+legs[1][0],legs[0][1]+legs[1][1]];
+      for(const d of legs){
+        const raw=[-d[1],d[0]],flip=raw[0]*sum[0]+raw[1]*sum[1]>=0?1:-1,n=[raw[0]*flip,raw[1]*flip];
+        const plate=new THREE.Mesh(this.drilledPlate(18,60,6,[{x:0,y:10,r:2.75}],'x'),material);
+        plate.rotation.z=Math.atan2(-d[0],d[1]);plate.position.set(d[0]*30+n[0]*3,d[1]*30+n[1]*3,0);g.add(plate);mesh=plate;
+      }
+      const [a,b]=legs,web=new THREE.Shape();web.moveTo(0,0);web.lineTo(a[0]*28,a[1]*28);web.lineTo(b[0]*28,b[1]*28);web.closePath();
+      const hole=new THREE.Path();hole.moveTo((a[0]+b[0])*5,(a[1]+b[1])*5);hole.lineTo(a[0]*20+b[0]*4,a[1]*20+b[1]*4);hole.lineTo(a[0]*4+b[0]*20,a[1]*4+b[1]*20);hole.closePath();web.holes.push(hole);
+      const geometry=new THREE.ExtrudeGeometry(web,{depth:18,bevelEnabled:false});geometry.translate(0,0,-9);g.add(new THREE.Mesh(geometry,material));
+    }else if(p.kind==='extrusion'){
       // Four continuous groove faces communicate T-slot construction, without
       // pretending the generic cross-section is a supplier machining drawing.
-      mesh=this.box(p.size,colors.extrusion);g.add(mesh);
+      mesh=this.box(p.size,p.sku.startsWith('dish-rail-')?0x24292f:colors.extrusion);g.add(mesh);
       const axis=p.axis??'y', ai={x:0,y:1,z:2}[axis];
       const cross=[0,1,2].filter(i=>i!==ai);const width=p.size[cross[0]];
       for(const face of cross)for(const sign of [-1,1]){
         const dims=[width*.19,width*.19,width*.19];dims[ai]=p.size[ai]+.2;dims[face]=.5;
         const groove=this.box(dims,0x24303e);groove.position.setComponent(face,sign*(width/2+.2));g.add(groove);
+      }
+    }else if(p.shape==='hub-spacer'){
+      // Local -X faces the hub. The stepped bore receives its existing end;
+      // the smaller outer bore supports the through-hub rod.
+      const length=p.size[0],depth=p.counterboreDepth!;
+      for(const [start,span,bore] of [[-length/2,depth,p.counterbore!],[-length/2+depth,length-depth,p.bore!]]){
+        const section=new THREE.Shape();section.absarc(0,0,p.size[1]/2,0,Math.PI*2,false);
+        const hole=new THREE.Path();hole.absarc(0,0,bore/2,0,Math.PI*2,true);section.holes.push(hole);
+        const geometry=new THREE.ExtrudeGeometry(section,{depth:span,bevelEnabled:false,curveSegments:32});geometry.rotateY(Math.PI/2);geometry.translate(start,0,0);
+        mesh=new THREE.Mesh(geometry,this.material(colors.metal));g.add(mesh);
       }
     }else if(p.shape==='ring'){
       const section=new THREE.Shape();section.absarc(0,0,Math.min(p.size[1],p.size[2])/2,0,Math.PI*2,false);
