@@ -1,5 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { Box3, BufferGeometry, DoubleSide, Float32BufferAttribute, LatheGeometry, Mesh, MeshBasicMaterial, Raycaster, Vector3 } from 'three';
+import { createWorkshopWheelModel } from '../src/components/WheelModel.ts';
 import { readFileSync } from 'node:fs';
 import spec from '../src/data/radialHolder.json' with { type:'json' };
 import lateralMeshes from '../src/components/workshop/fusionHolderMeshes.json' with { type:'json' };
@@ -72,11 +74,13 @@ test('each dial mounts against one thick ear without a fitted gap or shims',()=>
  near(exported.meshes['Lug left washer'].max[0],supportPlane-p.ear_thickness);
 });
 
-test('both hubs and offsets use the same slotted bridge, with normal probe contact and a single-ear M5 pivot',()=>{
+test('both hubs and offsets use the same slotted bridge, with left-edge probe contact and a single-ear M5 pivot',()=>{
  for(const width of [100,135])for(const offset of [-5,0,5])for(const projection of [3,20]){
   const a=assembly(width,offset,projection),m=a.radialMount!;
-  assert.ok(!a.errors.some(e=>e.includes('radial')),a.errors.join('; '));
-  near(m.uprightSpan,Math.max(120,width+projection));near(m.rightBolt+m.bridgeShift,m.uprightSpan);near(m.leftBolt+m.bridgeShift,0);near(m.dialX,Math.max(120,width+projection)/2+offset);near(m.tip[0],offset);
+  const rightLimit=width===135&&offset===-5&&projection===20;
+  if(rightLimit)assert.ok(a.errors.some(e=>e.includes('required local bolt position 145.3 mm')));
+  else assert.ok(!a.errors.some(e=>e.includes('radial')),a.errors.join('; '));
+  near(m.uprightSpan,Math.max(120,width+projection));near(m.rightBolt+m.bridgeShift,m.uprightSpan-(rightLimit ? 0.3 : 0));near(m.leftBolt+m.bridgeShift,0);near(m.dialX,Math.max(120,width+projection)/2+offset-a.wheel.width/2);near(m.tip[0],offset-a.wheel.width/2);
   const radius=a.wheel.diameter/2;near(Math.hypot(m.tip[1]-a.wheel.center[1],m.tip[2]),radius);
   [0,(a.wheel.center[1]-m.tip[1])/radius,-m.tip[2]/radius].forEach((v,i)=>near(m.direction[i],v));near(m.alignmentErrorDegrees,0);
   for(const name of ['Radial printable bridge'] as const){
@@ -84,7 +88,7 @@ test('both hubs and offsets use the same slotted bridge, with normal probe conta
    assert.equal(part.rotation,undefined);
   }
   const lugBolt=a.parts.find(p=>p.radialMeshKey==='Lug M5x25 bolt')!;
-  near(lugBolt.position[0],offset+.9);assert.equal(lugBolt.axis,'x');
+  near(lugBolt.position[0],offset-a.wheel.width/2-.9);assert.equal(lugBolt.axis,'x');
   assert.equal(a.parts.filter(p=>p.radialMeshKey?.endsWith(' bolt')).length,4);
   const bridge=a.parts.find(p=>p.radialMeshKey==='Radial printable bridge')!;
   assert.ok(bridge.position[1]+bridge.size[1]/2<m.tip[1]-40);
@@ -100,8 +104,8 @@ test('both hubs and offsets use the same slotted bridge, with normal probe conta
 
 test('out-of-range fits cannot stretch the printed meshes or conceal incorrect contact',()=>{
  const wide=assembly(200,15),m=wide.radialMount!;
- assert.ok(wide.errors.some(e=>e.includes('right fixing cannot reach')));assert.ok(wide.errors.some(e=>e.includes('cannot centre beneath')));assert.ok(wide.errors.some(e=>e.includes('±5 mm')));
- near(m.rightBolt,145);near(m.dialX,83);assert.notEqual(m.tip[0],15);
+ assert.ok(wide.errors.some(e=>e.includes('right fixing cannot reach')));assert.ok(wide.errors.some(e=>e.includes('cannot reach the left rim edge')));assert.ok(wide.errors.some(e=>e.includes('±5 mm')));
+ near(m.rightBolt,145);near(m.dialX,69.8);assert.notEqual(m.tip[0],15-wide.wheel.width/2);
  assert.deepEqual(wide.parts.find(p=>p.radialMeshKey==='Radial printable bridge')!.size,assembly().parts.find(p=>p.radialMeshKey==='Radial printable bridge')!.size);
  assert.ok(assembly(148).errors.some(e=>e.includes('Hope front 100 mm')));
  const other=buildAssembly(wheel,{...workshopDefaults(wheel),mode:'dials',profile:'3030'});assert.ok(other.errors.some(e=>e.includes('2020 slot-6 uprights only')));
@@ -109,7 +113,7 @@ test('out-of-range fits cannot stretch the printed meshes or conceal incorrect c
 
 test('fixed dial reference, stale calibration reset, and pointer mode survive the revision',()=>{
  const saved=workshopSnapshot({...workshopDefaults(wheel),dialLugThickness:9,dialLugHole:9,dialLugOffset:12},wheel),restored=loadWorkshop(saved,wheel);
- const previous=JSON.parse(workshopSnapshot({...workshopDefaults(wheel),readings:'0,0.1,0.05'},wheel));previous.design=12;assert.equal(loadWorkshop(JSON.stringify(previous),wheel).readings,'');
+ const previous=JSON.parse(workshopSnapshot({...workshopDefaults(wheel),readings:'0,0.1,0.05'},wheel));previous.design=15;assert.equal(loadWorkshop(JSON.stringify(previous),wheel).readings,'');
  assert.deepEqual([restored.dialLugThickness,restored.dialLugHole,restored.dialLugOffset],[5.2,6.85,10.25]);
  const a=buildAssembly(wheel,workshopDefaults(wheel));assert.equal(a.radialMount,undefined);assert.equal(a.parts.filter(p=>p.shape==='probe1').length,2);
 });
@@ -144,4 +148,64 @@ test('lateral single ear retains a manifold flat-backed support-free print mesh'
   }
  }
  assert.ok(bedArea>300);assert.ok([...edges.values()].every(n=>n===2));
+});
+
+
+test('radial pin reaches the shared wheel left edge across rim widths, offsets and flips',()=>{
+ for(const rimWidthOuter of [24,28,32])for(const osb of [0,3])for(const rimFlip of ['Auto','Left','Right'] as const){
+  const config={...wheel,rimWidthOuter,osb,rimFlip,hubOffset:2};
+  const a=buildAssembly(config,{...workshopDefaults(config),mode:'dials',axle:'qr10',hubWidth:135,seatLeft:10,seatRight:10,projection:3});
+  assert.ok(!a.errors.some(e=>e.includes('radial')),a.errors.join('; '));
+  const model=createWorkshopWheelModel(a.wheel.inputs,a.wheel.hubWidth);
+  model.group.updateMatrixWorld(true);
+  const rim=model.group.children.find((o):o is Mesh=>o instanceof Mesh&&o.geometry instanceof LatheGeometry)!;
+  const bounds=new Box3().setFromObject(rim);
+  near(a.radialMount!.tip[0],bounds.min.x);
+  const oldBridgeOrigin=a.wheel.offset-spec.parameters.dial_reference_x;
+  near(a.radialMount!.origin[0]-oldBridgeOrigin,13.2-rimWidthOuter/2);
+ }
+});
+
+test('left-mounted dial lug and reversed hardware seat on opposite faces of the unchanged ear',()=>{
+ const a=assembly(),m=a.radialMount!,p=spec.parameters;
+ const leftEar=m.origin[0]+p.dial_reference_x-p.lug_thickness/2-p.ear_thickness;
+ const rightEar=leftEar+p.ear_thickness;
+ const dial=a.parts.find(p=>p.radialMeshKey==='Radial dial case and rear lug')!;
+ const native=exported.meshes['Radial dial case and rear lug'];
+ const centre=(native.min[0]+native.max[0])/2;
+ const lugX=native.positions.filter((_,i)=>i%3===0&&native.positions[i+2]<p.case_rear-.01).map(x=>x-centre+dial.position[0]);
+ near(Math.max(...lugX),leftEar);
+ near(Math.min(...lugX),leftEar-p.lug_thickness);
+ const hardwareBounds=(key:keyof typeof exported.meshes)=>{
+  const part=a.parts.find(v=>v.radialMeshKey===key)!,source=exported.meshes[key];
+  assert.deepEqual(part.rotation,[0,0,Math.PI]);
+  const half=(source.max[0]-source.min[0])/2;
+  return [part.position[0]-half,part.position[0]+half];
+ };
+ near(hardwareBounds('Lug left washer')[0],rightEar);
+ near(hardwareBounds('Lug right washer')[1],leftEar-p.lug_thickness);
+ assert.ok(hardwareBounds('Lug M5 head')[0]>rightEar);
+ assert.ok(hardwareBounds('Lug M5 nut envelope')[1]<leftEar-p.lug_thickness);
+ const bridge=a.parts.find(v=>v.radialMeshKey==='Radial printable bridge')!;
+ const printed=exported.meshes['Radial printable bridge'];
+ assert.deepEqual(bridge.size,printed.max.map((v,i)=>v-printed.min[i]));
+ assert.equal(bridge.rotation,undefined);
+});
+
+test('left-mounted dial clears the printed holder throughout the 0–25 degree tilt range',()=>{
+ const source=exported.meshes['Radial printable bridge'];
+ const geometry=new BufferGeometry();geometry.setAttribute('position',new Float32BufferAttribute(source.positions,3));geometry.setIndex(source.indices);
+ const material=new MeshBasicMaterial({side:DoubleSide}),holder=new Mesh(geometry,material);holder.updateMatrixWorld(true);
+ const ray=new Raycaster(),direction=new Vector3(.91,.321,.265).normalize();
+ const points=exported.meshes['Radial dial case and rear lug'].positions;
+ for(const degrees of [0,5,10,15,20,25])for(let i=0;i<points.length;i+=3){
+  const point=new Vector3(points[i]-13.2,points[i+1],points[i+2]-spec.parameters.pivot_z);
+  point.applyAxisAngle(new Vector3(1,0,0),-degrees*Math.PI/180);point.z+=spec.parameters.pivot_z;
+  // Vertices on the ear's seating plane are intended contact, not interference.
+  if(Math.abs(point.x-51.4)<1e-4)continue;
+  ray.set(point,direction);
+  const hits=ray.intersectObject(holder).map(h=>h.distance).filter((d,j,values)=>j===0||d-values[j-1]>1e-4);
+  assert.ok(hits.length%2===0||hits[0]<1e-4,`Dial intersects holder at ${degrees} degrees: ${point.toArray()}`);
+ }
+ geometry.dispose();material.dispose();
 });

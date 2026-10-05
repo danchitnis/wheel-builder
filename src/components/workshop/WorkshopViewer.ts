@@ -1,3 +1,4 @@
+import { createWorkshopWheelModel } from '../WheelModel';
 import probe1Export from './fusionProbe1Mesh.json';
 import * as THREE from 'three';
 import fusionHolderMeshes from './fusionHolderMeshes.json';
@@ -186,24 +187,9 @@ export class WorkshopViewer {
   update(a:Assembly,refit=false){
     this.clear(this.group);this.clear(this.wheel);this.clear(this.labels);this.meshes.clear();this.parts=a.parts;
     for(const p of a.parts){const g=this.part(p);this.meshes.set(p.id,g);this.group.add(g);}
-    const w=a.wheel, R=w.diameter/2;
-    // Annular rim: the real rim section is represented by its outside envelope.
-    const shape=new THREE.Shape();shape.absarc(0,0,R,0,Math.PI*2,false);
-    const hole=new THREE.Path();hole.absarc(0,0,R-w.depth,0,Math.PI*2,true);shape.holes.push(hole);
-    const rimGeom=new THREE.ExtrudeGeometry(shape,{depth:w.width,bevelEnabled:false,curveSegments:96});rimGeom.translate(0,0,-w.width/2);rimGeom.rotateY(Math.PI/2);
-    const rim=new THREE.Mesh(rimGeom,this.material(0x586778));rim.position.x=w.offset;this.wheel.add(rim);
-    this.wheel.add(this.cylinder(16,w.hubWidth,0x34455c,'x'));
-    for(const side of [-1,1]){
-      const fx=side<0?-w.left:w.right,fr=(side<0?w.flangeL:w.flangeR)/2;
-      const flange=this.cylinder(fr,4,0x8393a6,'x');flange.position.x=fx;this.wheel.add(flange);
-      for(let i=0;i<w.spokes/2;i++){
-        const t=i/(w.spokes/2)*Math.PI*2+(side>0?.1:0);
-        const start=new THREE.Vector3(fx,Math.cos(t)*fr,Math.sin(t)*fr);
-        const end=new THREE.Vector3(w.offset,Math.cos(t+.35)*(R-w.depth),Math.sin(t+.35)*(R-w.depth));
-        const diff=end.clone().sub(start), spoke=this.cylinder(.8,diff.length(),0x93a4b7);
-        spoke.position.copy(start.add(end).multiplyScalar(.5));spoke.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),diff.normalize());this.wheel.add(spoke);
-      }
-    }
+    const w=a.wheel;
+    const model=createWorkshopWheelModel(w.inputs,w.hubWidth);
+    this.wheel.add(model.group);
     this.wheelOrigin.fromArray(w.center);this.wheel.position.copy(this.wheelOrigin);
     const bounds=new THREE.Box3().setFromObject(this.group).union(new THREE.Box3().setFromObject(this.wheel));
     bounds.getCenter(this.center);this.span=Math.max(...bounds.getSize(new THREE.Vector3()).toArray(),600);

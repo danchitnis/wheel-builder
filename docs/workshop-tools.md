@@ -58,7 +58,7 @@ the standalone print guide and the calibration notebook have been removed from
 the page; there are no measurement-entry fields or calibration disclosures.
 
 Settings live in localStorage under `wheel-builder:workshop:v1`. Design revision
-15 and the saved wheel fingerprint invalidate fit overrides from an earlier
+16 and the saved wheel fingerprint invalidate fit overrides from an earlier
 design or a different wheel. Legacy calibration fields remain in the storage
 format for compatibility, but the page does not collect or display them.
 Storage failure leaves the in-memory configuration usable; WebGL failure leaves
@@ -268,7 +268,13 @@ The print envelope is **180 × 68 × 30.75 mm**. The projecting arm is solid and
 its local fillets sit above that arm; there is no recessed 2 mm floor.
 
 Left bolt centres travel −21 to +16 mm at 18 mm pitch; right travel is
-108–145 mm. Sliding the bridge places the dial at 46–83 mm from the left upright.
+108–145 mm. The dial now mounts against the **left face** of the same ear, moving its
+centre 13.2 mm left relative to the native Fusion reference assembly. Reverse
+all lug hardware so the bolt enters from the right; the printed bridge is unchanged.
+Sliding the bridge places the dial at 32.8–69.8 mm from the left upright.
+Set the pin at `rim offset − outer rim width / 2`, on the solid left bead edge
+rather than the hollow centre channel. For the 28 mm rim this is 14 mm left
+of centre, with the holder shifted 0.8 mm left from its previous position.
 The workshop checks both Hope hubs, ±5 mm offsets and 3–20 mm end projections,
 retaining the actual upright spacing and reporting fits outside the travel.
 Meshes only translate and rotate. Pointer mode remains available.
@@ -287,7 +293,8 @@ exports the assembled F3D, one millimetre STL and measured workshop meshes.
 `cad/correct_lateral_lug.py` reproduces the matching lateral V5 single-ear correction.
 
 Validation uses `cad/verify_radial_holder.py` for one closed solid, perpendicular
-lug/pin axes and 83 interference checks through the tilt and fixing ranges.
+lug/pin axes and 83 interference checks through the original tilt and fixing ranges.
+Workshop mesh tests additionally check the dial on the left ear face through its tilt range.
 Mesh tests check manifold edges and print overhangs. `cad/slice_radial_holder.py`
 runs a generic 0.2 mm CuraEngine slice without supports; this is not production
 printer G-code. Physical print fit, clamping friction and stiffness need testing.
@@ -305,8 +312,9 @@ up their temporary G-code and logs automatically.
 
 The physical lateral V4 print failed at a fork ear when fitted over the dial lug.
 V5 removes the second ear and fitted-gap constraint, retaining one 8 mm ear
-with a 28 mm overall projection and R2 top shoulders. Both holders retain the
-original dial position and require physical print and clamp testing.
+with a 28 mm overall projection and R2 top shoulders. The lateral holder retains
+its original dial position. The workshop radial assembly mounts the same dial on the opposite ear face as described above.
+Both require physical print and clamp testing.
 
 Root fillets are local: R8 free-side and R2 dial-side on the lateral holder;
 R6 outer and R3 dial-side on the radial holder. A local Ø16 mm circular relief
