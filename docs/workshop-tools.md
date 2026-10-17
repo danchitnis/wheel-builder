@@ -51,6 +51,14 @@ The assembly has not been built or physically certified to any tolerance.
 
 ## Page layout and persistence
 
+The page starts with the wheel setup, followed by the tool selector and build
+specifications. A link beside the wheel summary jumps to the 3D printed parts.
+Five STL downloads are built directly from the current files in `cad/`: the 2020
+V hub cap, its fit coupon, Probe 1, the lateral dial holder and the radial dial
+bridge. Filenames are preserved on download. These are fixed designs, not resized
+exports of the current workshop settings; each link describes its use or extrusion
+compatibility. Other PLA envelopes do not have downloadable print geometry.
+
 The 3D viewer, fit status and component list share one column beside the settings.
 On narrow screens that column appears first. Select a component to inspect its
 dimensions, mounting specification and print orientation. Assembly instructions,

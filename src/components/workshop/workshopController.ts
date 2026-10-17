@@ -26,6 +26,13 @@ export async function initWorkshop() {
   el('wheel-source').textContent=transferred.source;
   el('wheel-summary').textContent=`${config.spokeCount} spokes · ${config.spacing || 'spacing unspecified'} · ${config.rimWidthOuter ?? '?'} mm rim width`;
   el<HTMLAnchorElement>('builder-return').href='/#'+serializeConfiguration(config,false);
+  el('printed-parts-jump').addEventListener('click',event=>{
+    // The URL fragment holds the transferred build; retain it when navigating
+    // within this page so reloading or sharing does not lose the wheel setup.
+    event.preventDefault();
+    el('printed-parts').scrollIntoView({block:'start',behavior:'smooth'});
+    el('printed-parts-heading').focus({preventScroll:true});
+  });
   if(transferred.error){el('import-error').hidden=false;el('import-error').textContent=transferred.error+' A saved or default wheel has been loaded.';}
   function fill(){
     select('profile').value=settings.profile;input('stock').value=settings.lengths.join(', ');

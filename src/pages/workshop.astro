@@ -1,30 +1,43 @@
 ---
 import Layout from '../layouts/Layout.astro';
+import hubCapUrl from '../../cad/2020-hub-cap.stl?url';
+import hubCouponUrl from '../../cad/2020-hub-coupon.stl?url';
+import probeUrl from '../../cad/probe1.stl?url';
+import lateralHolderUrl from '../../cad/lateral-dial-holder.stl?url';
+import radialHolderUrl from '../../cad/radial-dial-holder.stl?url';
+
+const printedParts = [
+  {name:'2020 V hub cap',file:'2020-hub-cap.stl',url:hubCapUrl,note:'2020 B-type, slot 6. Print two identical caps.'},
+  {name:'2020 fit coupon',file:'2020-hub-coupon.stl',url:hubCouponUrl,note:'Check the extrusion slot fit before printing the hub caps.'},
+  {name:'Probe 1 pointer',file:'probe1.stl',url:probeUrl,note:'The same pointer fits the truing stand and dishing gauge.'},
+  {name:'Lateral dial holder',file:'lateral-dial-holder.stl',url:lateralHolderUrl,note:'Single-ear holder for the rear-lug dial shown in the model.'},
+  {name:'Radial dial bridge',file:'radial-dial-holder.stl',url:radialHolderUrl,note:'One-piece bridge for 2020 slot-6 uprights and the rear-lug dial.'},
+];
 ---
 <Layout title="Workshop tools — Wheel builder">
   <main class="workshop">
     <header class="workshop-header">
       <a id="builder-return" href="/" class="back">← Wheel builder</a>
-      <span class="eyebrow">THE WHEEL WORKSHOP / 01</span>
       <button id="print-spec" class="secondary">Print specifications</button>
     </header>
-    <section class="intro">
-      <div><p class="eyebrow">DESIGN • ASSEMBLE • CALIBRATE</p><h1>Build your own<br/><span>precision workshop.</span></h1><p class="intro-text">Two independent tools. Standard aluminium extrusion.<br/>Designed around the wheel you’re building.</p></div>
-      <div class="wheel-card"><span class="eyebrow">YOUR WHEEL</span><strong id="wheel-name">Loading wheel…</strong><p id="wheel-source"></p><p id="wheel-summary"></p><small>Bare wheel · no tyre, cassette or rotor</small></div>
+    <section class="wheel-card" aria-labelledby="wheel-setup-heading">
+      <h1 id="wheel-setup-heading">Wheel setup</h1>
+      <strong id="wheel-name">Loading wheel…</strong>
+      <p id="wheel-source"></p><p id="wheel-summary"></p>
+      <div class="wheel-actions"><small>Bare wheel · no tyre, cassette or rotor</small><a id="printed-parts-jump" href="#printed-parts">Download 3D printed parts ↓</a></div>
     </section>
     <p id="import-error" class="notice" hidden></p>
     <p id="storage-status" class="notice" hidden></p>
-    <nav class="tool-tabs" aria-label="Workshop tool"><button data-tool="stand" aria-pressed="true"><span>01</span> Truing stand <small>Lateral + radial alignment</small></button><button data-tool="dish" aria-pressed="false"><span>02</span> Dishing gauge <small>Independent centring reference</small></button></nav>
+    <nav class="tool-tabs" aria-label="Workshop tool"><button data-tool="stand" aria-pressed="true">Truing stand <small>Lateral + radial alignment</small></button><button data-tool="dish" aria-pressed="false">Dishing gauge <small>Wheel centring</small></button></nav>
     <div class="workbench">
       <aside class="settings panel">
-        <div class="section-heading"><span class="eyebrow">CONFIGURE</span><span class="pill">mm</span></div>
-        <h2>Build specification</h2>
+        <div class="section-heading"><h2>Build specification</h2><span class="pill">mm</span></div>
         <label>Extrusion system<select id="profile"><option value="2020" selected>2020 · B-type · slot 6</option><option value="3030">3030 · B-type · slot 8</option><option value="4040">4040 · I-type · slot 8</option></select></label>
         <p id="profile-note" class="help"></p>
         <label id="stand-stock-control">Available stock lengths<input id="stock" value="300, 400, 500, 600, 700, 800, 900, 1000"/></label><p id="stand-stock-help" class="help">Comma-separated lengths, 100–2000 mm. Full members only; no cutting. Valid edits update immediately.</p><output id="dish-stock-result" hidden></output>
         <div id="dish-model-details" class="help" hidden>Photo model: 300 mm centre rail + two 100 mm arms. Four 135° bend brackets provide the joints and metal rim contacts; unchanged Probe 1 mounts directly to the centre rail. A 45° bracket can be used with complementary mounting faces.</div>
         <div id="dish-range-controls" hidden><label>Initial setup variation ± (mm)<input id="dish-allowance" type="number" min="1" max="15" step="1" value="5"/></label><output id="probe-range"></output></div>
-        <label>Measurement heads<select id="measurement"><option value="pointers">Phase 1 · adjustable pointers</option><option value="dials">Phase 2 · dial upgrade</option></select></label>
+        <label>Measurement heads<select id="measurement"><option value="pointers">Adjustable pointers</option><option value="dials">Dial indicators</option></select></label>
         <div class="divider"></div><h3>Wheel fit</h3>
         <label>Axle interface<select id="axle"><option value="">Confirm axle interface…</option><option value="qr9">QR · 9 mm front axle</option><option value="qr10">QR · 10 mm rear axle</option><option value="12">12 mm thru axle</option><option value="15">15 mm thru axle</option><option value="20">20 mm thru axle</option></select></label>
         <div class="input-pair"><label>Left stationary end Ø (mm)<input id="seat-left" type="number" min="6" max="35" step="0.1" placeholder="Measure hub end"/></label><label>Right stationary end Ø (mm)<input id="seat-right" type="number" min="6" max="35" step="0.1" placeholder="Measure hub end"/></label></div>
@@ -39,7 +52,7 @@ import Layout from '../layouts/Layout.astro';
       </aside>
       <div class="preview-column">
       <section class="preview panel" aria-label="3D assembly">
-        <div class="preview-heading"><div><span class="eyebrow">INTERACTIVE ASSEMBLY</span><h2 id="assembly-title">Truing stand</h2></div><span class="pill">3D / LIVE</span></div>
+        <div class="preview-heading"><h2 id="assembly-title">Truing stand</h2></div>
         <div id="viewer"><div id="viewer-message">Preparing 3D assembly…</div></div>
         <div class="view-controls"><div class="camera-buttons" aria-label="Camera presets"><button data-view="iso" title="Reset isometric view">Isometric</button><button data-view="front">Front / operator</button><button data-view="side">Side</button><button data-view="top">Top</button><button data-view="bottom">Underside</button></div><span class="gesture">Drag to orbit · scroll to zoom · right-drag to pan</span></div>
         <div class="display-controls"><label><input id="show-wheel" type="checkbox" checked/> Wheel</label><label><input id="show-dimensions" type="checkbox" checked/> Stock labels</label><label class="explode-label">Explode <input id="explode" type="range" min="0" max="1" step="0.01" value="0"/></label></div>
@@ -55,14 +68,20 @@ import Layout from '../layouts/Layout.astro';
       </section>
       <section id="fit-status" class="fit-status" aria-live="polite"></section>
     <section class="parts panel">
-      <div class="section-heading"><div><span class="eyebrow">EVERY PART, ACCOUNTED FOR</span><h2>Components & stock list <span id="part-count"></span></h2></div><button id="export-csv" class="secondary">Download CSV</button></div>
+      <div class="section-heading"><h2>Components & stock list <span id="part-count"></span></h2><button id="export-csv" class="secondary">Download CSV</button></div>
       <p class="help">Select a row or a part in the model to inspect it. Quantities include only the selected tool. Dimensions are envelopes unless marked as stock.</p>
       <div id="part-detail" class="part-detail" aria-live="polite">Select a component to see its dimensions and assembly specification.</div>
       <div class="table-scroll"><table><thead><tr><th>Component</th><th>Qty</th><th>Material</th><th>Size / stock</th><th>Specification</th></tr></thead><tbody id="parts-body"></tbody></table></div>
     </section>
       </div>
     </div>
-    <footer>WHEEL WORKSHOP <span>Dimensioned DIY designs · validate fit and calibration before use</span></footer>
+    <section id="printed-parts" class="panel print-downloads" aria-labelledby="printed-parts-heading">
+      <h2 id="printed-parts-heading" tabindex="-1">3D printed parts</h2>
+      <p class="help">Download the STL files in millimetres. These are fixed designs; changing workshop settings does not resize the files. Other PLA components shown as dimensional envelopes do not have STL files.</p>
+      <ul class="download-list">
+        {printedParts.map(part => <li><a href={part.url} download={part.file}>{part.name} — download STL</a><p class="help">{part.note}</p></li>)}
+      </ul>
+    </section>
     <noscript><p class="notice">JavaScript is required to calculate the assembly and component list. Enable it to configure these tools.</p></noscript>
   </main>
 </Layout>
@@ -71,24 +90,26 @@ import Layout from '../layouts/Layout.astro';
   initWorkshop();
 </script>
 <style is:global>
-  .workshop{--line:#263445;--muted:#90a0b4;--accent:#66e0d3;max-width:1600px;width:100%;margin:auto;padding:0 32px;color:#e8edf4;font-size:14px}
+  .workshop{--line:#263445;--muted:#90a0b4;--accent:#66e0d3;max-width:1600px;width:100%;margin:auto;padding:0 32px 32px;color:#e8edf4;font-size:14px}
   .workshop button,.workshop input,.workshop select,.workshop textarea{font:inherit}
   .workshop button,.workshop a,.workshop input,.workshop select,.workshop textarea{outline-offset:4px}
   .workshop button:focus-visible,.workshop a:focus-visible{outline:2px solid var(--accent)}
-  .workshop-header{height:86px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);gap:16px}
-  .workshop .back{color:var(--accent);text-decoration:none}.workshop .eyebrow{font:10px 'JetBrains Mono',monospace;letter-spacing:2px;color:var(--muted)}
-  .workshop .intro{display:flex;justify-content:space-between;align-items:center;gap:40px;padding:48px 0 40px}.workshop h1{font-size:clamp(32px,4vw,54px);line-height:1.12;letter-spacing:-2px;margin:16px 0}.workshop h1 span{color:var(--accent)}
-  .workshop .intro-text{color:var(--muted);line-height:1.8}.workshop .wheel-card{width:350px;padding:24px;border-left:2px solid var(--accent);background:#111a25}.workshop .wheel-card strong{display:block;font-size:18px;line-height:1.5;margin:12px 0}.workshop .wheel-card p{margin:6px 0;color:var(--muted)}.workshop small{font-size:11px;color:var(--muted)}
-  .workshop .tool-tabs{display:flex;gap:8px;margin-bottom:20px}.workshop .tool-tabs button{background:#101722;border:1px solid var(--line);padding:18px 24px;border-radius:10px;color:#d9e1ec;text-align:left;font-weight:600;flex:1;cursor:pointer}.workshop .tool-tabs button span{color:var(--muted);margin-right:14px;font-family:monospace}.workshop .tool-tabs small{display:block;margin:6px 0 0 30px;font-weight:400}.workshop .tool-tabs button[aria-pressed=true]{border-color:#4bafa7;background:#102624}.workshop .tool-tabs button[aria-pressed=true] span{color:var(--accent)}
+  .workshop-header{min-height:64px;display:flex;align-items:center;justify-content:space-between;border-bottom:1px solid var(--line);gap:16px}
+  .workshop .back{color:var(--accent);text-decoration:none}
+  .workshop h1{font-size:22px;font-weight:600;line-height:1.3;margin:0 0 12px}
+  .workshop .wheel-card{margin:20px 0;padding:20px 24px;border:1px solid var(--line);border-radius:10px;background:#111a25}.workshop .wheel-card strong{display:block;font-size:16px;line-height:1.5;margin:8px 0}.workshop .wheel-card p{margin:6px 0;color:var(--muted)}.workshop small{font-size:11px;color:var(--muted)}
+  .workshop .wheel-actions{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-top:12px}.workshop .wheel-actions a{font-size:12px;text-underline-offset:3px}
+  .workshop .tool-tabs{display:flex;gap:8px;margin-bottom:20px}.workshop .tool-tabs button{background:#101722;border:1px solid var(--line);padding:14px 20px;border-radius:10px;color:#d9e1ec;text-align:left;font-weight:600;flex:1;cursor:pointer}.workshop .tool-tabs small{display:block;margin-top:6px;font-weight:400}.workshop .tool-tabs button[aria-pressed=true]{border-color:#4bafa7;background:#102624}
   .workshop .panel{border:1px solid var(--line);border-radius:12px;background:#0e1520}.workshop .workbench{display:grid;grid-template-columns:290px minmax(0,1fr);gap:20px}.workshop .settings{padding:22px;align-self:start}.workshop .preview-column{display:flex;flex-direction:column;gap:20px;min-width:0}.workshop .preview-column .preview{align-self:stretch}.workshop .preview-column .fit-status{margin:0}.workshop .section-heading{display:flex;justify-content:space-between;align-items:center;gap:12px}.workshop h2{font-size:20px;font-weight:600;margin:8px 0 18px;letter-spacing:-.5px}.workshop h3{font-size:15px;margin:18px 0 12px}.workshop .pill{font:10px monospace;border:1px solid var(--line);border-radius:4px;padding:5px 7px;color:var(--muted)}
   .workshop label{display:block;font-size:12px;color:#c6d1df;margin-top:16px}.workshop input:not([type=checkbox]):not([type=range]),.workshop select,.workshop textarea{width:100%;display:block;background:#080f19;color:#e1e8f1;border:1px solid #344252;border-radius:6px;padding:10px;margin-top:7px;box-sizing:border-box;min-width:0}.workshop input:focus,.workshop select:focus,.workshop textarea:focus{border-color:var(--accent)}
   .workshop .help{color:var(--muted);font-size:11px;line-height:1.7;margin-top:9px}.workshop .divider{border-top:1px solid var(--line);margin-top:20px}.workshop .secondary{padding:9px 13px;border:1px solid #405065;border-radius:6px;background:#152030;color:#dbe5f2;cursor:pointer;font-size:12px}.workshop .secondary:hover{border-color:var(--accent)}.workshop #reset-settings{margin-top:18px;width:100%}
   .workshop .preview{align-self:start;overflow:hidden;display:flex;flex-direction:column;min-width:0}.workshop .preview-heading{display:flex;justify-content:space-between;align-items:center;padding:22px 24px 0}.workshop #viewer{min-height:450px;flex:0 0 auto;position:relative;height:min(550px,70vh)}.workshop #viewer-message{position:absolute;inset:0;display:grid;place-items:center;padding:40px;color:var(--muted);text-align:center}.workshop #viewer-message[hidden]{display:none}
   .workshop .view-controls{padding:14px 20px;border-top:1px solid var(--line);display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}.workshop .camera-buttons{display:flex;gap:6px;flex-wrap:wrap}.workshop .camera-buttons button{border:1px solid #364659;background:#152132;border-radius:5px;padding:7px 10px;font-size:11px;cursor:pointer}.workshop .gesture{font-size:10px;color:var(--muted)}.workshop .display-controls{display:flex;padding:0 22px 14px;align-items:center;gap:24px;flex-wrap:wrap}.workshop .display-controls label{display:flex;align-items:center;gap:8px;margin:0}.workshop input[type=checkbox],.workshop input[type=range]{accent-color:#46c8b9}.workshop .explode-label{flex:1;min-width:150px}.workshop #explode{width:100%;min-width:80px}.workshop .legend{padding:12px 22px;display:flex;gap:16px;flex-wrap:wrap;font-size:10px;color:var(--muted);border-top:1px solid var(--line);background:#101a27}.workshop .legend i{display:inline-block;width:7px;height:7px;border-radius:2px;margin-right:5px}.workshop .silver{background:#a8b6c8}.workshop .teal{background:#16b8b1}.workshop .gold{background:#f6bd60}
   .workshop .fit-status{padding:18px 22px;margin:20px 0;border:1px solid #36534e;border-radius:10px;background:#10211f;color:#b0dcd2;line-height:1.7}.workshop .fit-status.invalid,.workshop .notice{border:1px solid #795b2f;color:#e8c88f;background:#261f14}.workshop .notice{padding:12px;border-radius:6px;margin:12px 0;line-height:1.6}.workshop [hidden]{display:none!important}.workshop .fit-status ul{margin:8px 0 0 18px;list-style:disc}.workshop .parts{padding:24px;min-width:0}.workshop #part-count{font:12px monospace;color:var(--muted);margin-left:10px}.workshop .part-detail{margin:18px 0;padding:16px;background:#132530;border-left:2px solid #48b7ad;line-height:1.8;font-size:12px}.workshop .table-scroll{overflow:auto;max-height:540px}.workshop table{width:100%;border-collapse:collapse;text-align:left;font-size:12px}.workshop th{font:10px monospace;color:var(--muted);text-transform:uppercase;letter-spacing:1px;position:sticky;top:0;background:#15202d;padding:12px}.workshop td{padding:12px;border-bottom:1px solid #1f2b39;vertical-align:top}.workshop td:last-child{max-width:450px;font-size:11px;color:var(--muted);line-height:1.6}.workshop td:first-child{min-width:170px}.workshop td:nth-child(4){min-width:145px;font-family:monospace}.workshop .part-button{background:none;border:0;color:#d8e6f3;text-align:left;cursor:pointer;padding:0}.workshop tr.selected{background:#123132}.workshop tr.selected .part-button{color:var(--accent)}
-  .workshop ol{list-style:decimal;padding-left:22px;color:#b2c0d0;font-size:12px;line-height:1.9}.workshop li{margin-bottom:12px;padding-left:5px}.workshop output{display:block;padding:12px;background:#12222c;color:#aad9df;font:12px monospace;line-height:1.7;margin-top:12px;border-radius:6px}.workshop .input-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}.workshop a{color:var(--accent)}.workshop footer{border-top:1px solid var(--line);padding:24px 0;color:var(--muted);font:10px monospace;display:flex;justify-content:space-between;gap:16px}
+  .workshop ol{list-style:decimal;padding-left:22px;color:#b2c0d0;font-size:12px;line-height:1.9}.workshop li{margin-bottom:12px;padding-left:5px}.workshop output{display:block;padding:12px;background:#12222c;color:#aad9df;font:12px monospace;line-height:1.7;margin-top:12px;border-radius:6px}.workshop .input-pair{display:grid;grid-template-columns:1fr 1fr;gap:14px}.workshop a{color:var(--accent)}
   .workshop .mount-explainer{padding:16px 22px;background:#102322;border-top:1px solid #31514a;font-size:12px;line-height:1.7}.workshop .mount-explainer p{color:#b2c8c4;margin:8px 0}.workshop .viewer-hint{margin:0 0 10px!important}.workshop .release-controls{display:flex;align-items:center;gap:18px;flex-wrap:wrap;margin-top:14px}.workshop .release-controls label{margin:0}.workshop #reverse-wheel{border:1px solid #40596a;border-radius:5px;padding:6px 10px;font-size:11px;cursor:pointer}
-  @media(max-width:1000px){.workshop{padding:0 18px}.workshop .workbench{grid-template-columns:255px minmax(0,1fr)}.workshop .gesture{display:none}.workshop h1{font-size:38px}.workshop .wheel-card{width:290px}.workshop #viewer{min-height:430px}}
-  @media(max-width:700px){.workshop-header>.eyebrow{display:none}.workshop .intro{display:block;padding:28px 0}.workshop .wheel-card{width:100%;margin-top:24px}.workshop .workbench{display:flex;flex-direction:column}.workshop .preview-column{order:-1}.workshop #viewer{height:400px;min-height:400px;flex:auto}.workshop .tool-tabs button{padding:14px;font-size:13px}.workshop .tool-tabs small{margin-left:0;font-size:10px}.workshop .parts{padding:16px}.workshop .parts h2{font-size:17px}.workshop .section-heading{flex-wrap:wrap}.workshop .display-controls{gap:16px}.workshop footer{flex-direction:column}.workshop .intro-text br{display:none}}
-  @media print{body{background:white!important;color:black!important}.workshop{max-width:none;padding:0;color:black}.workshop .workshop-header,.workshop .tool-tabs,.workshop .preview,.workshop button,.workshop .settings,.workshop footer{display:none!important}.workshop .intro{padding:10px 0}.workshop h1{font-size:26px}.workshop .intro-text{display:none}.workshop .panel,.workshop .wheel-card,.workshop .fit-status,.workshop .notice,.workshop output,.workshop .part-detail{background:white!important;color:black!important;border-color:#888}.workshop .table-scroll{max-height:none;overflow:visible}.workshop table{font-size:9px}.workshop th{position:static;background:#eee;color:black}.workshop td,.workshop td:last-child,.workshop .help,.workshop li,.workshop small{color:#333}.workshop .part-button{display:block!important;color:black!important}.workshop tr{break-inside:avoid}.workshop h2,.workshop h3{break-after:avoid}.workshop .wheel-card{width:300px}.workshop .workbench{display:block}.workshop input,.workshop textarea{background:white!important;color:black!important}.workshop .eyebrow{color:#555}.workshop .part-detail{font-size:10px}.workshop #part-count{color:#333}}
+  .workshop .print-downloads{padding:24px;margin-top:20px;scroll-margin-top:20px}.workshop .download-list{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,260px),1fr));gap:16px 24px;margin-top:20px}.workshop .download-list li{padding:0;margin:0;list-style:none}.workshop .download-list a{display:inline-block;font-size:13px;line-height:1.6;text-decoration:underline;text-underline-offset:3px}.workshop .download-list .help{margin-top:5px}
+  @media(max-width:1000px){.workshop{padding:0 18px 24px}.workshop .workbench{grid-template-columns:255px minmax(0,1fr)}.workshop .gesture{display:none}.workshop #viewer{min-height:430px}}
+  @media(max-width:700px){.workshop .wheel-card{padding:18px}.workshop .workbench{display:flex;flex-direction:column}.workshop .preview-column{order:-1}.workshop #viewer{height:400px;min-height:400px;flex:auto}.workshop .tool-tabs button{padding:14px;font-size:13px}.workshop .tool-tabs small{font-size:10px}.workshop .parts{padding:16px}.workshop .parts h2{font-size:17px}.workshop .section-heading{flex-wrap:wrap}.workshop .display-controls{gap:16px}.workshop .print-downloads{padding:18px}}
+  @media print{body{background:white!important;color:black!important}.workshop{max-width:none;padding:0;color:black}.workshop .workshop-header,.workshop .tool-tabs,.workshop .preview,.workshop button,.workshop .settings{display:none!important}.workshop h1{font-size:26px}.workshop .panel,.workshop .wheel-card,.workshop .fit-status,.workshop .notice,.workshop output,.workshop .part-detail{background:white!important;color:black!important;border-color:#888}.workshop .table-scroll{max-height:none;overflow:visible}.workshop table{font-size:9px}.workshop th{position:static;background:#eee;color:black}.workshop td,.workshop td:last-child,.workshop .help,.workshop li,.workshop small{color:#333}.workshop .part-button{display:block!important;color:black!important}.workshop tr{break-inside:avoid}.workshop h2,.workshop h3{break-after:avoid}.workshop .wheel-card{break-inside:avoid}.workshop .workbench{display:block}.workshop input,.workshop textarea{background:white!important;color:black!important}.workshop .part-detail{font-size:10px}.workshop #part-count{color:#333}}
 </style>
