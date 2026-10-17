@@ -1,5 +1,6 @@
 import { calculateWheelBuild, type WheelBuildInputs } from './physicsCalculator.ts';
 import type { Point3, SpokePath, SpokePaths } from './spokePath';
+import { wheelSideLabel } from './wheelSide.ts';
 
 export type LacingTarget = 'flange' | 'rim' | 'valve' | 'reference-flange' | 'reference-rim' | 'setup-reference' | 'alignment' | 'logo' | 'b-flange' | 'b-rim' | 'b-reference-flange' | 'b-reference-rim' | `b-crossing-${number}` | `crossing-${number}`;
 export interface GuideInstructionPart { text: string; target?: LacingTarget }
@@ -170,7 +171,7 @@ export function createLacingGuide(inputs: WheelBuildInputs, paths: SpokePaths): 
   const spokes: GuideSpoke[] = paths.spokes.filter(p => p.valid).map(path => {
     const right = path.side === 'Right', crosses = right ? inputs.crossesRight : inputs.crossesLeft;
     const group = (path.headsOut ? 0 : 2) + (right ? 1 : 2);
-    const sideLabel = `${path.side} / ${inputs.isRear !== false ? (right ? 'drive' : 'non-drive') : inputs.discType === 'None' ? 'front' : right ? 'non-disc' : 'disc'}`;
+    const sideLabel = wheelSideLabel(inputs, path.side);
     const headsDir = path.headsOut ? 'Heads out (elbows in)' : 'Heads in (elbows out)';
     const rimHoleIndex = (((path.index + (path.headsOut ? 1 : -1) * crosses) % n + n) % n) * 2 + (right ? 2 : 1);
     const pattern = crosses === 0 ? 'Radial pattern: no spoke crossings or weaving.' : path.headsOut ?

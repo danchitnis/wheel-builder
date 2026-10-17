@@ -5,8 +5,9 @@ import {
   type CadTheme,
   defaultCadTheme,
 } from '../utils/cadRenderer';
+import { wheelSideLabel, type WheelSideContext } from '../utils/wheelSide.ts';
 
-export interface HubCadData {
+export interface HubCadData extends WheelSideContext {
   flangePcdLeft: number;      // dL (mm)
   flangePcdRight: number;     // dR (mm)
   centerToLeft: number;       // wL (mm)
@@ -435,11 +436,11 @@ export class HubCadVisualizer {
     this.ctx.fillText(`Scale: 1:${(1 / scale).toFixed(2)} • Thickness t: ${ft_mm.toFixed(1)}mm • Center Offset: ${ho.toFixed(1)}mm`, 16, 40);
 
     this.ctx.fillStyle = '#38bdf8';
-    this.ctx.fillText('◀ NDS (NON-DRIVE SIDE)', 16, cssH - 16);
+    this.ctx.fillText(`◀ ${wheelSideLabel(this.data, 'Left')}`, 16, cssH - 16);
 
     this.ctx.fillStyle = '#f43f5e';
     this.ctx.textAlign = 'right';
-    this.ctx.fillText('DRIVE SIDE (DS) ▶', cssW - 16, cssH - 16);
+    this.ctx.fillText(`${wheelSideLabel(this.data, 'Right')} ▶`, cssW - 16, cssH - 16);
 
     this.ctx.restore();
 

@@ -6,6 +6,7 @@ import hubCapSpec from '../data/hubSupportCap.json' with { type: 'json' };
 import hubCapExport from '../components/workshop/fusionHubCapMeshes.json' with { type: 'json' };
 import { hubs } from '../data/hubs.ts';
 import type { WheelBuildInputs } from './physicsCalculator.ts';
+import { fitSettingsFrom } from './nippleFit.ts';
 import { parseConfiguration, restoreConfiguration, serializeConfiguration, BUILD_SESSION_KEY, type BuildConfiguration, type BuildStorage } from './buildConfiguration.ts';
 
 export const cornerBracketDimensions = { leg:50, width:18, thickness:9, holeOffset:40, bore:6 } as const;
@@ -169,6 +170,7 @@ export function buildAssembly(config: BuildConfiguration, s: WorkshopSettings): 
   if (Math.abs(frameOffset) > 15) errors.push('Frame offset exceeds this design’s ±15 mm measurement adjustment.');
   const hub = hubs.find(h => h.id === config.hp);
   const wheelInputs: WheelBuildInputs = {
+    nippleFit: fitSettingsFrom(config),
     erd: diameter - 2 * depth, rimWidthOuter: rw,
     rimWidthInner: config.rimWidthInner ?? 22, rimDepth: depth,
     rimProfile: config.rimProfile, rimEyelets: config.rimEyelets, rimValveDiameter: config.rimValveDiameter,

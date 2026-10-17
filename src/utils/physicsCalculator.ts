@@ -1,6 +1,8 @@
 import type { RimAppearance } from '../data/rims';
+import type { NippleFitSettings } from './nippleFit.ts';
 
 export interface WheelBuildInputs extends RimAppearance {
+  nippleFit?: NippleFitSettings;
   erd: number;                  // ERD in mm
   osb: number;                  // Offset Spoke Bed (asymmetrical rim offset) in mm
   drillingOffsetLeft: number;   // Left drilling offset in mm
@@ -55,8 +57,28 @@ export interface SideCalculations {
 export interface WheelBuildCalculations {
   left: SideCalculations;
   right: SideCalculations;
-  tensionRatioLeft: number;        // NDS relative tension %
-  tensionRatioRight: number;       // DS relative tension %
+  tensionRatioLeft: number;        // Left relative tension %, NaN when unavailable
+  tensionRatioRight: number;       // Right relative tension %, NaN when unavailable
+  tensionRatioValid: boolean;
+}
+
+/** Signed lateral rim shift; shared by the calculator and schematic views. */
+export function resolveRimShift(inputs: Pick<WheelBuildInputs, 'rimFlip' | 'osb' | 'centerToLeft' | 'centerToRight' | 'hubOffset'>): number {
+  if (inputs.rimFlip === 'Left') return inputs.osb;
+  if (inputs.rimFlip === 'Right') return -inputs.osb;
+  return inputs.centerToLeft - inputs.hubOffset > inputs.centerToRight + inputs.hubOffset ? inputs.osb : -inputs.osb;
+}
+
+/** Traditional geometry validity, independent of optional detailed flange/path inputs. */
+export function wheelGeometryValid(inputs: WheelBuildInputs, result: WheelBuildCalculations): boolean {
+  const positive = [inputs.erd, inputs.spokeHoleDiameter, inputs.flangePcdLeft, inputs.flangePcdRight,
+    inputs.centerToLeft, inputs.centerToRight];
+  return positive.every(v => Number.isFinite(v) && v > 0) &&
+    [inputs.osb, inputs.hubOffset, inputs.drillingOffsetLeft, inputs.drillingOffsetRight].every(Number.isFinite) &&
+    Number.isInteger(inputs.spokeCount) && inputs.spokeCount >= 8 && inputs.spokeCount <= 64 && inputs.spokeCount % 4 === 0 &&
+    [inputs.crossesLeft, inputs.crossesRight].every(v => Number.isInteger(v) && v >= 0 && v <= inputs.spokeCount / 8) &&
+    inputs.erd > Math.max(inputs.flangePcdLeft, inputs.flangePcdRight) + inputs.spokeHoleDiameter &&
+    [result.left, result.right].every(side => side.effectiveFlangeDistanceValid && Number.isFinite(side.rawLength3D) && side.calculatedSpokeLength > 0);
 }
 
 /**
@@ -65,13 +87,11 @@ export interface WheelBuildCalculations {
 export function calculateWheelBuild(inputs: WheelBuildInputs): WheelBuildCalculations {
   const {
     erd,
-    osb,
     drillingOffsetLeft,
     drillingOffsetRight,
     spokeCount,
     spokeHoleDiameter,
     hubOffset,
-    rimFlip,
     flangePcdLeft,
     centerToLeft,
     crossesLeft,
@@ -81,18 +101,7 @@ export function calculateWheelBuild(inputs: WheelBuildInputs): WheelBuildCalcula
   } = inputs;
 
   // 1. Determine rim spoke bed lateral shift based on rim flip
-  let rimShift = 0;
-  if (rimFlip === 'Left') {
-    rimShift = osb;
-  } else if (rimFlip === 'Right') {
-    rimShift = -osb;
-  } else {
-    if (centerToLeft - hubOffset > centerToRight + hubOffset) {
-      rimShift = osb;
-    } else {
-      rimShift = -osb;
-    }
-  }
+  const rimShift = resolveRimShift(inputs);
 
   // 2. Compute effective center-to-flange axial distances (W_eff) in 3D
   const wLeftEff = centerToLeft - hubOffset - rimShift - drillingOffsetLeft;
@@ -162,23 +171,21 @@ export function calculateWheelBuild(inputs: WheelBuildInputs): WheelBuildCalcula
   const left = calcSide(rfL, wLeftEff, crossesLeft);
   const right = calcSide(rfR, wRightEff, crossesRight);
 
-  let tensionRatioLeft = 100.0;
-  let tensionRatioRight = 100.0;
-
-  if (wLeftEff > 0 && wRightEff > 0) {
-    if (wLeftEff > wRightEff) {
-      tensionRatioLeft = (wRightEff / wLeftEff) * 100.0;
-      tensionRatioRight = 100.0;
-    } else if (wRightEff > wLeftEff) {
-      tensionRatioRight = (wLeftEff / wRightEff) * 100.0;
-      tensionRatioLeft = 100.0;
-    }
-  }
-
-  return {
+  const result: WheelBuildCalculations = {
     left,
     right,
-    tensionRatioLeft,
-    tensionRatioRight,
+    tensionRatioLeft: NaN,
+    tensionRatioRight: NaN,
+    tensionRatioValid: false,
   };
+  if (wheelGeometryValid(inputs, result)) {
+    // Equal numbers of spokes on each side: T_L sin(beta_L) = T_R sin(beta_R).
+    // Use the raw flange-centre chord, before the hub-hole length deduction.
+    const sinLeft = wLeftEff / left.rawLength3D, sinRight = wRightEff / right.rawLength3D;
+    const normalizer = Math.max(sinLeft, sinRight);
+    result.tensionRatioLeft = 100 * sinRight / normalizer;
+    result.tensionRatioRight = 100 * sinLeft / normalizer;
+    result.tensionRatioValid = true;
+  }
+  return result;
 }

@@ -38,6 +38,20 @@ const server = createServer(async (req, res) => {
           }
           return original.call(this, type, ...args);
         };`;
+      if (mode === 'nipple-webgl-once') injection = `
+        let nippleFailureUsed = false;
+        document.addEventListener('click', event => {
+          if (nippleFailureUsed || !event.target.closest('#btn-tab-nipple')) return;
+          nippleFailureUsed = true;
+          const original = HTMLCanvasElement.prototype.getContext;
+          HTMLCanvasElement.prototype.getContext = function(type, ...args) {
+            if (type === 'webgl2') {
+              HTMLCanvasElement.prototype.getContext = original;
+              throw new Error('Simulated nipple WebGL startup failure');
+            }
+            return original.call(this, type, ...args);
+          };
+        }, true);`;
       if (mode === 'clipboard') injection = `
         Object.defineProperty(navigator, 'clipboard', {value: {
           writeText: async () => { throw new Error('Simulated clipboard denial'); }

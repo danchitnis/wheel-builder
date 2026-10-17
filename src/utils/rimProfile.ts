@@ -1,4 +1,4 @@
-// Schematic extrusion: axial position and radial height above the ERD seat, mm.
+// Schematic extrusion: axial position and radial height above the ERD spoke-tip reference, mm.
 // Body depth excludes the eyelet. Internal wall thicknesses are illustrative.
 export function shallowRimSection(outerWidth: number, innerWidth: number, depth: number) {
   const half = outerWidth / 2;

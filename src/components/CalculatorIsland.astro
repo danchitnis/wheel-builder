@@ -1,6 +1,7 @@
 ---
 import { rims, defaultRim } from '../data/rims';
 import { hubs, defaultHub } from '../data/hubs';
+import NippleFitPanel from './NippleFitPanel.astro';
 ---
 
 <!-- TAB NAVIGATION BAR -->
@@ -40,6 +41,11 @@ import { hubs, defaultHub } from '../data/hubs';
       <button id="btn-tab-rim" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-titanium-400 hover:text-titanium-200 hover:bg-titanium-800/50">
         <span>⭕</span>
         <span>Rim Config (2D)</span>
+      </button>
+
+      <button id="btn-tab-nipple" class="tab-btn px-3.5 py-2 rounded-xl text-xs font-bold transition-all flex items-center gap-2 text-titanium-400 hover:text-titanium-200 hover:bg-titanium-800/50">
+        <span>🔩</span>
+        <span>Nipple Config (3D)</span>
       </button>
     </div>
   </div>
@@ -249,8 +255,8 @@ import { hubs, defaultHub } from '../data/hubs';
 
           <!-- Visibility / Color / Interlacing / Ruler Selects -->
           <div class="flex flex-wrap gap-1 bg-titanium-950/80 backdrop-blur-md border border-titanium-800 p-1 rounded-xl">
-            <button id="toggle-l-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">NDS (L)</button>
-            <button id="toggle-r-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">DS (R)</button>
+            <button id="toggle-l-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">Left</button>
+            <button id="toggle-r-spokes" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-cyan-950/30 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 transition-all">Right</button>
             <button id="toggle-interlace" aria-pressed="false" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-titanium-950 text-titanium-500 border border-cyan-500/20 hover:border-cyan-500/50 transition-all" title="Interlace at the outermost crossing on both crossed sides; radial sides have no weave">Non-interlaced · both sides</button>
             <button id="toggle-ruler" class="px-2 py-1 text-[10px] font-bold rounded-lg bg-yellow-950/40 text-yellow-400 border border-yellow-500/30 hover:border-yellow-500/60 transition-all" title="Toggle Direct 3D Straight Measurement Vector Ruler">📏 Ruler</button>
             <select id="select-colormode" aria-label="Spoke colour mode" class="bg-titanium-950 border border-titanium-800 rounded-lg text-[10px] font-bold px-1 py-1 text-titanium-200 cursor-pointer focus:outline-none">
@@ -304,6 +310,18 @@ import { hubs, defaultHub } from '../data/hubs';
             </div>
             <p class="text-xs text-titanium-400">The bend allowance compares the shaft path with its own straight chord, excluding the manufactured J-bend. Head and elbow seating against the flange are not simulated. These are geometric estimates, not validated purchase lengths. Final stock length depends on measured ERD and nipple engagement.</p>
             <p id="path-errors" role="status" class="text-xs text-amber-300"></p>
+
+            <details id="input-sensitivity" class="rounded-xl border border-titanium-800 p-3 text-xs">
+              <summary class="cursor-pointer font-bold text-cyan-300 py-1">Input sensitivity</summary>
+              <p id="input-sensitivity-help" class="text-titanium-400 mt-3">Change in traditional spoke length when one input increases by 1 mm. Includes offsets and Auto rim orientation. These are input responses, not measurement tolerances or confidence intervals.</p>
+              <div class="overflow-x-auto mt-3">
+                <table class="w-full text-left" aria-describedby="input-sensitivity-help">
+                  <caption class="text-left text-titanium-300 mb-2">Length change (mm) for +1 mm input</caption>
+                  <thead class="text-titanium-400"><tr><th scope="col" class="py-2 pr-2">Input</th><th scope="col" data-wheel-side="Left">Left</th><th scope="col" data-wheel-side="Right">Right</th></tr></thead>
+                  <tbody id="sensitivity-results" class="mono-data text-titanium-100"></tbody>
+                </table>
+              </div>
+            </details>
 
             <!-- Invalid effective flange distance warning banner -->
             <div id="weff-warning" class="hidden bg-yellow-950/40 border border-yellow-500/40 text-yellow-200 rounded-xl px-3.5 py-2.5 text-xs font-medium"></div>
@@ -374,14 +392,14 @@ import { hubs, defaultHub } from '../data/hubs';
                 <span class="font-bold text-titanium-400 uppercase tracking-wider text-[10px]">Tension Balance</span>
                 <span id="tension-ratio-label" class="text-lg font-bold text-cyan-400 mono-data">-- % : 100 %</span>
               </div>
-              <span class="text-[10px] text-titanium-500 font-medium uppercase tracking-wide">Inversely proportional to W_eff</span>
+              <span class="text-[10px] text-titanium-500 font-medium uppercase tracking-wide text-right">Lateral force equilibrium · equal side counts</span>
             </div>
 
             <!-- Progress Bars -->
             <div class="flex flex-col gap-1.5 mt-2">
               <div class="flex flex-col gap-0.5">
                 <div class="flex justify-between text-[10px] font-bold text-titanium-400">
-                  <span>LEFT TENSION</span>
+                  <span data-wheel-side="Left">Left</span>
                   <span id="bar-pct-l" class="mono-data">--%</span>
                 </div>
                 <div class="w-full bg-titanium-950 rounded-full h-2 overflow-hidden border border-titanium-800">
@@ -391,7 +409,7 @@ import { hubs, defaultHub } from '../data/hubs';
 
               <div class="flex flex-col gap-0.5">
                 <div class="flex justify-between text-[10px] font-bold text-titanium-400">
-                  <span>RIGHT TENSION</span>
+                  <span data-wheel-side="Right">Right</span>
                   <span id="bar-pct-r" class="mono-data">100%</span>
                 </div>
                 <div class="w-full bg-titanium-950 rounded-full h-2 overflow-hidden border border-titanium-800">
@@ -570,7 +588,7 @@ import { hubs, defaultHub } from '../data/hubs';
 
         <div class="grid grid-cols-2 gap-4">
           <div class="flex flex-col gap-1 col-span-2">
-            <label class="text-xs font-medium text-titanium-400">ERD - Spoke Bed Diameter (mm)</label>
+            <label class="text-xs font-medium text-titanium-400">ERD — calibrated spoke-tip diameter (mm)</label>
             <input type="number" id="input-erd" step="0.1" value={defaultRim.erd} class="bg-titanium-950 border border-titanium-800 rounded-lg px-3 py-2 text-sm text-titanium-100 focus:border-cyan-500 focus:outline-none" />
           </div>
           
@@ -639,6 +657,10 @@ import { hubs, defaultHub } from '../data/hubs';
         </div>
       </div>
     </div>
+  </div>
+
+  <div id="tab-content-nipple" class="tab-pane hidden w-full">
+    <NippleFitPanel />
   </div>
 
   <!-- ================= TAB 4: INTERACTIVE LACING GUIDE ================= -->
@@ -810,8 +832,13 @@ import { hubs, defaultHub } from '../data/hubs';
   import { type LacingSnapshot, type LacingTarget } from '../utils/lacingGuide';
   import { lacingSetupDiagram, lacingSpokeDiagram } from '../utils/lacingSetupDiagram';
   import { calculateSpokePaths } from '../utils/spokePath';
+  import { initializeNippleFitPanel, readNippleFitSettings } from './nippleFitController';
+  import { fitNumericFields } from '../utils/nippleFit';
+  const nippleFitPanel = initializeNippleFitPanel(() => updateAll());
   import { defaultHub } from '../data/hubs';
-  import { calculateWheelBuild } from '../utils/physicsCalculator';
+  import { calculateWheelBuild, resolveRimShift, wheelGeometryValid } from '../utils/physicsCalculator';
+  import { calculateInputSensitivity } from '../utils/inputSensitivity';
+  import { wheelSideLabel } from '../utils/wheelSide';
   import type { Viewport3D as Viewport3DInstance } from './Viewport3D';
   import type { HubCadVisualizer as HubCadVisualizerInstance } from './HubCadVisualizer';
   import type { RimCadVisualizer as RimCadVisualizerInstance } from './RimCadVisualizer';
@@ -845,11 +872,13 @@ import { hubs, defaultHub } from '../data/hubs';
   const btnTabLacing = document.getElementById('btn-tab-lacing') as HTMLButtonElement;
   const btnTabHub = document.getElementById('btn-tab-hub') as HTMLButtonElement;
   const btnTabRim = document.getElementById('btn-tab-rim') as HTMLButtonElement;
+  const btnTabNipple = document.getElementById('btn-tab-nipple') as HTMLButtonElement;
 
   const paneAssembly = document.getElementById('tab-content-assembly') as HTMLElement;
   const paneLacing = document.getElementById('tab-content-lacing') as HTMLElement;
   const paneHub = document.getElementById('tab-content-hub') as HTMLElement;
   const paneRim = document.getElementById('tab-content-rim') as HTMLElement;
+  const paneNipple = document.getElementById('tab-content-nipple') as HTMLElement;
 
   const assemblyViewportHost = document.getElementById('assembly-viewport-host') as HTMLElement;
   const lacingViewportHost = document.getElementById('lacing-viewport-host') as HTMLElement;
@@ -999,13 +1028,14 @@ import { hubs, defaultHub } from '../data/hubs';
   const tooltipBracing = document.getElementById('tooltip-bracing') as HTMLElement;
 
   // 1. SWITCH TAB LOGIC
-  function switchTab(tab: 'assembly' | 'lacing' | 'hub' | 'rim') {
+  function switchTab(tab: 'assembly' | 'lacing' | 'hub' | 'rim' | 'nipple') {
     clearLacingHighlight();
     const tabs = [
       { id: 'assembly', btn: btnTabAssembly, pane: paneAssembly },
       { id: 'lacing', btn: btnTabLacing, pane: paneLacing },
       { id: 'hub', btn: btnTabHub, pane: paneHub },
       { id: 'rim', btn: btnTabRim, pane: paneRim },
+      { id: 'nipple', btn: btnTabNipple, pane: paneNipple },
     ];
 
     tabs.forEach(t => {
@@ -1028,7 +1058,7 @@ import { hubs, defaultHub } from '../data/hubs';
         lacingViewportHost.appendChild(viewportCard);
       } else if (tab === 'assembly' && assemblyViewportHost && viewportCard.parentElement !== assemblyViewportHost) {
         assemblyViewportHost.appendChild(viewportCard);
-      } else if ((tab === 'hub' || tab === 'rim') && assemblyViewportHost && viewportCard.parentElement !== assemblyViewportHost) {
+      } else if ((tab !== 'assembly' && tab !== 'lacing') && assemblyViewportHost && viewportCard.parentElement !== assemblyViewportHost) {
         assemblyViewportHost.appendChild(viewportCard);
       }
     }
@@ -1045,6 +1075,7 @@ import { hubs, defaultHub } from '../data/hubs';
       }
     }
 
+    nippleFitPanel.setVisible(tab === 'nipple');
     if (tab === 'assembly' || tab === 'lacing') void ensureViewport();
     if (tab === 'hub') void ensureHubCad().then(() => hubCad?.resize());
     if (tab === 'rim') void ensureRimCad().then(() => rimCad?.resize());
@@ -1057,12 +1088,12 @@ import { hubs, defaultHub } from '../data/hubs';
     }, 50);
   }
 
-  const tabButtons = [btnTabAssembly, btnTabLacing, btnTabHub, btnTabRim];
-  const tabNames = ['assembly', 'lacing', 'hub', 'rim'] as const;
+  const tabButtons = [btnTabAssembly, btnTabLacing, btnTabHub, btnTabRim, btnTabNipple];
+  const tabNames = ['assembly', 'lacing', 'hub', 'rim', 'nipple'] as const;
   btnTabAssembly.parentElement!.setAttribute('role', 'tablist');
   btnTabAssembly.parentElement!.setAttribute('aria-label', 'Wheel builder views');
   tabButtons.forEach((button, index) => {
-    const pane = [paneAssembly, paneLacing, paneHub, paneRim][index];
+    const pane = [paneAssembly, paneLacing, paneHub, paneRim, paneNipple][index];
     button.setAttribute('role', 'tab');
     button.setAttribute('aria-controls', pane.id);
     button.setAttribute('aria-selected', String(index === 0));
@@ -1070,7 +1101,7 @@ import { hubs, defaultHub } from '../data/hubs';
     pane.setAttribute('role', 'tabpanel');
     pane.setAttribute('aria-labelledby', button.id);
     button.addEventListener('keydown', event => {
-      const next = event.key === 'Home' ? 0 : event.key === 'End' ? 3 : event.key === 'ArrowRight' ? (index + 1) % 4 : event.key === 'ArrowLeft' ? (index + 3) % 4 : -1;
+      const next = event.key === 'Home' ? 0 : event.key === 'End' ? tabButtons.length - 1 : event.key === 'ArrowRight' ? (index + 1) % tabButtons.length : event.key === 'ArrowLeft' ? (index + tabButtons.length - 1) % tabButtons.length : -1;
       if (next < 0) return;
       event.preventDefault(); switchTab(tabNames[next]); tabButtons[next].focus();
     });
@@ -1080,6 +1111,7 @@ import { hubs, defaultHub } from '../data/hubs';
   btnTabLacing.addEventListener('click', () => switchTab('lacing'));
   btnTabHub.addEventListener('click', () => switchTab('hub'));
   btnTabRim.addEventListener('click', () => switchTab('rim'));
+  btnTabNipple.addEventListener('click', () => switchTab('nipple'));
 
   if (btnEditHub) btnEditHub.addEventListener('click', () => switchTab('hub'));
   if (btnEditRim) btnEditRim.addEventListener('click', () => switchTab('rim'));
@@ -1100,6 +1132,7 @@ import { hubs, defaultHub } from '../data/hubs';
 
     return {
       ...rimAppearance,
+      nippleFit: readNippleFitSettings(),
       erd: numeric(erdIn),
       rimWidthOuter: parseFloat(woIn.value) || defaultRim.widthOuter!,
       rimWidthInner: parseFloat(wiIn.value) || defaultRim.widthInner!,
@@ -1222,6 +1255,7 @@ import { hubs, defaultHub } from '../data/hubs';
           flangeOuterDiameterLeft: Number.isFinite(inputs.flangeOuterDiameterLeft) ? inputs.flangeOuterDiameterLeft : undefined,
           flangeOuterDiameterRight: Number.isFinite(inputs.flangeOuterDiameterRight) ? inputs.flangeOuterDiameterRight : undefined,
           hubOffset: inputs.hubOffset,
+          isRear: inputs.isRear, discType: inputs.discType,
           brand: option?.dataset.brand || '',
           name: option?.dataset.name || '',
           spacing: option?.dataset.spacing || '',
@@ -1255,6 +1289,8 @@ import { hubs, defaultHub } from '../data/hubs';
           rimDepth: inputs.rimDepth,
           ...rimAppearance,
           rimFlip: inputs.rimFlip,
+          resolvedRimShift: resolveRimShift(inputs),
+          isRear: inputs.isRear, discType: inputs.discType,
           brand: option?.dataset.brand || '',
           name: option?.dataset.name || '',
         });
@@ -1349,8 +1385,12 @@ import { hubs, defaultHub } from '../data/hubs';
     // Trigger math engine
     const results = calculateWheelBuild(inputs);
     const paths = calculateSpokePaths(inputs);
-    const leftLabel = inputs.isRear ? 'Left / non-drive' : 'Left / disc';
-    const rightLabel = inputs.isRear ? 'Right / drive' : 'Right / non-disc';
+    nippleFitPanel.refresh(inputs, paths);
+    const leftLabel = wheelSideLabel(inputs, 'Left');
+    const rightLabel = wheelSideLabel(inputs, 'Right');
+    for (const node of document.querySelectorAll<HTMLElement>('[data-wheel-side]')) {
+      node.textContent = node.dataset.wheelSide === 'Left' ? leftLabel : rightLabel;
+    }
     document.querySelector('[data-side-label="left-length"]')!.textContent = `${leftLabel} — traditional`;
     document.querySelector('[data-side-label="right-length"]')!.textContent = `${rightLabel} — traditional`;
     toggleLSpokes.textContent = leftLabel;
@@ -1373,14 +1413,29 @@ import { hubs, defaultHub } from '../data/hubs';
     }
     document.getElementById('path-errors')!.textContent = paths.errors.length ? paths.errors[0] : '';
 
+    const sensitivities = document.getElementById('sensitivity-results')!;
+    sensitivities.replaceChildren();
+    for (const sensitivity of calculateInputSensitivity(inputs)) {
+      const row = document.createElement('tr');
+      const name = document.createElement('th'); name.scope = 'row'; name.className = 'py-2 pr-2 font-normal'; name.textContent = sensitivity.label;
+      row.append(name);
+      for (const change of [sensitivity.left, sensitivity.right]) {
+        const cell = document.createElement('td'); cell.className = 'py-2 pr-2';
+        const value = change === null ? null : Math.abs(change) < .0005 ? 0 : change;
+        cell.textContent = value === null ? 'Unavailable' : `${value >= 0 ? '+' : ''}${value.toFixed(3)}`;
+        row.append(cell);
+      }
+      sensitivities.append(row);
+    }
+
     // Update Numerical DOM Output
     if (outLenL) outLenL.innerHTML = `${results.left.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
     if (outLenLRound) outLenLRound.innerHTML = `Nearest whole millimetre: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.left.calculatedSpokeLength)} mm</span>`;
     if (outLenR) outLenR.innerHTML = `${results.right.calculatedSpokeLength.toFixed(1)}<span class="text-lg text-titanium-500 ml-1">mm</span>`;
     if (outLenRRound) outLenRRound.innerHTML = `Nearest whole millimetre: <span class="font-bold text-titanium-100 mono-data">${Math.round(results.right.calculatedSpokeLength)} mm</span>`;
 
-    for (const [result, length, rounded] of [[results.left, outLenL, outLenLRound], [results.right, outLenR, outLenRRound]] as const) {
-      if (!result.effectiveFlangeDistanceValid || !Number.isFinite(result.calculatedSpokeLength) || inputs.erd <= 0 || inputs.spokeHoleDiameter <= 0) {
+    for (const [length, rounded] of [[outLenL, outLenLRound], [outLenR, outLenRRound]] as const) {
+      if (!wheelGeometryValid(inputs, results)) {
         length.textContent = 'Unavailable'; rounded.textContent = 'Check wheel geometry';
       }
     }
@@ -1437,13 +1492,13 @@ import { hubs, defaultHub } from '../data/hubs';
     // Tension Balance Meters
     const tL = results.tensionRatioLeft;
     const tR = results.tensionRatioRight;
-    if (tensionRatioLabel) tensionRatioLabel.textContent = `${tL.toFixed(0)} % : ${tR.toFixed(0)} %`;
+    if (tensionRatioLabel) tensionRatioLabel.textContent = results.tensionRatioValid ? `${tL.toFixed(1)} % : ${tR.toFixed(1)} %` : 'Unavailable';
     
-    if (barPctL) barPctL.textContent = `${tL.toFixed(0)}%`;
-    if (barPctR) barPctR.textContent = `${tR.toFixed(0)}%`;
+    if (barPctL) barPctL.textContent = results.tensionRatioValid ? `${tL.toFixed(1)}%` : 'Unavailable';
+    if (barPctR) barPctR.textContent = results.tensionRatioValid ? `${tR.toFixed(1)}%` : 'Unavailable';
 
-    if (barFillL) barFillL.style.width = `${tL}%`;
-    if (barFillR) barFillR.style.width = `${tR}%`;
+    if (barFillL) barFillL.style.width = results.tensionRatioValid ? `${tL}%` : '0%';
+    if (barFillR) barFillR.style.width = results.tensionRatioValid ? `${tR}%` : '0%';
 
     // Selected Preset Names & Summary Card Synchronizer
     const hubOpt = hubPreset.options[hubPreset.selectedIndex];
@@ -1481,6 +1536,7 @@ import { hubs, defaultHub } from '../data/hubs';
         flangeOuterDiameterLeft: Number.isFinite(inputs.flangeOuterDiameterLeft) ? inputs.flangeOuterDiameterLeft : undefined,
         flangeOuterDiameterRight: Number.isFinite(inputs.flangeOuterDiameterRight) ? inputs.flangeOuterDiameterRight : undefined,
         hubOffset: inputs.hubOffset,
+        isRear: inputs.isRear, discType: inputs.discType,
         brand: hubBrand,
         name: hubName,
         spacing: hubSpacing,
@@ -1499,6 +1555,8 @@ import { hubs, defaultHub } from '../data/hubs';
         rimDepth: inputs.rimDepth,
         ...rimAppearance,
         rimFlip: inputs.rimFlip,
+        resolvedRimShift: resolveRimShift(inputs),
+        isRear: inputs.isRear, discType: inputs.discType,
         brand: rimBrand,
         name: rimName,
       });
@@ -1960,7 +2018,7 @@ import { hubs, defaultHub } from '../data/hubs';
     document.getElementById('lacing-checkpoint-title')!.textContent = detail.checkpointTitle;
     document.getElementById('lacing-checkpoint-text')!.textContent = detail.orientationCheckpoint ?? '';
     lacingSpokeLengthText.classList.toggle('hidden', !selection);
-    lacingSpokeLengthText.textContent = selection ? `${selection.label} — Spoke length: ${selection.roundedLength} mm each (A and B)` : '';
+    lacingSpokeLengthText.textContent = selection ? `${selection.label} — Purchased: ${getPurchasedLength(targetSpoke?.side ?? 'Left', selection.roundedLength)} mm each (A and B) · calculated rounding: ${selection.roundedLength} mm` : '';
     lacingRuleTipText.replaceChildren();
     document.getElementById('lacing-link-help')!.classList.toggle('hidden', !valid || preview);
     if (!valid || preview || !targetSpoke) {
@@ -1978,7 +2036,7 @@ import { hubs, defaultHub } from '../data/hubs';
         lacingRuleTipText.append(item);
       }
     }
-    const announcement = `${patternStatus.textContent} ${lacingSpokeCounter.textContent}. ${lacingSpokeTitle.textContent}. ${!preview && targetSpoke ? `${targetSpoke.sideLabel}. ${targetSpoke.headsDir}. ${selection ? `Spoke length ${selection.roundedLength} millimetres. ` : ''}${orientation} ${step > 0 ? targetSpoke.instructionSteps.flat().map(p => p.text).join(" ") ?? "" : "One heads-out and one heads-in spoke per pair. Position both before attaching either nipple; select Start pair 1."}` : ''} ${detail.orientationCheckpoint ?? ''} ${notice}`;
+    const announcement = `${patternStatus.textContent} ${lacingSpokeCounter.textContent}. ${lacingSpokeTitle.textContent}. ${!preview && targetSpoke ? `${targetSpoke.sideLabel}. ${targetSpoke.headsDir}. ${selection ? `Purchased spoke length ${getPurchasedLength(targetSpoke.side, selection.roundedLength)} millimetres; calculated rounding ${selection.roundedLength} millimetres. ` : ''}${orientation} ${step > 0 ? targetSpoke.instructionSteps.flat().map(p => p.text).join(" ") ?? "" : "One heads-out and one heads-in spoke per pair. Position both before attaching either nipple; select Start pair 1."}` : ''} ${detail.orientationCheckpoint ?? ''} ${notice}`;
     if (announcement !== lastAnnouncement) {
       document.getElementById('lacing-announcement')!.textContent = announcement;
       lastAnnouncement = announcement;
@@ -1988,6 +2046,11 @@ import { hubs, defaultHub } from '../data/hubs';
   window.addEventListener('lacing-view-change', event => {
     document.getElementById('lacing-viewing-side')!.textContent = event.detail;
   });
+
+  function getPurchasedLength(side: string, rounded: number) {
+    const settings = readNippleFitSettings();
+    return (side === 'Left' ? settings.purchasedLengthLeft : settings.purchasedLengthRight) ?? rounded;
+  }
 
   // 8. BUILD PERSISTENCE AND EXPLICIT SHARING
   const sessionStorageForBuild = () => window.sessionStorage;
@@ -2000,7 +2063,7 @@ import { hubs, defaultHub } from '../data/hubs';
       return [key, Number.isFinite(value) ? value : null];
     })) as Record<NumericField, number | null>;
     return {
-      ...measurements, rp: rimPreset.value, hp: hubPreset.value,
+      ...measurements, ...readNippleFitSettings(), rp: rimPreset.value, hp: hubPreset.value,
       rimProfile: rimAppearance.rimProfile ?? 'standard',
       rimEyelets: rimAppearance.rimEyelets ?? false,
       rimValveDiameter: rimAppearance.rimValveDiameter ?? 6.5,
@@ -2014,8 +2077,8 @@ import { hubs, defaultHub } from '../data/hubs';
     hubPreset.value = config.hp;
     applyRimPreset();
     applyHubPreset();
-    for (const [key, id] of Object.entries(numericFields)) {
-      const value = config[key as NumericField];
+    for (const [key, id] of Object.entries({...numericFields, ...fitNumericFields})) {
+      const value = config[key as NumericField | keyof typeof fitNumericFields];
       (document.getElementById(id) as HTMLInputElement).value = value === null ? '' : String(value);
     }
     rimAppearance = { rimProfile: config.rimProfile, rimEyelets: config.rimEyelets, rimValveDiameter: config.rimValveDiameter };

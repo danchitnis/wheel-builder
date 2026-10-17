@@ -1,0 +1,73 @@
+---
+import { nippleFitDefaults } from '../utils/nippleFit';
+
+const fieldClass = 'block w-full mt-1 rounded-lg border border-titanium-700 bg-titanium-950 px-3 py-2 text-sm text-titanium-100';
+const cardClass = 'rounded-2xl border border-titanium-800 bg-titanium-900/60 p-5';
+---
+<section id="nipple-fit-panel" class="flex flex-col lg:flex-row gap-6 w-full" aria-label="Nipple fit configuration">
+  <div class="w-full lg:w-[360px] xl:w-[380px] flex-shrink-0 flex flex-col gap-5">
+    <div class={cardClass}>
+      <h2 class="text-sm font-bold text-cyan-300">Spoke configuration</h2>
+      <p class="mt-2 text-xs text-titanium-400">Compare purchased lengths with the modeled 3D route. Leave a length blank to use calculated rounding.</p>
+      <div class="grid grid-cols-2 gap-4 mt-4">
+        {['left','right'].map(side => <fieldset class="min-w-0"><legend data-wheel-side={side === 'left' ? 'Left' : 'Right'} class="text-sm font-bold text-titanium-100">{side} side</legend>
+          <label class="block mt-2 text-xs text-titanium-300">Purchased length (mm)<input id={`fit-length-${side}`} type="number" min="1" max="2000" step="0.1" class={fieldClass}/></label>
+          <p id={`fit-auto-${side}`} class="mt-1 text-xs text-titanium-400"></p>
+          <div id={`fit-shortcuts-${side}`} class="grid grid-cols-2 gap-2 mt-2" aria-label={`${side} length shortcuts`}></div>
+          <button id={`fit-reset-${side}`} type="button" class="mt-2 text-xs text-cyan-300 underline underline-offset-4">Use calculated rounding</button>
+          <label class="block mt-3 text-xs text-titanium-300">Spoke thread length (mm)<input id={`fit-thread-${side}`} type="number" min="0.1" max="100" step="0.1" value={side === 'left' ? nippleFitDefaults.spokeThreadLeft : nippleFitDefaults.spokeThreadRight} class={fieldClass}/></label>
+        </fieldset>)}
+      </div>
+    </div>
+    <div class={cardClass}>
+      <h2 class="text-sm font-bold text-cyan-300">Nipple configuration</h2>
+      <p class="mt-2 text-xs text-titanium-300">DT Swiss Standard · 2 × 12 mm · nickel-plated brass</p>
+      <p class="mt-2 text-xs text-titanium-400">Settings apply to both sides. Enter the dimensions of your nipple. Wrench width, bore, slot width and internal dimensions are illustrative estimates. <a href="https://www.dtswiss.com/en/components/spokes-and-nipples/nipples/dt-standard" target="_blank" rel="noreferrer" class="text-cyan-300 underline">Manufacturer reference</a></p>
+      <div class="grid grid-cols-2 gap-3 mt-3">
+        {[
+          ['fit-nipple-length','Overall length (mm)',12],
+          ['fit-wrench-length','Wrench section length (mm)',4.5],
+          ['fit-barrel-length','Cylinder section length (mm)',4.5],
+          ['fit-head-height','Tapered head height (mm)',3],
+          ['fit-head-diameter','Head diameter at top (mm)',6],
+          ['fit-body-diameter','Cylinder diameter below head (mm)',4],
+          ['fit-lead-in','Unthreaded entry (mm; estimate)',2],
+          ['fit-slot-depth','Screwdriver-slot depth (mm; estimate)',1],
+        ].map(([id,label,value]) => <label class="text-xs text-titanium-300">{label}<input id={id} type="number" min={id==='fit-lead-in'?'0':'0.1'} max="100" step="0.1" value={value} class={fieldClass}/></label>)}
+      </div>
+      <p id="fit-nipple-section-summary" class="text-xs text-titanium-400 mt-3"></p>
+      <p id="fit-nipple-thread-summary" class="text-xs text-titanium-400 mt-3"></p>
+      <div class="mt-4 border-t border-titanium-800 pt-3">
+        <h3 class="text-xs font-bold text-titanium-200">ERD measurement reference</h3>
+        <label class="block mt-2 text-xs text-titanium-300">Measuring-spoke thread length (mm)<input id="fit-erd-thread" type="number" min="0.1" max="100" step="0.1" value={nippleFitDefaults.erdReferenceThread} class={fieldClass}/></label>
+        <p class="text-xs text-titanium-400 mt-2">ERD is measured when the last external thread just disappears into the nipple opening. This reference stays fixed when candidate spoke threads change. A different nipple needs its own measured ERD.</p>
+      </div>
+    </div>
+  </div>
+  <div class={`flex-1 min-w-0 ${cardClass}`}>
+    <div class="flex flex-wrap gap-3 items-end justify-between">
+      <h2 class="text-sm font-bold text-titanium-100 self-center">Nipple cutaways (3D)</h2>
+      <div class="flex flex-wrap gap-3 items-end">
+        <label class="text-xs text-titanium-300">Spoke orientation<select id="fit-heads" class={fieldClass}><option value="out">Heads-out</option><option value="in">Heads-in</option></select></label>
+        <label class="flex items-center gap-2 text-xs text-titanium-200 py-2"><input id="fit-section" type="checkbox" checked/>Half-section</label>
+        <button id="fit-camera-reset" type="button" class="guide-button">Reset views</button>
+      </div>
+    </div>
+    <div class="grid grid-cols-2 gap-3 sm:gap-5 mt-5">
+      {['left','right'].map(side => <section class="min-w-0" aria-labelledby={`fit-heading-${side}`}>
+        <h3 id={`fit-heading-${side}`} data-wheel-side={side === 'left' ? 'Left' : 'Right'} class="text-sm font-bold text-titanium-100">{side}</h3>
+        <div id={`fit-canvas-${side}`} class="mt-3 rounded-lg bg-titanium-950 overflow-hidden h-[280px] sm:h-[360px] lg:h-[420px]" role="img" aria-label={`${side} rim, nipple and purchased spoke cutaway`}></div>
+        <p id={`fit-status-${side}`} role="status" class="mt-3 text-xs text-amber-200"></p>
+        <p id={`fit-preview-status-${side}`} role="status" class="text-xs text-titanium-400 mt-2">Select Nipple Config to load the cutaway preview.</p>
+        <dl id={`fit-measurements-${side}`} class="grid gap-3 mt-4 text-xs"></dl>
+        <p id={`fit-side-range-${side}`} class="mt-3 text-xs text-titanium-400"></p>
+      </section>)}
+    </div>
+    <button id="fit-preview-retry" type="button" class="guide-button mt-3 hidden">Retry cutaway previews</button>
+    <p class="mt-4 text-xs text-titanium-400">Drag to rotate; scroll to zoom. Silver: nipple · cyan: spoke thread · amber: internal thread · slate: rim. Rim sections and thread markings are illustrative. Rim support is drawn at the taper start; actual head seating depends on the rim and eyelet. Untensioned geometry only; stretch, compression and seating are not simulated.</p>
+  </div>
+</section>
+
+<style is:global>
+  #nipple-fit-panel .fit-length-shortcut { padding: .4rem .5rem; font-size: 12px; min-height: 36px; font-variant-numeric: tabular-nums; }
+</style>

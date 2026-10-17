@@ -1,5 +1,6 @@
 import type { RimAppearance } from '../data/rims';
 import { shallowRimSection } from '../utils/rimProfile';
+import { wheelSideLabel, type WheelSideContext } from '../utils/wheelSide.ts';
 import {
   drawCadGrid,
   drawCadDimensionLine,
@@ -8,7 +9,7 @@ import {
   defaultCadTheme,
 } from '../utils/cadRenderer';
 
-export interface RimCadData extends RimAppearance {
+export interface RimCadData extends RimAppearance, WheelSideContext {
   erd: number;                  // ERD in mm
   osb: number;                  // Offset Spoke Bed in mm
   drillingOffsetLeft: number;   // Left drilling offset in mm
@@ -17,6 +18,7 @@ export interface RimCadData extends RimAppearance {
   rimWidthInner?: number;       // Inner well width in mm
   rimDepth?: number;            // Profile depth in mm
   rimFlip: 'Auto' | 'Left' | 'Right';
+  resolvedRimShift?: number;     // Resolved using the build's hub geometry
   brand?: string;
   name?: string;
   category?: string;
@@ -132,7 +134,7 @@ export class RimCadVisualizer {
     const cssW = w / dpr;
     const cssH = h / dpr;
 
-    // Origin (Rim Centerline at Spoke Bed Level) in screen coordinates
+    // Schematic origin at the calibrated spoke-tip reference in screen coordinates
     const originX = cssW / 2 + this.panX;
     const originY = cssH / 2 + 20 + this.panY;
 
@@ -154,11 +156,9 @@ export class RimCadVisualizer {
       rimFlip,
     } = this.data;
 
-    // Effective shift of spoke bed based on rim flip
-    let rimShift = 0;
-    if (rimFlip === 'Left') rimShift = osb;
-    else if (rimFlip === 'Right') rimShift = -osb;
-    else rimShift = osb; // default auto left shift
+    // The build supplies Auto orientation; standalone previews assume symmetric
+    // flanges, which resolves Auto to the same direction as the calculation.
+    const rimShift = this.data.resolvedRimShift ?? (rimFlip === 'Left' ? osb : -osb);
 
     // Convert mm to screen
     const toScreenX = (mmX: number) => originX + mmX * scale;
@@ -183,7 +183,8 @@ export class RimCadVisualizer {
     const xHoleRight_scr = toScreenX(xHoleRight_mm);
 
     // 2. Draw Rim Profile Section (Double-Walled Extrusion Profile)
-    const yNippleSeat = 0;
+    // Schematic section origin at the spoke-tip reference, not a measured seat.
+    const ySpokeTipReference = 0;
     const shallow = this.data.rimProfile === 'shallow-double-wall';
     const section = shallowRimSection(rimWidthOuter, rimWidthInner, rimDepth);
     const yAeroTip = shallow ? 0 : -rimDepth;
@@ -317,15 +318,15 @@ export class RimCadVisualizer {
       this.ctx.restore();
     };
 
-    drawNippleAndSpoke(xHoleLeft_scr, toScreenY(yAeroTip), 'NDS Spoke', '#38bdf8', -12);
-    drawNippleAndSpoke(xHoleRight_scr, toScreenY(yAeroTip), 'DS Spoke', '#f43f5e', 14);
+    drawNippleAndSpoke(xHoleLeft_scr, toScreenY(yAeroTip), wheelSideLabel(this.data, 'Left'), '#38bdf8', -12);
+    drawNippleAndSpoke(xHoleRight_scr, toScreenY(yAeroTip), wheelSideLabel(this.data, 'Right'), '#f43f5e', 14);
 
     // 4. ERD Reference Line
     this.ctx.strokeStyle = '#f59e0b';
     this.ctx.lineWidth = 1.5;
     this.ctx.setLineDash([6, 4]);
 
-    const erdY_scr = toScreenY(yNippleSeat);
+    const erdY_scr = toScreenY(ySpokeTipReference);
     this.ctx.beginPath();
     this.ctx.moveTo(toScreenX(xOuterLeft - 15), erdY_scr);
     this.ctx.lineTo(toScreenX(xOuterRight + 15), erdY_scr);
@@ -371,7 +372,7 @@ export class RimCadVisualizer {
     drawCadCallout(
       this.ctx,
       { x: toScreenX(xOuterRight + 10), y: erdY_scr },
-      `ERD Nipple Bed Ref: ${erd.toFixed(1)} mm`,
+      `ERD Spoke-tip Ref: ${erd.toFixed(1)} mm`,
       {
         dirX: 1,
         dirY: -1,
@@ -432,7 +433,7 @@ export class RimCadVisualizer {
 
     this.ctx.font = '10px "JetBrains Mono", monospace';
     this.ctx.fillStyle = '#94a3b8';
-    this.ctx.fillText(`ERD: ${erd.toFixed(1)}mm • Profile: ${rimWidthOuter.toFixed(1)}×${rimDepth.toFixed(1)}mm (Inner: ${rimWidthInner.toFixed(1)}mm) • OSB: ${osb.toFixed(1)}mm`, 16, 40);
+    this.ctx.fillText(`Schematic • ERD: ${erd.toFixed(1)}mm • Profile: ${rimWidthOuter.toFixed(1)}×${rimDepth.toFixed(1)}mm (Inner: ${rimWidthInner.toFixed(1)}mm) • OSB: ${osb.toFixed(1)}mm`, 16, 40);
 
     if (shallow) {
       this.ctx.fillStyle = '#94a3b8';
@@ -454,11 +455,11 @@ export class RimCadVisualizer {
       this.ctx.textAlign = 'left';
     }
     this.ctx.fillStyle = '#38bdf8';
-    this.ctx.fillText('◀ NDS (LEFT)' , 16, cssH - 16);
+    this.ctx.fillText(`◀ ${wheelSideLabel(this.data, 'Left')}`, 16, cssH - 16);
 
     this.ctx.fillStyle = '#f43f5e';
     this.ctx.textAlign = 'right';
-    this.ctx.fillText('DRIVE SIDE (DS) ▶', cssW - 16, cssH - 16);
+    this.ctx.fillText(`${wheelSideLabel(this.data, 'Right')} ▶`, cssW - 16, cssH - 16);
 
     this.ctx.restore();
 

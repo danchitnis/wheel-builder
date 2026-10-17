@@ -1,8 +1,10 @@
 import * as THREE from 'three';
+import { createNippleGeometry } from './NippleGeometry.ts';
+import { calculateNippleFit, purchasedSpokePoints, nippleFitDefaults, nippleReferences, nippleProfileError } from '../utils/nippleFit.ts';
 import { calculateSpokePaths, type SpokePath, type SpokePaths, type Point3 } from '../utils/spokePath.ts';
 import { createLacingGuide, type LacingGuide } from '../utils/lacingGuide.ts';
 import { shallowRimSection } from '../utils/rimProfile.ts';
-import type { WheelBuildInputs } from '../utils/physicsCalculator.ts';
+import { resolveRimShift, type WheelBuildInputs } from '../utils/physicsCalculator.ts';
 
 export interface WheelModelOptions {
   paths?: SpokePaths;
@@ -67,15 +69,10 @@ export function createWheelModel(inputs: WheelBuildInputs, options: WheelModelOp
     metalness: 0.4,
   });
 
-  const nippleMat = new THREE.MeshStandardMaterial({
-    color: 0xcca050, // Polished brass
-    roughness: 0.2,
-    metalness: 0.9,
-  });
-
   // --- 1. GENERATE RIM (Lathe Profile for ultra-realism) ---
-  // A modern aero, double-walled rim profile centered around ERD spoke bed (R_bed)
-  const R_bed = erd / 2; // Exact Spoke Bed radius (where nipples seat)
+  // Schematic shell anchored to the calibrated spoke-tip circle. Its walls are
+  // illustrative and do not locate the actual nipple bearing or affect fit.
+  const R_bed = erd / 2;
   const rimDepth = inputs.rimDepth ?? 22;   // Outer rim depth
   const R_outer = R_bed + rimDepth; // Outer tire hook bead radius
   const rimWidth = (inputs.rimWidthOuter ?? 26) / 2;   // Rim half-width
@@ -105,13 +102,7 @@ export function createWheelModel(inputs: WheelBuildInputs, options: WheelModelOp
   rimMesh.rotation.x = Math.PI / 2;
 
   // Shift rim bed to account for rimShift/OSB
-  let rimShift = 0;
-  if (rimFlip === 'Left') rimShift = osb;
-  else if (rimFlip === 'Right') rimShift = -osb;
-  else {
-    if (centerToLeft - hubOffset > centerToRight + hubOffset) rimShift = osb;
-    else rimShift = -osb;
-  }
+  const rimShift = resolveRimShift(inputs);
   rimMesh.position.z = -rimShift;
   group.add(rimMesh);
   if (shallow) {
@@ -566,10 +557,12 @@ export function createWheelModel(inputs: WheelBuildInputs, options: WheelModelOp
     headMesh.position.copy(sp.P_head);
     group.add(headMesh);
 
-    // Measured shaft: exactly the shared path, translated only for exploded view.
+    // Retain the measured route; only its final straight span follows purchased length.
     const displayShift = (entry.side === 'Left' ? -1 : 1) * expOffset;
     const displayPoint = (p: Point3) => new THREE.Vector3(p.x, p.y, p.z + displayShift);
-    const shaftPoints = sp.model.points.map(displayPoint);
+    const fitSettings = inputs.nippleFit ?? nippleFitDefaults;
+    const fit = calculateNippleFit(sp.model, fitSettings, inputs.spokeDiameter ?? 2);
+    const shaftPoints = purchasedSpokePoints(sp.model, fit).map(displayPoint);
     const shaftCurve = new SpokeDisplayCurve(shaftPoints);
     const spokeTubeGeom = new THREE.TubeGeometry(shaftCurve, (shaftPoints.length - 1) * 4, spokeRad, 8, false);
     const spokeMesh = new THREE.Mesh(spokeTubeGeom, spokeMaterial);
@@ -583,6 +576,7 @@ export function createWheelModel(inputs: WheelBuildInputs, options: WheelModelOp
       marker.position.copy(displayPoint(point)); group.add(marker);
     }
     spokeMesh.userData = {
+      nippleFit: fit, purchasedEnd: shaftPoints.at(-1),
       side: entry.side, index: j, sequenceIndex: m, group: entry.group, groupName: entry.groupName,
       isLeading: sp.isLeading, length: sp.model.traditionalLength,
       direct3DLength: sp.model.chordLength, actualCurveLength: sp.model.pathLength,
@@ -595,30 +589,15 @@ export function createWheelModel(inputs: WheelBuildInputs, options: WheelModelOp
     group.add(spokeMesh);
     spokeMeshes.push(spokeMesh);
 
-    // 3. Nipple Group
-    const nippleGroup = new THREE.Group();
-    const nHead = new THREE.Mesh(new THREE.CylinderGeometry(2.1, 1.7, 2.0, 16), nippleMat);
-    nHead.position.y = 1.0;
-    nippleGroup.add(nHead);
-
-    const nNeck = new THREE.Mesh(new THREE.CylinderGeometry(1.6, 1.6, 2.0, 16), nippleMat);
-    nNeck.position.y = -1.0;
-    nippleGroup.add(nNeck);
-
-    const nBody = new THREE.Mesh(new THREE.CylinderGeometry(1.5, 1.5, 8.0, 16), nippleMat);
-    nBody.position.y = -6.0;
-    nippleGroup.add(nBody);
-
-    const nCollar = new THREE.Mesh(new THREE.BoxGeometry(2.7, 3.5, 2.7), nippleMat);
-    nCollar.position.y = -6.5;
-    nippleGroup.add(nCollar);
-
-    const upVec = new THREE.Vector3(0, 1, 0);
-    const inwardVector = finalSpan.clone().negate();
-
-    nippleGroup.quaternion.setFromUnitVectors(upVec, inwardVector);
-    nippleGroup.position.copy(sp.P_rim);
-    group.add(nippleGroup);
+    // ERD is a spoke-tip reference, not an extra nipple-length allowance.
+    if (!nippleProfileError(fitSettings)) {
+      const references = nippleReferences(fitSettings);
+      const nippleGroup = createNippleGeometry(fitSettings);
+      nippleGroup.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0), finalSpan);
+      nippleGroup.position.copy(sp.P_rim).addScaledVector(finalSpan, -references.calibratedTipReference);
+      nippleGroup.userData = { side: entry.side, index: j, references };
+      group.add(nippleGroup);
+    }
   });
 
   return { group, spokeMeshes, lacingOrderedSpokes, P_valveBed, inwardRadDir, valveAngle, zL, zR };

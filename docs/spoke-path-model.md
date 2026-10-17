@@ -4,7 +4,8 @@ The default build uses the Hope Pro 5 rear 135 mm, 32-hole, 6-bolt hub,
 Brompton G Line rim (382.3 mm ERD), 2 mm spokes and two crosses on both sides, with non-interlaced routing on both sides by default.
 The interlacing toggle changes the 3D path allowance, not the traditional length.
 Interactive lacing shows the main calculator's traditional length for the active
-side, rounded to the nearest whole millimetre, regardless of head orientation or interlacing.
+side and the selected purchased length; automatic selection rounds the traditional
+length to the nearest whole millimetre, regardless of head orientation or interlacing.
 Saved builds retain their explicit routing choice. Interlacing remains an optional
 setting. In either pattern, adjacent flange holes alternate heads-out and heads-in;
 non-interlaced does not mean putting all heads on one face. Radial sides have no weave.
@@ -97,6 +98,86 @@ No tension, stretch, bending stiffness, plastic seating, friction or rim
 compression is modelled. These estimates are not validated improvements in
 purchase length; comparison against a built wheel is still required.
 
+## Purchased spoke and nipple inspection
+
+The **Nipple Config (3D)** tab keeps purchased lengths separate from the traditional
+calculation. Blank purchased lengths track the nearest whole millimetre of the
+traditional result; explicit left/right choices survive geometry edits. The
+rendered final straight span changes by purchased length minus estimated adjusted
+length. The original reference path, its measurements and lacing order remain
+unchanged. Builder and Workshop use the same nipple and purchased-tip geometry.
+
+The ERD calibration uses this measurement convention: stop when the last
+external spoke thread disappears into the hub-facing nipple opening, before
+mechanical runout. The measuring spoke's threaded length is a separate saved
+measurement from the two candidate spoke thread lengths. All three default to
+9 mm and can be edited independently for the spokes being used. Changing candidate
+threads does not move the ERD reference or change the calculated spoke length.
+Changing the nipple used for the ERD measurement requires a matching measured ERD.
+
+The initial profile is DT Swiss Standard nickel-plated brass for nominal 2 mm
+spokes, 12 mm overall. The default exterior profile has a 4.5 mm wrench section,
+4.5 mm cylindrical section, and 3 mm tapered head, growing from 4 mm body diameter
+to 6 mm at the top. These exterior dimensions are editable and saved with the build; the overall length
+does not rescale individual sections. Any unassigned axial length is explicitly
+reported as a straight allowance below the taper. Wrench corners are clipped to
+the measured body diameter. The bore remains cylindrical through the taper and
+the screwdriver slot retains its width.
+
+The internal 2 mm entry, 1 mm screwdriver-slot depth, wrench width, bore diameter,
+slot width, rim/eyelet sections and groove spacing remain schematic estimates,
+not production dimensions or exact thread pitch. This is not an M2 thread
+specification. The main rim retains its
+schematic profile anchored at ERD / 2, the calibrated spoke-tip radius. Neither
+its walls nor its visual depth establish a physical bearing surface. The inspector
+places its illustrative rim section at the nipple's taper start. Actual contact
+on the tapered head depends on the rim bore and eyelet; it cannot be inferred
+from exterior nipple dimensions alone. These display choices never feed back
+into calculated lengths or engagement.
+
+One pure reference helper supplies the opening, calibrated tip reference, internal
+thread boundaries, taper start, slot floor and head top to calculation and rendering.
+The taper start and calibrated tip reference are independent even though both
+happen to be 9 mm in the default profile. The nominal 2 mm profile's illustrative
+bore, wrench, slot and thread-marking dimensions are centralized profile constants.
+
+With the nipple opening at axial zero, the tip is at measuring-thread length plus
+the purchased-minus-adjusted length difference. Male threads occupy the interval
+from tip minus candidate thread length to tip. Female threads occupy entry length
+through overall nipple length minus slot depth. Engagement is their interval
+overlap, rather than total nipple insertion. The panel separately reports exposed
+male thread, slot-floor clearance, head protrusion and remaining travel before
+the unthreaded shaft reaches the start of the female thread. A position past
+thread runout is drawn for comparison and explicitly identified as potentially
+unachievable. The previews load when their tab is first selected. Left and right
+cutaways appear side by side, without diagram annotations or a side selector.
+Spoke and nipple configuration sections remain in the left sidebar, including
+visible shared nipple dimensions and an estimated internal-thread summary.
+A shared orientation selector, half-section toggle and reset control apply to both
+views. Numeric results survive preview failure on either side.
+
+The measurements show purchased-minus-traditional length separately from
+purchased-minus-modeled length. The latter includes the bend allowance and is
+the tip displacement from the calibrated ERD reference. A 1 mm change in purchased
+length moves the tip by exactly 1 mm.
+
+## Tension balance and input sensitivity
+
+For the supported equal left/right spoke counts, relative tensions satisfy
+`T_left × sin(beta_left) = T_right × sin(beta_right)`. Bracing angles use the
+flange-hole-centre chord before the hub-hole deduction. Normalize the higher
+tension to 100%. Flange distance alone is insufficient when spoke angles differ.
+Invalid geometry has no usable tension ratio. This estimates lateral equilibrium;
+it does not simulate material deformation or infer actual spoke tension.
+
+The collapsed Input sensitivity table recalculates traditional lengths after
+increasing one input by 1 mm: ERD, either flange PCD, either centre-to-flange
+distance, or hub-hole diameter. It retains offsets and Auto orientation, including
+orientation changes that affect both sides. Invalid baseline or perturbed geometry
+is unavailable. These are finite input responses, not derivatives, measurement
+tolerances or confidence intervals. The CAD and path views resolve rim orientation
+through the same helper as the calculation.
+
 ## Validation
 
 All ten Hope Pro 5 J-bend presets were checked against Hope's linked chart on
@@ -118,6 +199,21 @@ the opposite-flange reference. Rotation tests verify the reference's angular
 relationship remains fixed when the hub rotates.
 Reference tests independently check Cartesian endpoints for every Hope preset at
 24, 28, 32 and 36 spokes, plus the primary front/rear preset-to-lacing flow.
+Additional independent tests cover 350, 550 and 620 mm ERDs, unequal PCDs,
+mixed crossing patterns, lateral offsets, Auto orientation, mirrored builds and
+lateral force equilibrium. No physical observation is used to fit a correction.
+
+### Physical observation retained for comparison
+
+A completed front wheel used the Hope Pro 5 Front 100 mm six-bolt hub, 32 spokes,
+two crosses and 382.3 mm ERD, with 171 mm left/disc and 177 mm right/non-disc spokes.
+The builder reported the left side appearing about 1 mm short and the right side
+about 1 mm long after tensioning, with some tips reportedly 0.5–1 mm above the
+nipple head. Traditional differences are −0.73 mm left and +1.26 mm right;
+these are length differences, not predicted head protrusion heights. With the
+default nipple references the model still places the right tips below the head.
+The physical protrusion discrepancy remains unresolved. It is not an expected
+test assertion, and no preset, ERD or formula was adjusted to match it.
 
 Run `npm test`, `npm run typecheck`, and `npm run build`. Tests include published
 three-cross reference lengths, radial/one-/two-cross configurations, both head

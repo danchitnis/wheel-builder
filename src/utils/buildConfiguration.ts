@@ -1,5 +1,6 @@
 import { defaultHub, hubs } from '../data/hubs.ts';
 import { defaultRim, rims } from '../data/rims.ts';
+import { fitNumericFields, nippleFitDefaults, type NippleFitSettings } from './nippleFit.ts';
 
 // One allowlist for form capture, restoration and the public sharing format.
 // null represents an explicitly blank measurement, never zero or a default.
@@ -14,7 +15,7 @@ export const numericFields = {
   crossesLeft: 'input-crossl', crossesRight: 'input-crossr',
 } as const;
 export type NumericField = keyof typeof numericFields;
-export type BuildConfiguration = Record<NumericField, number | null> & {
+export type BuildConfiguration = Record<NumericField, number | null> & NippleFitSettings & {
   rp: string;
   hp: string;
   rimProfile: 'standard' | 'shallow-double-wall';
@@ -32,7 +33,7 @@ const rimFields = ['erd', 'rimWidthOuter', 'rimWidthInner', 'rimDepth', 'osb',
 const hubFields = ['flangePcdLeft', 'flangePcdRight', 'centerToLeft', 'centerToRight',
   'spokeHoleDiameter', 'flangeThicknessLeft', 'flangeThicknessRight',
   'flangeOuterDiameterLeft', 'flangeOuterDiameterRight', 'isRear', 'spacing', 'discType'] as const;
-const shareFields = [...Object.keys(numericFields), 'rimProfile', 'rimEyelets',
+const shareFields = [...Object.keys(numericFields), ...Object.keys(fitNumericFields), 'rimProfile', 'rimEyelets',
   'rimValveDiameter', 'rimFlip', 'interlaced', 'isRear', 'spacing', 'discType'] as (keyof BuildConfiguration)[];
 const legacyFields = ['ol', 'or', 'flangeThickness', 'geometryProvenance', 'hubName'];
 const recognizedFields = new Set(['v', 'rp', 'hp', ...shareFields, ...legacyFields]);
@@ -42,6 +43,7 @@ export function configurationDefaults(rp = defaultRim.id, hp = defaultHub.id): B
   const hub = hp === 'custom' ? defaultHub : hubs.find(h => h.id === hp);
   if (!rim || !hub) throw new Error('This link uses a rim or hub preset that is no longer available.');
   return {
+    ...nippleFitDefaults,
     rp, hp,
     erd: rim.erd, rimWidthOuter: rim.widthOuter ?? defaultRim.widthOuter!,
     rimWidthInner: rim.widthInner ?? defaultRim.widthInner!, rimDepth: rim.depth ?? defaultRim.depth!,
@@ -118,7 +120,7 @@ export function parseConfiguration(fragment: string): ConfigurationParseResult {
         for (const key of keys) if (!params.has(key)) config[key] = value;
       }
     }
-    for (const key of Object.keys(numericFields) as NumericField[]) if (params.has(key)) config[key] = numberValue(key);
+    for (const key of Object.keys({...numericFields, ...fitNumericFields}) as (NumericField | keyof NippleFitSettings)[]) if (params.has(key)) config[key] = numberValue(key);
     for (const key of ['crossesLeft', 'crossesRight', 'spokeCount'] as const) {
       const value = config[key];
       if (value === null || !Number.isInteger(value) || (key === 'spokeCount'

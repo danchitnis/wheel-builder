@@ -1,4 +1,4 @@
-import type { WheelBuildInputs } from './physicsCalculator';
+import { resolveRimShift, type WheelBuildInputs } from './physicsCalculator.ts';
 
 export type Point3 = { x: number; y: number; z: number };
 export interface SpokePath {
@@ -94,7 +94,7 @@ export function calculateSpokePaths(inputs:WheelBuildInputs, arcStep=0.01):Spoke
   const diameter=inputs.spokeDiameter ?? 2, r=diameter/2;
   const common=[erd,spokeCount,spokeHoleDiameter,hubOffset,osb,diameter,inputs.drillingOffsetLeft,inputs.drillingOffsetRight];
   if(!common.every(Number.isFinite)||erd<=0||diameter<=0||spokeHoleDiameter<diameter||!Number.isInteger(spokeCount)||spokeCount<8||spokeCount>64||spokeCount%4!==0||!Number.isFinite(arcStep)||arcStep<=0) return {spokes,errors:['Invalid wheel geometry or spoke diameter exceeds the hub hole.']};
-  const shift=inputs.rimFlip==='Left'?osb:inputs.rimFlip==='Right'?-osb:inputs.centerToLeft-hubOffset>inputs.centerToRight+hubOffset?osb:-osb;
+  const shift=resolveRimShift(inputs);
   for(const sideName of ['Left','Right'] as const) {
     const left=sideName==='Left',sign=left?-1:1;
     const pcd=left?inputs.flangePcdLeft:inputs.flangePcdRight;
